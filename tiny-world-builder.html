@@ -1213,6 +1213,14 @@
         <input id="render-visible-size" type="range" min="8" max="20" step="1" />
         <output id="render-visible-size-value"></output>
       </div>
+      <label>Home board size
+        <select id="render-home-grid">
+          <option value="8">8 × 8</option>
+          <option value="12">12 × 12</option>
+          <option value="16">16 × 16</option>
+          <option value="20">20 × 20</option>
+        </select>
+      </label>
       <div class="range-row">
         <span>Lighting</span>
         <input id="render-lighting" type="range" min="50" max="145" step="1" />
@@ -1265,6 +1273,11 @@
         <output id="render-brightness-value"></output>
       </div>
       <div class="range-row">
+        <span>Gamma</span>
+        <input id="render-gamma" type="range" min="60" max="180" step="1" />
+        <output id="render-gamma-value"></output>
+      </div>
+      <div class="range-row">
         <span>Saturation</span>
         <input id="render-saturation" type="range" min="80" max="130" step="1" />
         <output id="render-saturation-value"></output>
@@ -1307,7 +1320,20 @@
      ===================================================================== */
 
   // -------- constants --------
-  const GRID = 8;
+  // GRID is the home board edge length. Mutable: the user can resize it
+  // to 8 / 12 / 16 / 20 from Render Settings. Tiles outside the current
+  // home grid are still tracked in world[][] (used by ghost boards and
+  // export) but rendered grayscale; growing GRID brings those tiles into
+  // the home area and rebuilds them in full colour.
+  const HOME_GRID_DEFAULT = 8;
+  const HOME_GRID_MIN = 8;
+  const HOME_GRID_MAX = 20;
+  const HOME_GRID_OPTIONS = [8, 12, 16, 20];
+  let GRID = HOME_GRID_DEFAULT;
+  try {
+    const stored = parseInt(localStorage.getItem('tinyworld:home-grid') || '', 10);
+    if (HOME_GRID_OPTIONS.includes(stored)) GRID = stored;
+  } catch (_) {}
   const TILE = 1;
   const TOP_H = 0.18;     // grass slab thickness
   const DIRT_H = 0.55;    // dirt block height (visible side)
@@ -1317,6 +1343,7 @@
     saturation: 'tinyworld:render:saturation',
     contrast: 'tinyworld:render:contrast',
     brightness: 'tinyworld:render:brightness',
+    gamma: 'tinyworld:render:gamma',
     vignette: 'tinyworld:render:vignette',
     warmth: 'tinyworld:render:warmth',
     shadow: 'tinyworld:render:shadow',
@@ -1333,13 +1360,14 @@
     objectOpacity: 'tinyworld:render:objectOpacity',
     version: 'tinyworld:render:version',
   };
-  const RENDER_SETTINGS_VERSION = '9';
+  const RENDER_SETTINGS_VERSION = '10';
   const RENDER_DEFAULTS = {
     post: '0',
     resolution: '1',
     saturation: '1',
     contrast: '1',
     brightness: '1',
+    gamma: '1',
     vignette: '0.04',
     warmth: '0',
     shadow: 'balanced',
@@ -1439,6 +1467,7 @@
       saturation: { value: storedNumber(RENDER_LS.saturation, 1.0, 0.8, 1.3) },
       contrast: { value: storedNumber(RENDER_LS.contrast, 1.0, 0.85, 1.25) },
       brightness: { value: storedNumber(RENDER_LS.brightness, 1.0, 0.75, 1.3) },
+      gamma: { value: storedNumber(RENDER_LS.gamma, 1.0, 0.6, 1.8) },
       warmth: { value: storedNumber(RENDER_LS.warmth, 0, -0.08, 0.08) },
     },
     vertexShader: [
@@ -1455,6 +1484,7 @@
       'uniform float saturation;',
       'uniform float contrast;',
       'uniform float brightness;',
+      'uniform float gamma;',
       'uniform float warmth;',
       'varying vec2 vUv;',
       'void main() {',
@@ -1470,6 +1500,7 @@
       '  col = (col - 0.5) * contrast + 0.5;',
       '  col *= brightness;',
       '  col += vec3(warmth, warmth * 0.55, -warmth * 0.25);',
+      '  col = pow(max(col, vec3(0.0)), vec3(1.0 / max(gamma, 0.001)));',
       '  float d = distance(vUv, vec2(0.5));',
       '  col *= 1.0 - smoothstep(0.44, 0.84, d) * vignette;',
       '  gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);',
@@ -3642,9 +3673,12 @@
   const world = [];
   const cellMeshes = {}; // 'x,z' -> { tile, object }
 
-  for (let x = 0; x < GRID; x++) {
+  // Pre-allocate world[][] up to HOME_GRID_MAX so adjacency lookups for
+  // tiles at the edge of any future grid size find a real neighbour cell
+  // (read as 'no kind, grass') rather than undefined.
+  for (let x = 0; x < HOME_GRID_MAX; x++) {
     world[x] = [];
-    for (let z = 0; z < GRID; z++) world[x][z] = { terrain: 'grass', terrainFloors: 1, kind: null, floors: 1, buildingType: null, fenceSide: null, extras: [] };
+    for (let z = 0; z < HOME_GRID_MAX; z++) world[x][z] = { terrain: 'grass', terrainFloors: 1, kind: null, floors: 1, buildingType: null, fenceSide: null, extras: [] };
   }
 
   const MAX_FLOORS = 8;
@@ -6077,7 +6111,7 @@
         }
       }
     }
-    const data = { v: STORAGE_VERSION, cells, cameraMode, toolId: selectedTool && selectedTool.id };
+    const data = { v: STORAGE_VERSION, gridSize: GRID, cells, cameraMode, toolId: selectedTool && selectedTool.id };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
     const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -6132,11 +6166,79 @@
   }
 
   function resetCameraDefaults() {
-    viewSize = DEFAULT_VIEW_SIZE;
+    // Scale the default view to the current home board so the whole
+    // grid sits inside the frame regardless of size (8 / 12 / 16 / 20).
+    viewSize = DEFAULT_VIEW_SIZE * (GRID / HOME_GRID_DEFAULT);
     azimuth = DEFAULT_AZIMUTH;
     polar = DEFAULT_POLAR;
     target.copy(DEFAULT_TARGET);
     setCameraMode(DEFAULT_CAMERA_MODE);
+  }
+
+  // Resize the home board between the allowed presets (8 / 12 / 16 / 20).
+  // World data outside the previous board is preserved in world[][] —
+  // growing the grid brings those tiles into the home area (so the
+  // existing 'outside home' grayscale is no longer applied to them).
+  // Shrinking is supported but the now-outside cells aren't re-rendered
+  // in their outside-home form; expansion is the primary path.
+  function setHomeGridSize(n, opts) {
+    const skipRebuild = !!(opts && opts.skipRebuild);
+    if (!HOME_GRID_OPTIONS.includes(n) || n === GRID) return;
+    GRID = n;
+    try { localStorage.setItem('tinyworld:home-grid', String(GRID)); } catch (_) {}
+
+    // Drop every ghost board — their world positions are anchored to GRID.
+    for (const [key, board] of ghostBoards) {
+      worldGroup.remove(board);
+      disposeGroup(board);
+    }
+    ghostBoards.clear();
+    ghostBoardCells.clear();
+
+    // Dispose every existing cell mesh; cellPos depends on GRID so all
+    // tiles need to be re-positioned. setCell will rebuild from
+    // world[x][z] which we never throw away.
+    for (const key of Object.keys(cellMeshes)) {
+      const entry = cellMeshes[key];
+      if (entry.tile)   { worldGroup.remove(entry.tile);   disposeGroup(entry.tile); }
+      if (entry.object) { worldGroup.remove(entry.object); disposeGroup(entry.object); }
+      if (entry.extras) for (const m of entry.extras) { worldGroup.remove(m); disposeGroup(m); }
+      delete cellMeshes[key];
+    }
+
+    if (skipRebuild) return;
+
+    // Rebuild every home cell from the surviving world data.
+    suppressSave = true;
+    for (let x = 0; x < GRID; x++) {
+      for (let z = 0; z < GRID; z++) {
+        const c = world[x][z];
+        setCell(x, z, {
+          terrain: c.terrain || 'grass',
+          terrainFloors: c.terrainFloors || 1,
+          kind: c.kind || null,
+          floors: c.floors || 1,
+          buildingType: c.buildingType || null,
+          fenceSide: c.fenceSide || null,
+          rotationY: c.rotationY || 0,
+          offsetX: c.offsetX || 0,
+          offsetZ: c.offsetZ || 0,
+          animate: false,
+          forceTile: true,
+        });
+        // Re-render extras (tufts/fences) without animating drops.
+        if (Array.isArray(c.extras) && c.extras.length && typeof renderCellExtras === 'function') {
+          renderCellExtras(x, z);
+        }
+      }
+    }
+    suppressSave = false;
+
+    // Re-create ghost boards around the freshly-sized home.
+    if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
+    // Re-frame the camera so the new board centres correctly.
+    resetCameraDefaults();
+    saveState();
   }
 
   // Smoothly tween the camera target/zoom back to the home 8x8 grid
@@ -6226,7 +6328,9 @@
     const resolutionEl = document.getElementById('render-resolution');
     const distanceEl = document.getElementById('render-distance');
     const visibleSizeEl = document.getElementById('render-visible-size');
+    const homeGridEl = document.getElementById('render-home-grid');
     const brightnessEl = document.getElementById('render-brightness');
+    const gammaEl = document.getElementById('render-gamma');
     const lightingEl = document.getElementById('render-lighting');
     const saturationEl = document.getElementById('render-saturation');
     const contrastEl = document.getElementById('render-contrast');
@@ -6244,6 +6348,7 @@
     const distanceValue = document.getElementById('render-distance-value');
     const visibleSizeValue = document.getElementById('render-visible-size-value');
     const brightnessValue = document.getElementById('render-brightness-value');
+    const gammaValue = document.getElementById('render-gamma-value');
     const lightingValue = document.getElementById('render-lighting-value');
     const saturationValue = document.getElementById('render-saturation-value');
     const contrastValue = document.getElementById('render-contrast-value');
@@ -6264,7 +6369,9 @@
       resolutionEl.value = String(Math.round(renderResolutionScale * 100));
       distanceEl.value = String(renderVisibleDistance);
       visibleSizeEl.value = String(renderVisibleSize);
+      if (homeGridEl) homeGridEl.value = String(GRID);
       brightnessEl.value = String(Math.round(postMaterial.uniforms.brightness.value * 100));
+      gammaEl.value = String(Math.round(postMaterial.uniforms.gamma.value * 100));
       lightingEl.value = String(Math.round(renderLighting * 100));
       saturationEl.value = String(Math.round(postMaterial.uniforms.saturation.value * 100));
       contrastEl.value = String(Math.round(postMaterial.uniforms.contrast.value * 100));
@@ -6282,6 +6389,7 @@
       distanceValue.textContent = distanceEl.value;
       visibleSizeValue.textContent = visibleSizeEl.value + 'x' + visibleSizeEl.value;
       brightnessValue.textContent = brightnessEl.value + '%';
+      gammaValue.textContent = gammaEl.value + '%';
       lightingValue.textContent = lightingEl.value + '%';
       saturationValue.textContent = saturationEl.value + '%';
       contrastValue.textContent = contrastEl.value + '%';
@@ -6304,6 +6412,7 @@
       localStorage.setItem(RENDER_LS.visibleDistance, String(renderVisibleDistance));
       localStorage.setItem(RENDER_LS.visibleSize, String(renderVisibleSize));
       localStorage.setItem(RENDER_LS.brightness, postMaterial.uniforms.brightness.value.toFixed(2));
+      localStorage.setItem(RENDER_LS.gamma, postMaterial.uniforms.gamma.value.toFixed(2));
       localStorage.setItem(RENDER_LS.lighting, renderLighting.toFixed(2));
       localStorage.setItem(RENDER_LS.saturation, postMaterial.uniforms.saturation.value.toFixed(2));
       localStorage.setItem(RENDER_LS.contrast, postMaterial.uniforms.contrast.value.toFixed(2));
@@ -6332,6 +6441,7 @@
       setRenderVisibleDistance(parseInt(distanceEl.value, 10));
       setRenderVisibleSize(parseInt(visibleSizeEl.value, 10));
       postMaterial.uniforms.brightness.value = parseInt(brightnessEl.value, 10) / 100;
+      postMaterial.uniforms.gamma.value = parseInt(gammaEl.value, 10) / 100;
       renderLighting = parseInt(lightingEl.value, 10) / 100;
       applyLightingSettings();
       postMaterial.uniforms.saturation.value = parseInt(saturationEl.value, 10) / 100;
@@ -6365,9 +6475,17 @@
     });
     closeBtn.addEventListener('click', () => { modal.hidden = true; });
     modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
-    for (const el of [postEl, shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, vignetteEl, warmthEl, cloudsEl, cloudSpeedEl, cloudHeightEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
+    for (const el of [postEl, shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, gammaEl, lightingEl, saturationEl, contrastEl, vignetteEl, warmthEl, cloudsEl, cloudSpeedEl, cloudHeightEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
       el.addEventListener('input', applyFromControls);
       el.addEventListener('change', applyFromControls);
+    }
+    // Home grid size — a separate listener because it triggers a full
+    // re-render rather than uniforms/material tweaks.
+    if (homeGridEl) {
+      homeGridEl.addEventListener('change', () => {
+        const n = parseInt(homeGridEl.value, 10);
+        setHomeGridSize(n);
+      });
     }
     resetBtn.addEventListener('click', () => {
       postProcessingEnabled = false;
@@ -6376,6 +6494,7 @@
       setRenderVisibleDistance(2);
       setRenderVisibleSize(16);
       postMaterial.uniforms.brightness.value = 1;
+      postMaterial.uniforms.gamma.value = 1;
       renderLighting = 1.34;
       applyLightingSettings();
       postMaterial.uniforms.saturation.value = 1;
@@ -7434,6 +7553,7 @@
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           v: STORAGE_VERSION,
+          gridSize: GRID,
           cells,
           cameraMode,
           toolId: selectedTool && selectedTool.id,
@@ -7455,6 +7575,15 @@
     }
     if (data.v !== 1 && data.v !== 2 && data.v !== 3 && data.v !== 4) return false;
 
+    // Restore the saved home grid size before painting cells so the new
+    // tiles are framed correctly and ghost boards land in the right
+    // position. Falls back to the current GRID if the save predates the
+    // gridSize field.
+    if (HOME_GRID_OPTIONS.includes(data.gridSize) && data.gridSize !== GRID) {
+      // The cell loop below repaints every tile, so skip the rebuild
+      // step inside setHomeGridSize and just dispose old meshes.
+      setHomeGridSize(data.gridSize, { skipRebuild: true });
+    }
     suppressSave = true;
     const overrides = new Map();
     for (const entry of data.cells) {
@@ -7540,6 +7669,7 @@
     suppressSave = false;
 
     resetCameraDefaults();
+    if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
     if (data.toolId) {
       const tool = TOOLS.find(t => t.id === data.toolId);
       if (tool) selectTool(tool);
@@ -8001,7 +8131,7 @@
       if (!userProfile) { alert('Please save your profile first.'); showTab('profile'); return; }
       const name = saveName.value.trim() || ('Build ' + new Date().toLocaleDateString());
       const cells = snapshotCells();
-      const data = { v: STORAGE_VERSION, cells, cameraMode, toolId: selectedTool && selectedTool.id };
+      const data = { v: STORAGE_VERSION, gridSize: GRID, cells, cameraMode, toolId: selectedTool && selectedTool.id };
       await apiCall('/api/builds', 'POST', { name, data });
       saveName.value = '';
       loadBuilds();
