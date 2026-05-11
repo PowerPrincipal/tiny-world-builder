@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "db:migrate": "node scripts/migrate.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/jasonkneen/tiny-world-builder#readme",
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@netlify/database": "^1.0.0",
     "@netlify/functions": "^5.2.0",
     "@netlify/identity": "^1.1.0",

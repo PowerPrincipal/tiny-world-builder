@@ -37,12 +37,7 @@ cd "$ROOT"
 
 # Apply database migrations automatically during deploy when Netlify exposes DB credentials.
 # Locally, this is skipped unless NETLIFY_DB_URL or DATABASE_URL is set.
-if [[ -n "${NETLIFY_DB_URL:-}${DATABASE_URL:-}" ]]; then
-  echo "→ Applying database migrations"
-  npx drizzle-kit migrate --config drizzle.config.ts
-else
-  echo "→ Skipping database migrations (NETLIFY_DB_URL/DATABASE_URL not set)"
-fi
+node scripts/migrate.mjs
 
 if [[ ! -f tiny-world-builder.html ]]; then
   echo "Missing tiny-world-builder.html" >&2
