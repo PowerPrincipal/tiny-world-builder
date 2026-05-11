@@ -5384,18 +5384,25 @@
     }
     if (selectedTool.kind === 'fence') {
       const side = fenceSideFromHover(currentHover);
+      // Same-side fence on a fence cell → level it up in place.
       if (cell.kind === 'fence' && normalizeFenceSide(cell.fenceSide) === side) {
         const newLevel = Math.min((cell.floors || 1) + 1, MAX_FLOORS);
         if (newLevel === (cell.floors || 1)) return;
         setCell(x, z, { terrain: cell.terrain, terrainFloors: terrainLevelForCell(cell), kind: 'fence', floors: newLevel, fenceSide: side });
         return;
       }
-      // Tile already has a different main occupant — fence co-exists
-      // as a decoration alongside it instead of squashing it.
+      // Different-side fence on a fence cell → add the new side as an
+      // extra so multiple fence sides co-exist on the same tile.
+      if (cell.kind === 'fence') {
+        addCellExtra(x, z, { kind: 'fence', fenceSide: side });
+        return;
+      }
+      // Different main occupant → fence co-exists alongside it.
       if (cell.kind && cell.kind !== 'fence') {
         addCellExtra(x, z, { kind: 'fence', fenceSide: side });
         return;
       }
+      // Empty cell → fence becomes the main kind.
       setCell(x, z, { terrain: cell.terrain, terrainFloors: terrainLevelForCell(cell), kind: 'fence', floors: 1, fenceSide: side });
       return;
     }
