@@ -1131,6 +1131,11 @@
         <output id="render-cloud-speed-value"></output>
       </div>
       <div class="range-row">
+        <span>Cloud height</span>
+        <input id="render-cloud-height" type="range" min="2" max="14" step="0.5" />
+        <output id="render-cloud-height-value"></output>
+      </div>
+      <div class="range-row">
         <span>Tilt blur</span>
         <input id="render-tilt-blur" type="range" min="0" max="8" step="0.5" />
         <output id="render-tilt-blur-value"></output>
@@ -1222,6 +1227,7 @@
     visibleSize: 'tinyworld:render:visibleSize',
     clouds: 'tinyworld:render:clouds',
     cloudSpeed: 'tinyworld:render:cloudSpeed',
+    cloudHeight: 'tinyworld:render:cloudHeight',
     tiltBlur: 'tinyworld:render:tiltBlur',
     tiltFocus: 'tinyworld:render:tiltFocus',
     ghostOpacity: 'tinyworld:render:ghostOpacity',
@@ -1244,6 +1250,7 @@
     visibleSize: '16',
     clouds: '0.61',
     cloudSpeed: '0.35',
+    cloudHeight: '7',
     tiltBlur: '3.5',
     tiltFocus: '18',
     ghostOpacity: '0.22',
@@ -1282,6 +1289,7 @@
   let renderVisibleSize = Math.round(storedNumber(RENDER_LS.visibleSize, 16, 8, 20));
   let renderCloudAmount = storedNumber(RENDER_LS.clouds, 0.61, 0, 1);
   let renderCloudSpeed = storedNumber(RENDER_LS.cloudSpeed, 0.35, 0, 1);
+  let renderCloudHeight = storedNumber(RENDER_LS.cloudHeight, 7, 2, 14);
   let renderTiltBlur = storedNumber(RENDER_LS.tiltBlur, 3.5, 0, 8);
   let renderTiltFocus = storedNumber(RENDER_LS.tiltFocus, 18, 15, 80);
   let renderGhostOpacity = storedNumber(RENDER_LS.ghostOpacity, 0.22, 0.05, 1);
@@ -5461,6 +5469,7 @@
     const warmthEl = document.getElementById('render-warmth');
     const cloudsEl = document.getElementById('render-clouds');
     const cloudSpeedEl = document.getElementById('render-cloud-speed');
+    const cloudHeightEl = document.getElementById('render-cloud-height');
     const tiltBlurEl = document.getElementById('render-tilt-blur');
     const tiltFocusEl = document.getElementById('render-tilt-focus');
     const ghostOpacityEl = document.getElementById('render-ghost-opacity');
@@ -5477,6 +5486,7 @@
     const warmthValue = document.getElementById('render-warmth-value');
     const cloudsValue = document.getElementById('render-clouds-value');
     const cloudSpeedValue = document.getElementById('render-cloud-speed-value');
+    const cloudHeightValue = document.getElementById('render-cloud-height-value');
     const tiltBlurValue = document.getElementById('render-tilt-blur-value');
     const tiltFocusValue = document.getElementById('render-tilt-focus-value');
     const ghostOpacityValue = document.getElementById('render-ghost-opacity-value');
@@ -5497,6 +5507,7 @@
       warmthEl.value = String(Math.round(postMaterial.uniforms.warmth.value * 100));
       cloudsEl.value = String(Math.round(renderCloudAmount * 100));
       cloudSpeedEl.value = String(Math.round(renderCloudSpeed * 100));
+      cloudHeightEl.value = String(renderCloudHeight);
       tiltBlurEl.value = String(renderTiltBlur);
       tiltFocusEl.value = String(Math.round(renderTiltFocus));
       ghostOpacityEl.value = String(Math.round(renderGhostOpacity * 100));
@@ -5513,6 +5524,7 @@
       warmthValue.textContent = warmthEl.value;
       cloudsValue.textContent = cloudsEl.value + '%';
       cloudSpeedValue.textContent = cloudSpeedEl.value + '%';
+      cloudHeightValue.textContent = cloudHeightEl.value;
       tiltBlurValue.textContent = tiltBlurEl.value + 'px';
       tiltFocusValue.textContent = tiltFocusEl.value + '%';
       ghostOpacityValue.textContent = ghostOpacityEl.value + '%';
@@ -5535,6 +5547,7 @@
       localStorage.setItem(RENDER_LS.shadow, renderShadowQuality);
       localStorage.setItem(RENDER_LS.clouds, renderCloudAmount.toFixed(2));
       localStorage.setItem(RENDER_LS.cloudSpeed, renderCloudSpeed.toFixed(2));
+      localStorage.setItem(RENDER_LS.cloudHeight, renderCloudHeight.toFixed(1));
       localStorage.setItem(RENDER_LS.tiltBlur, renderTiltBlur.toFixed(1));
       localStorage.setItem(RENDER_LS.tiltFocus, renderTiltFocus.toFixed(0));
       localStorage.setItem(RENDER_LS.ghostOpacity, renderGhostOpacity.toFixed(2));
@@ -5557,7 +5570,9 @@
       postMaterial.uniforms.warmth.value = parseInt(warmthEl.value, 10) / 100;
       renderCloudAmount = parseInt(cloudsEl.value, 10) / 100;
       renderCloudSpeed = parseInt(cloudSpeedEl.value, 10) / 100;
+      renderCloudHeight = parseFloat(cloudHeightEl.value);
       applyCloudSettings();
+      if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderTiltBlur = parseFloat(tiltBlurEl.value);
       renderTiltFocus = parseInt(tiltFocusEl.value, 10);
       applyTiltShiftSettings();
@@ -5575,7 +5590,7 @@
     });
     closeBtn.addEventListener('click', () => { modal.hidden = true; });
     modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
-    for (const el of [postEl, shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, vignetteEl, warmthEl, cloudsEl, cloudSpeedEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
+    for (const el of [postEl, shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, vignetteEl, warmthEl, cloudsEl, cloudSpeedEl, cloudHeightEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
       el.addEventListener('input', applyFromControls);
       el.addEventListener('change', applyFromControls);
     }
@@ -5594,7 +5609,9 @@
       postMaterial.uniforms.warmth.value = 0;
       renderCloudAmount = 0.61;
       renderCloudSpeed = 0.35;
+      renderCloudHeight = 7;
       applyCloudSettings();
+      if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderTiltBlur = 3.5;
       renderTiltFocus = 18;
       applyTiltShiftSettings();
@@ -5678,8 +5695,6 @@
   var clouds = [];
   var CLOUD_MAX = 18;
   var CLOUD_RANGE_X = 24; // wrap-around x extent (centred on 0)
-  var CLOUD_Y_MIN = 5.5;
-  var CLOUD_Y_MAX = 8.5;
   var CLOUD_Z_RANGE = 18;
 
   function makeCloud() {
@@ -5709,19 +5724,35 @@
     return g;
   }
 
+  // Vertical jitter applied on top of the height slider so a band of
+  // clouds at the same setting doesn't all sit at the exact same y.
+  var CLOUD_Y_JITTER = 1.5;
+  // Permanent flatten on the Y axis — clouds read more "stretched"
+  // and sky-like than puffy at half height.
+  var CLOUD_FLATTEN = 0.5;
+
   function spawnCloud(initial) {
     const c = makeCloud();
     const scale = 0.7 + Math.random() * 0.8;
-    c.scale.set(scale, scale, scale);
+    c.scale.set(scale, scale * CLOUD_FLATTEN, scale);
     c.position.set(
       initial ? (Math.random() - 0.5) * CLOUD_RANGE_X * 2 : -CLOUD_RANGE_X - Math.random() * 4,
-      CLOUD_Y_MIN + Math.random() * (CLOUD_Y_MAX - CLOUD_Y_MIN),
+      renderCloudHeight + (Math.random() - 0.5) * CLOUD_Y_JITTER,
       (Math.random() - 0.5) * CLOUD_Z_RANGE
     );
     c.userData.driftSpeed = 0.35 + Math.random() * 0.45; // base m/s, then multiplied by renderCloudSpeed
+    c.userData.yOffset = (Math.random() - 0.5) * CLOUD_Y_JITTER;
     cloudGroup.add(c);
     clouds.push(c);
     return c;
+  }
+
+  function applyCloudHeight() {
+    if (!clouds) return;
+    for (const c of clouds) {
+      const off = c.userData.yOffset || 0;
+      c.position.y = renderCloudHeight + off;
+    }
   }
 
   function syncCloudPopulation() {
@@ -5748,7 +5779,8 @@
       if (c.position.x > CLOUD_RANGE_X) {
         c.position.x = -CLOUD_RANGE_X - Math.random() * 2;
         c.position.z = (Math.random() - 0.5) * CLOUD_Z_RANGE;
-        c.position.y = CLOUD_Y_MIN + Math.random() * (CLOUD_Y_MAX - CLOUD_Y_MIN);
+        c.userData.yOffset = (Math.random() - 0.5) * CLOUD_Y_JITTER;
+        c.position.y = renderCloudHeight + c.userData.yOffset;
       }
     }
   }
