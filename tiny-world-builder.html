@@ -489,6 +489,27 @@
     color: var(--muted);
     line-height: 1.4;
   }
+  .confirm-card { width: min(380px, 100%); }
+  .confirm-card .modal-head strong {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+  }
+  .confirm-copy {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .confirm-actions { justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .btn.confirm-destructive {
+    background: #b84838;
+    border-color: #a23a2b;
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn.confirm-destructive:hover { background: #a23a2b; }
   .range-row {
     display: grid;
     grid-template-columns: 116px 1fr 44px;
@@ -822,6 +843,9 @@
     <button class="btn icon" id="persp" data-tooltip="Perspective" aria-label="Toggle camera mode">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05"/><path d="M12 22.08V12"/></svg>
     </button>
+    <button class="btn icon" id="home" data-tooltip="Center on your grid" aria-label="Center on your 8 by 8 grid">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
     <button class="btn icon" id="reset" data-tooltip="Reset world" aria-label="Reset world">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
     </button>
@@ -983,6 +1007,20 @@
         <button class="auth-btn" id="auth-reset-btn" type="button">Set new password</button>
       </form>
     </div>
+  </div>
+
+  <div id="confirm-reset-modal" class="modal" hidden>
+    <form class="modal-card confirm-card" role="dialog" aria-labelledby="confirm-reset-title" onsubmit="return false">
+      <div class="modal-head">
+        <strong id="confirm-reset-title">Reset to the starter world?</strong>
+        <button class="modal-close" id="confirm-reset-close" title="Close" aria-label="Close">×</button>
+      </div>
+      <p class="confirm-copy">This replaces your current build with the preset village. You'll lose anything you've placed on the 8×8 grid.</p>
+      <div class="modal-foot confirm-actions">
+        <button class="btn confirm-cancel" id="confirm-reset-cancel" type="button">Cancel</button>
+        <button class="btn confirm-destructive" id="confirm-reset-ok" type="button">Reset world</button>
+      </div>
+    </form>
   </div>
 
   <div id="welcome-modal" class="modal">
@@ -4977,7 +5015,7 @@
       selectTool(shortcutTool);
       return;
     }
-    if (k === 'r') doReset();
+    if (k === 'r') confirmReset();
     else if (k === 'c') doClear();
     else if (k === 'p' || k === 'i') togglePerspective();
     else if (e.key === 'ArrowLeft') { e.preventDefault(); panCameraByCells(-1, 0); }
@@ -4993,8 +5031,9 @@
     }
   });
 
-  document.getElementById('reset').addEventListener('click', doReset);
+  document.getElementById('reset').addEventListener('click', () => confirmReset());
   document.getElementById('clear').addEventListener('click', doClear);
+  document.getElementById('home').addEventListener('click', flyHomeCamera);
   const perspBtn = document.getElementById('persp');
   perspBtn.addEventListener('click', togglePerspective);
 
@@ -5078,10 +5117,64 @@
     setCameraMode(DEFAULT_CAMERA_MODE);
   }
 
+  // Smoothly tween the camera target/zoom back to the home 8x8 grid
+  // without touching world data — used by the Home button.
+  let homeTween = null;
+  function flyHomeCamera() {
+    const start = {
+      tx: target.x, tz: target.z, view: viewSize,
+      az: azimuth, po: polar,
+    };
+    const end = {
+      tx: DEFAULT_TARGET.x, tz: DEFAULT_TARGET.z, view: DEFAULT_VIEW_SIZE,
+      az: DEFAULT_AZIMUTH, po: DEFAULT_POLAR,
+    };
+    homeTween = { start, end, t: 0, dur: 0.55 };
+  }
+  function tickHomeTween(dt) {
+    if (!homeTween) return;
+    homeTween.t = Math.min(1, homeTween.t + dt / homeTween.dur);
+    const u = easeOutCubic(homeTween.t);
+    const { start, end } = homeTween;
+    target.x = start.tx + (end.tx - start.tx) * u;
+    target.z = start.tz + (end.tz - start.tz) * u;
+    viewSize = start.view + (end.view - start.view) * u;
+    azimuth  = start.az + (end.az - start.az) * u;
+    polar    = start.po + (end.po - start.po) * u;
+    onResize();
+    if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
+    if (homeTween.t >= 1) homeTween = null;
+  }
+
   function doReset() {
     loadInitialScene();
     resetCameraDefaults();
   }
+
+  function confirmReset() {
+    const modal = document.getElementById('confirm-reset-modal');
+    if (!modal) { doReset(); return; }
+    modal.hidden = false;
+    const okBtn = document.getElementById('confirm-reset-ok');
+    if (okBtn) okBtn.focus();
+  }
+  (function setupResetConfirm() {
+    const modal = document.getElementById('confirm-reset-modal');
+    if (!modal) return;
+    const close = () => { modal.hidden = true; };
+    const ok = document.getElementById('confirm-reset-ok');
+    const cancel = document.getElementById('confirm-reset-cancel');
+    const closeBtn = document.getElementById('confirm-reset-close');
+    ok.addEventListener('click', () => { close(); doReset(); });
+    cancel.addEventListener('click', close);
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    window.addEventListener('keydown', e => {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Enter') { e.preventDefault(); close(); doReset(); }
+    });
+  })();
   function doClear() {
     const TILE_STAGGER = 0.022;
     for (let x = 0; x < GRID; x++)
@@ -5329,6 +5422,7 @@
 
     // tile/object drop-in animations (load + placement)
     if (dropAnims.length) tickDropAnims(dt);
+    if (homeTween) tickHomeTween(dt);
     tickOpacityTransitions(dt);
 
     // sway trees / bob crops / wiggle tufts
