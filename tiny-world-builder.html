@@ -1310,15 +1310,20 @@
       </label>
       <div class="range-row">
         <span>Resolution</span>
-        <input id="render-resolution" type="range" min="55" max="100" step="5" />
+        <input id="render-resolution" type="range" min="55" max="150" step="5" />
         <output id="render-resolution-value"></output>
+      </div>
+      <div class="range-row">
+        <span>Smoothing</span>
+        <input id="render-smoothing" type="range" min="0" max="100" step="1" />
+        <output id="render-smoothing-value"></output>
       </div>
       <div class="range-row">
         <span>View distance</span>
         <input id="render-distance" type="range" min="1" max="4" step="1" />
         <output id="render-distance-value"></output>
       </div>
-      <div class="range-row">
+      <div class="range-row" hidden>
         <span>Visible size</span>
         <input id="render-visible-size" type="range" min="8" max="20" step="1" />
         <output id="render-visible-size-value"></output>
@@ -1350,6 +1355,11 @@
         <span>Cloud height</span>
         <input id="render-cloud-height" type="range" min="2" max="14" step="0.5" />
         <output id="render-cloud-height-value"></output>
+      </div>
+      <div class="range-row">
+        <span>Cloud shadow</span>
+        <input id="render-cloud-shadow" type="range" min="0" max="100" step="1" />
+        <output id="render-cloud-shadow-value"></output>
       </div>
       <div class="range-row">
         <span>Tilt blur</span>
@@ -1399,7 +1409,7 @@
       </div>
       <div class="range-row">
         <span>Vignette</span>
-        <input id="render-vignette" type="range" min="0" max="35" step="1" />
+        <input id="render-vignette" type="range" min="0" max="100" step="1" />
         <output id="render-vignette-value"></output>
       </div>
       <div class="range-row">
@@ -1450,6 +1460,7 @@
   const RENDER_LS = {
     post: 'tinyworld:render:post',
     resolution: 'tinyworld:render:resolution',
+    smoothing: 'tinyworld:render:smoothing',
     saturation: 'tinyworld:render:saturation',
     contrast: 'tinyworld:render:contrast',
     brightness: 'tinyworld:render:brightness',
@@ -1463,6 +1474,7 @@
     clouds: 'tinyworld:render:clouds',
     cloudSpeed: 'tinyworld:render:cloudSpeed',
     cloudHeight: 'tinyworld:render:cloudHeight',
+    cloudShadow: 'tinyworld:render:cloudShadow',
     tiltBlur: 'tinyworld:render:tiltBlur',
     tiltFocus: 'tinyworld:render:tiltFocus',
     ghostOpacity: 'tinyworld:render:ghostOpacity',
@@ -1483,10 +1495,12 @@
     shadow: 'balanced',
     lighting: '1.34',
     visibleDistance: '2',
-    visibleSize: '16',
+    visibleSize: '8',
     clouds: '0.61',
     cloudSpeed: '0.35',
     cloudHeight: '6',
+    cloudShadow: '0.5',
+    smoothing: '0.7',
     tiltBlur: '3.5',
     tiltFocus: '18',
     ghostOpacity: '1',
@@ -1516,21 +1530,47 @@
       h: Math.max(window.innerHeight, MIN_STAGE_H),
     };
   }
-  const BASE_DPR_CAP = window.matchMedia && window.matchMedia('(max-width: 800px)').matches ? 1.25 : 1.5;
+  const BASE_DPR_CAP = window.matchMedia && window.matchMedia('(max-width: 800px)').matches ? 1.5 : 2.0;
   let postProcessingEnabled = localStorage.getItem(RENDER_LS.post) === '1';
-  let renderResolutionScale = storedNumber(RENDER_LS.resolution, 1, 0.55, 1);
+  let renderResolutionScale = storedNumber(RENDER_LS.resolution, 1, 0.55, 1.5);
+  let renderSmoothing = storedNumber(RENDER_LS.smoothing, 0.7, 0, 1);
   let renderShadowQuality = localStorage.getItem(RENDER_LS.shadow) || 'balanced';
   let renderLighting = storedNumber(RENDER_LS.lighting, 1.34, 0.5, 1.45);
   let renderVisibleDistance = Math.round(storedNumber(RENDER_LS.visibleDistance, 2, 1, 4));
-  let renderVisibleSize = Math.round(storedNumber(RENDER_LS.visibleSize, 16, 8, 20));
+  // Visible-square size starts equal to the home grid so the world
+  // only grows as the camera pans. On the FIRST pan we expand it to
+  // ~1.5x the home grid so the user gets a generous look-ahead window
+  // as they explore.
+  let renderVisibleSize = GRID;
+  let hasUserPanned = false;
+  function visibleSizeForExplorer() {
+    return Math.round(GRID * 1.5);
+  }
+  function expandVisibleSizeOnFirstMove() {
+    if (hasUserPanned) return;
+    hasUserPanned = true;
+    renderVisibleSize = visibleSizeForExplorer();
+    if (typeof updateGhostRenderBubble === 'function') updateGhostRenderBubble();
+  }
   let renderCloudAmount = storedNumber(RENDER_LS.clouds, 0.61, 0, 1);
   let renderCloudSpeed = storedNumber(RENDER_LS.cloudSpeed, 0.35, 0, 1);
   let renderCloudHeight = storedNumber(RENDER_LS.cloudHeight, 6, 2, 14);
+  // Cloud shadow strength — controls per-puff alphaTest so only the
+  // denser parts of each cloud cast on the world below.
+  let renderCloudShadow = storedNumber(RENDER_LS.cloudShadow, 0.5, 0, 1);
   let renderTiltBlur = storedNumber(RENDER_LS.tiltBlur, 3.5, 0, 8);
   let renderTiltFocus = storedNumber(RENDER_LS.tiltFocus, 18, 15, 80);
-  let renderGhostOpacity = storedNumber(RENDER_LS.ghostOpacity, 1, 0.05, 1);
-  let renderFloorOpacity = storedNumber(RENDER_LS.floorOpacity, 1, 0.1, 1);
-  let renderObjectOpacity = storedNumber(RENDER_LS.objectOpacity, 1, 0, 1);
+  // Forced to 100% — the three ghost opacities are locked at 1 even if
+  // the user previously dragged the (now hidden) sliders. Any stored
+  // values from older sessions are ignored.
+  const renderGhostOpacity = 1;
+  const renderFloorOpacity = 1;
+  const renderObjectOpacity = 1;
+  try {
+    localStorage.removeItem(RENDER_LS.ghostOpacity);
+    localStorage.removeItem(RENDER_LS.floorOpacity);
+    localStorage.removeItem(RENDER_LS.objectOpacity);
+  } catch (_) {}
   const renderer = new THREE.WebGLRenderer({
     canvas: canvasEl,
     // Hardware MSAA for the post-disabled path. The post-enabled path
@@ -1583,7 +1623,8 @@
     uniforms: {
       tDiffuse: { value: postTarget.texture },
       resolution: { value: new THREE.Vector2(1, 1) },
-      vignette: { value: storedNumber(RENDER_LS.vignette, 0.04, 0, 0.35) },
+      vignette: { value: storedNumber(RENDER_LS.vignette, 0.04, 0, 1) },
+      aaStrength: { value: renderSmoothing },
       saturation: { value: storedNumber(RENDER_LS.saturation, 1.0, 0.8, 1.3) },
       contrast: { value: storedNumber(RENDER_LS.contrast, 1.0, 0.85, 1.25) },
       brightness: { value: storedNumber(RENDER_LS.brightness, 1.0, 0.75, 1.3) },
@@ -1606,6 +1647,7 @@
       'uniform float brightness;',
       'uniform float gamma;',
       'uniform float warmth;',
+      'uniform float aaStrength;',
       'varying vec2 vUv;',
       'void main() {',
       '  vec2 texel = 1.0 / max(resolution, vec2(1.0));',
@@ -1631,7 +1673,7 @@
       '  c += texture2D(tDiffuse, vUv + vec2(0.0, texel.y)) * 0.07;',
       '  c += texture2D(tDiffuse, vUv - vec2(0.0, texel.y)) * 0.07;',
       '  vec4 aaSoft = (cc + ne + nw + se + sw) * 0.2;',
-      '  c = mix(c, aaSoft, edge * 0.55);',
+      '  c = mix(c, aaSoft, edge * aaStrength);',
       '  vec3 col = c.rgb;',
       '  float luma = dot(col, vec3(0.299, 0.587, 0.114));',
       '  col = mix(vec3(luma), col, saturation);',
@@ -1656,7 +1698,7 @@
   }
 
   function setRenderResolutionScale(value) {
-    renderResolutionScale = Math.max(0.55, Math.min(1, value));
+    renderResolutionScale = Math.max(0.55, Math.min(1.5, value));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, BASE_DPR_CAP) * renderResolutionScale);
     const { w, h } = stageSize();
     resizePostTarget(w, h);
@@ -1837,12 +1879,14 @@
     panForward.normalize();
     target.addScaledVector(panRight, -dx * scale);
     target.addScaledVector(panForward, dy * scale);
+    expandVisibleSizeOnFirstMove();
     updateCamera();
     ensureGhostBoardsAroundTarget();
   }
   function panCameraByCells(dx, dz) {
     target.x += dx;
     target.z += dz;
+    expandVisibleSizeOnFirstMove();
     updateCamera();
     ensureGhostBoardsAroundTarget();
   }
@@ -1858,7 +1902,8 @@
   //      its position and shadow camera follow `target` every frame so
   //      shadows render correctly anywhere on the world, not just near
   //      the home board origin.
-  const ambient = new THREE.AmbientLight(0xffffff, 0.18);
+  // Low ambient floor — just enough so shadowed sides aren't pitch black.
+  const ambient = new THREE.AmbientLight(0xffffff, 0.06);
   scene.add(ambient);
 
   const hemi = new THREE.HemisphereLight(0xffffff, 0xb39879, 0.30);
@@ -1866,8 +1911,9 @@
 
   // Fixed sun direction relative to the camera target — same angle of
   // attack everywhere on the map.
-  const SUN_OFFSET = new THREE.Vector3(7, 12, 5);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  // Lower y → flatter sun angle → longer, more visible shadows.
+  const SUN_OFFSET = new THREE.Vector3(8, 9, 6);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.35);
   sun.position.copy(target).add(SUN_OFFSET);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -1880,8 +1926,9 @@
   sun.shadow.camera.bottom = -SHADOW_HALF;
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 60;
-  sun.shadow.bias = -0.0006;
-  sun.shadow.radius = 2;
+  sun.shadow.bias = -0.00025;
+  sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 1.5;
   scene.add(sun);
   scene.add(sun.target);
   sun.target.position.copy(target);
@@ -1893,18 +1940,26 @@
   // be called before the lighting block has run — sees a falsy value
   // for `typeof` and skips the call safely.
   var updateSunFollow = function () {
-    sun.position.set(target.x + SUN_OFFSET.x, target.y + SUN_OFFSET.y, target.z + SUN_OFFSET.z);
+    // Rotate the sun offset by the current camera azimuth so the sun's
+    // angle relative to the VIEWER stays constant. Pan + orbit both move
+    // shadows live: panning shifts where shadows fall, orbiting rotates
+    // them around each object.
+    const ca = Math.cos(azimuth);
+    const sa = Math.sin(azimuth);
+    const ox = SUN_OFFSET.x * ca - SUN_OFFSET.z * sa;
+    const oz = SUN_OFFSET.x * sa + SUN_OFFSET.z * ca;
+    sun.position.set(target.x + ox, target.y + SUN_OFFSET.y, target.z + oz);
     sun.target.position.set(target.x, target.y, target.z);
     sun.target.updateMatrixWorld();
     sun.shadow.camera.updateProjectionMatrix();
   };
 
   function applyLightingSettings() {
-    hemi.intensity = 0.12 + renderLighting * 0.18;
-    sun.intensity = 0.55 + renderLighting * 0.45;
-    // Ambient is a flat floor — scale it gently with the lighting slider
-    // so very low settings still leave shadowed sides legible.
-    ambient.intensity = 0.10 + renderLighting * 0.12;
+    hemi.intensity = 0.08 + renderLighting * 0.14;
+    sun.intensity = 0.85 + renderLighting * 0.55;
+    // Keep ambient minimal so cast shadows stay visible at every lighting
+    // setting. Shadowed sides still get fill from hemi.
+    ambient.intensity = 0.04 + renderLighting * 0.05;
   }
 
   function setShadowQuality(value) {
@@ -2272,24 +2327,58 @@
   }
 
   // -------- object factories --------
-  function makeTree() {
+  function makeTree(level = 1) {
+    const L = Math.max(1, Math.min(MAX_FLOORS, level));
     const g = new THREE.Group();
 
-    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.18), M.trunk);
-    trunk.position.y = 0.25;
+    // Trunk grows in both height and thickness with level.
+    const trunkH = 0.5 + (L - 1) * 0.12;
+    const trunkW = 0.18 + (L - 1) * 0.018;
+    const trunk = new THREE.Mesh(new THREE.BoxGeometry(trunkW, trunkH, trunkW), M.trunk);
+    trunk.position.y = trunkH / 2;
     g.add(trunk);
 
-    const lower = new THREE.Mesh(roundedBox(0.62, 0.42, 0.62, 0.08), M.leaves);
-    lower.position.y = 0.5;
+    // Lower canopy.
+    const lowerW = 0.62 + (L - 1) * 0.06;
+    const lowerH = 0.42 + (L - 1) * 0.04;
+    const lower = new THREE.Mesh(roundedBox(lowerW, lowerH, lowerW, 0.08), M.leaves);
+    const lowerY = trunkH + lowerH * 0.5 - 0.08;
+    lower.position.y = lowerY;
     g.add(lower);
 
-    const upper = new THREE.Mesh(roundedBox(0.42, 0.32, 0.42, 0.06), M.leaves);
-    upper.position.y = 0.92;
+    // Upper canopy.
+    const upperW = 0.42 + (L - 1) * 0.04;
+    const upperH = 0.32 + (L - 1) * 0.03;
+    const upper = new THREE.Mesh(roundedBox(upperW, upperH, upperW, 0.06), M.leaves);
+    const upperY = lowerY + lowerH * 0.5 + upperH * 0.5 - 0.05;
+    upper.position.y = upperY;
     g.add(upper);
 
-    const tip = new THREE.Mesh(roundedBox(0.22, 0.18, 0.22, 0.04), M.leaves);
-    tip.position.y = 1.18;
-    g.add(tip);
+    // At higher levels swap the wispy tip for a denser darker crown.
+    if (L >= 3) {
+      const crown = new THREE.Mesh(roundedBox(0.30 + (L - 3) * 0.04, 0.28 + (L - 3) * 0.04, 0.30 + (L - 3) * 0.04, 0.06), M.leavesDk);
+      crown.position.y = upperY + upperH * 0.5 + 0.14;
+      g.add(crown);
+    } else {
+      const tip = new THREE.Mesh(roundedBox(0.22, 0.18, 0.22, 0.04), M.leaves);
+      tip.position.y = upperY + upperH * 0.5 + 0.09;
+      g.add(tip);
+    }
+
+    // Big, mature trees grow side bushes around the upper canopy for a
+    // fuller silhouette.
+    if (L >= 5) {
+      const bushCount = L >= 7 ? 5 : (L >= 6 ? 4 : 3);
+      for (let i = 0; i < bushCount; i++) {
+        const ang = (i / bushCount) * Math.PI * 2;
+        const r = 0.20 + (L - 5) * 0.04;
+        const bw = 0.26 + (L - 5) * 0.04;
+        const bh = 0.22 + (L - 5) * 0.03;
+        const bush = new THREE.Mesh(roundedBox(bw, bh, bw, 0.05), i % 2 ? M.leaves : M.leavesDk);
+        bush.position.set(Math.cos(ang) * r, lowerY + 0.10, Math.sin(ang) * r);
+        g.add(bush);
+      }
+    }
 
     g.userData = { kind: 'tree', swayPhase: Math.random() * Math.PI * 2 };
     castReceive(g);
@@ -4440,10 +4529,10 @@
     opacityRoots.add(group);
     group.traverse(o => {
       if (!o.isMesh || !o.material) return;
-      if (ghost) {
-        o.castShadow = false;
-        o.receiveShadow = false;
-      }
+      // Ghost meshes participate in the shadow pass — same sun, same
+      // shadows everywhere the user can see. The cells already use
+      // castReceive/groundReceiveOnly from their factories; don't
+      // override that here.
       // Array materials are vanishingly rare in this codebase, but stay safe.
       if (Array.isArray(o.material)) {
         o.material = o.material.map(m => m.clone());
@@ -4611,7 +4700,7 @@
     const cell = cells[x][z];
     const level = cell.floors || 1;
     let mesh = null;
-    if      (cell.kind === 'tree')      mesh = makeTree();
+    if      (cell.kind === 'tree')      mesh = makeTree(level);
     else if (cell.kind === 'rock')      mesh = makeRock(getGhostRockNeighbors(cells, x, z), level, x + 1000, z + 1000);
     else if (cell.kind === 'bridge')    mesh = makeBridge(ghostBridgeOrientation(cells, x, z), cell.floors || 1);
     else if (cell.kind === 'tuft')      mesh = makeTuft();
@@ -4965,24 +5054,39 @@
       if (a.t < 0) continue;
       const u = Math.min(1, a.t / a.dur);
       a.obj.position.y = a.baseY + a.distance * (1 - a.easing(u));
+
+      // Fire the impact effects slightly BEFORE landing so the ripple's
+      // initial dip and the dust burst peak at the exact moment the
+      // object touches down — the "give" reads as part of the landing,
+      // not as something that happens after.
+      if (!a.preImpactFired && u >= 0.82 && a.obj.userData && a.obj.userData.kind !== 'tile') {
+        a.preImpactFired = true;
+        const mass = massForMesh(a.obj);
+        const gx = a.obj.userData.gx;
+        const gz = a.obj.userData.gz;
+        const ox = (typeof gx === 'number') ? gx : Math.round(a.obj.position.x + GRID / 2 - 0.5);
+        const oz = (typeof gz === 'number') ? gz : Math.round(a.obj.position.z + GRID / 2 - 0.5);
+        if (mass >= 2) {
+          triggerRipple(ox, oz, mass); // also plays 'ripple' SFX
+        } else if (typeof playSfx === 'function') {
+          playSfx('land', 0.35);
+        }
+      }
+
       if (u >= 1) {
         a.obj.position.y = a.baseY;
         a.obj.userData.landing = false;
         emitImpactDust(a.obj);
-        if (a.obj.userData && a.obj.userData.kind !== 'tile') {
+        // For tiles or anything we didn't pre-fire (very short drops),
+        // run the impact effects now as a fallback.
+        if (!a.preImpactFired && a.obj.userData && a.obj.userData.kind !== 'tile') {
           const mass = massForMesh(a.obj);
           const gx = a.obj.userData.gx;
           const gz = a.obj.userData.gz;
           const ox = (typeof gx === 'number') ? gx : Math.round(a.obj.position.x + GRID / 2 - 0.5);
           const oz = (typeof gz === 'number') ? gz : Math.round(a.obj.position.z + GRID / 2 - 0.5);
-          if (mass >= 2) {
-            triggerRipple(ox, oz, mass); // also plays 'ripple' SFX
-          } else if (typeof playSfx === 'function') {
-            // Light objects (tufts, crops) and tiles — quiet land thump.
-            // The 'land' channel has its own slower clock so cascades stay
-            // tasteful instead of forming a wall of foley.
-            playSfx('land', 0.35);
-          }
+          if (mass >= 2) triggerRipple(ox, oz, mass);
+          else if (typeof playSfx === 'function') playSfx('land', 0.35);
         }
         dropAnims.splice(i, 1);
       }
@@ -5372,7 +5476,7 @@
     let posX = null, posZ = null;
     let setGridUserData = true;
 
-    if      (kind === 'tree')      mesh = makeTree();
+    if      (kind === 'tree')      mesh = makeTree(level);
     else if (kind === 'rock')      mesh = makeRock(getRockNeighbors(x, z), level, x, z, world[x][z].terrain === 'water');
     else if (kind === 'bridge')    mesh = makeBridge(getBridgeOrientation(x, z), level);
     else if (kind === 'tuft')      mesh = makeTuft();
@@ -5624,6 +5728,12 @@
 
     if (terrainChanged || tileHeightChanged || forceTile) {
       renderCellTile(x, z, { animate, delay: tileDelay });
+    } else if (!cellMeshes[x + ',' + z] || !cellMeshes[x + ',' + z].tile) {
+      // Defensive: if for any reason this cell has no ground mesh
+      // (e.g. user clicked a freshly materialised ghost cell with no
+      // pre-rendered tile yet), render one before the object lands so
+      // we never get a hole under the new object.
+      renderCellTile(x, z, { animate: false });
     }
 
     // Terrain adjacency: path bands, shoreline lips, water foam, and bridge
@@ -6024,7 +6134,10 @@
         const p = (boardX || boardZ)
           ? ghostCellPos(boardX, boardZ, n.userData.gx, n.userData.gz)
           : tilePos(n.userData.gx, n.userData.gz);
-        if (opacityAtWorldPosition(p.x, p.z) <= 0.001) continue;
+        // raycaster already skipped hidden meshes; if it's here it's a
+        // legitimate target. The old opacityAtWorldPosition check killed
+        // clicks on revealed ghost cells outside the visible window.
+        if (!n.visible) continue;
         return {
           x: n.userData.gx,
           z: n.userData.gz,
@@ -6460,6 +6573,13 @@
       if (!world[x]) world[x] = [];
       world[x][z] = { ...ghostCell, userEdited: true };
       removeGhostCellMesh(cell.boardX, cell.boardZ, cell.x, cell.z);
+      // Materialise the home cellMesh first. setCell (called inside
+      // applyTool) only rebuilds the tile when terrain or height
+      // changes — so without this, planting a tree / rock on a grass
+      // ghost cell would leave the cell with no ground under the new
+      // object.
+      renderCellTile(x, z, { animate: false });
+      if (world[x][z].kind) renderCellObject(x, z, { animate: false });
       applyTool(x, z);
       // Re-stamp the flag after setCell rewrote the cell.
       if (world[x] && world[x][z]) world[x][z].userEdited = true;
@@ -6976,6 +7096,7 @@
     } catch (_) {}
 
     GRID = n;
+    renderVisibleSize = hasUserPanned ? Math.round(GRID * 1.5) : GRID;
     try { localStorage.setItem('tinyworld:home-grid', String(GRID)); } catch (_) {}
     updateUnsavedCopyForGrid();
     if (typeof buildHomeBorder === 'function') buildHomeBorder();
@@ -7107,7 +7228,57 @@
     if (homeTween.t >= 1) homeTween = null;
   }
 
+  // Tear down everything outside the home board. Used by doReset and
+  // on first load so the world genuinely starts as a single GRID x GRID
+  // tile and grows outward as the user pans.
+  function clearGhostWorld() {
+    // Dispose every ghost board mesh + clear pending queue + cache.
+    for (const [, board] of ghostBoards) {
+      worldGroup.remove(board);
+      disposeGroup(board);
+    }
+    ghostBoards.clear();
+    ghostBoardCells.clear();
+    pendingGhostBoards.length = 0;
+    pendingGhostBoardSet.clear();
+
+    // Drop any out-of-home cellMeshes (user overrides on ghost cells)
+    // and wipe the matching world[][] entries so buildGhostBoard
+    // doesn't skip them next time.
+    for (const key of Object.keys(cellMeshes)) {
+      const [kx, kz] = key.split(',').map(Number);
+      if (kx >= 0 && kx < GRID && kz >= 0 && kz < GRID) continue;
+      const entry = cellMeshes[key];
+      if (entry.tile)   { worldGroup.remove(entry.tile);   disposeGroup(entry.tile); }
+      if (entry.object) { worldGroup.remove(entry.object); disposeGroup(entry.object); }
+      if (entry.extras) for (const m of entry.extras) { worldGroup.remove(m); disposeGroup(m); }
+      delete cellMeshes[key];
+    }
+    for (const xKey of Object.keys(world)) {
+      const x = parseInt(xKey, 10);
+      if (!Number.isFinite(x)) continue;
+      const row = world[xKey];
+      if (!row) continue;
+      const insideX = x >= 0 && x < GRID;
+      for (const zKey of Object.keys(row)) {
+        const z = parseInt(zKey, 10);
+        if (!Number.isFinite(z)) continue;
+        const inside = insideX && z >= 0 && z < GRID;
+        if (inside) continue;
+        // Reset pre-allocated buffer cells to default grass; delete any
+        // entries that don't belong to the buffer at all.
+        if (x >= 0 && x < HOME_GRID_MAX && z >= 0 && z < HOME_GRID_MAX) {
+          row[zKey] = { terrain: 'grass', terrainFloors: 1, kind: null, floors: 1, buildingType: null, fenceSide: null, extras: [] };
+        } else {
+          delete row[zKey];
+        }
+      }
+    }
+  }
+
   function doReset() {
+    hasUserPanned = false;
+    renderVisibleSize = GRID;
     // Reset always returns to the original 8x8 grid, regardless of what
     // the user resized to. setHomeGridSize is a no-op if GRID is already
     // at the default. skipRebuild because loadInitialScene immediately
@@ -7115,8 +7286,15 @@
     if (GRID !== HOME_GRID_DEFAULT && typeof setHomeGridSize === 'function') {
       setHomeGridSize(HOME_GRID_DEFAULT, { skipRebuild: true });
     }
+    clearGhostWorld();
     loadInitialScene();
     resetCameraDefaults();
+    // Re-enqueue ghost boards now that the world is fresh — they'll
+    // build with all cells starting at opacity 0 (outside the visible
+    // window) so the user only sees the home grid until they pan.
+    if (typeof ensureGhostBoardsAroundTarget === 'function') {
+      ensureGhostBoardsAroundTarget();
+    }
     if (typeof playSfx === 'function') playSfx('whoosh');
     if (typeof fireWebhook === 'function') fireWebhook('world.reset', {});
   }
@@ -7172,6 +7350,7 @@
     const postEl = document.getElementById('render-post');
     const shadowEl = document.getElementById('render-shadow');
     const resolutionEl = document.getElementById('render-resolution');
+    const smoothingEl = document.getElementById('render-smoothing');
     const distanceEl = document.getElementById('render-distance');
     const visibleSizeEl = document.getElementById('render-visible-size');
     const homeGridEl = document.getElementById('render-home-grid');
@@ -7185,12 +7364,14 @@
     const cloudsEl = document.getElementById('render-clouds');
     const cloudSpeedEl = document.getElementById('render-cloud-speed');
     const cloudHeightEl = document.getElementById('render-cloud-height');
+    const cloudShadowEl = document.getElementById('render-cloud-shadow');
     const tiltBlurEl = document.getElementById('render-tilt-blur');
     const tiltFocusEl = document.getElementById('render-tilt-focus');
     const ghostOpacityEl = document.getElementById('render-ghost-opacity');
     const floorOpacityEl = document.getElementById('render-floor-opacity');
     const objectOpacityEl = document.getElementById('render-object-opacity');
     const resolutionValue = document.getElementById('render-resolution-value');
+    const smoothingValue = document.getElementById('render-smoothing-value');
     const distanceValue = document.getElementById('render-distance-value');
     const visibleSizeValue = document.getElementById('render-visible-size-value');
     const brightnessValue = document.getElementById('render-brightness-value');
@@ -7203,6 +7384,7 @@
     const cloudsValue = document.getElementById('render-clouds-value');
     const cloudSpeedValue = document.getElementById('render-cloud-speed-value');
     const cloudHeightValue = document.getElementById('render-cloud-height-value');
+    const cloudShadowValue = document.getElementById('render-cloud-shadow-value');
     const tiltBlurValue = document.getElementById('render-tilt-blur-value');
     const tiltFocusValue = document.getElementById('render-tilt-focus-value');
     const ghostOpacityValue = document.getElementById('render-ghost-opacity-value');
@@ -7213,6 +7395,7 @@
       postEl.checked = postProcessingEnabled;
       shadowEl.value = renderShadowQuality;
       resolutionEl.value = String(Math.round(renderResolutionScale * 100));
+      smoothingEl.value = String(Math.round(renderSmoothing * 100));
       distanceEl.value = String(renderVisibleDistance);
       visibleSizeEl.value = String(renderVisibleSize);
       if (homeGridEl) homeGridEl.value = String(GRID);
@@ -7226,12 +7409,14 @@
       cloudsEl.value = String(Math.round(renderCloudAmount * 100));
       cloudSpeedEl.value = String(Math.round(renderCloudSpeed * 100));
       cloudHeightEl.value = String(renderCloudHeight);
+      cloudShadowEl.value = String(Math.round(renderCloudShadow * 100));
       tiltBlurEl.value = String(renderTiltBlur);
       tiltFocusEl.value = String(Math.round(renderTiltFocus));
       ghostOpacityEl.value = String(Math.round(renderGhostOpacity * 100));
       floorOpacityEl.value = String(Math.round(renderFloorOpacity * 100));
       objectOpacityEl.value = String(Math.round(renderObjectOpacity * 100));
       resolutionValue.textContent = resolutionEl.value + '%';
+      smoothingValue.textContent = smoothingEl.value + '%';
       distanceValue.textContent = distanceEl.value;
       visibleSizeValue.textContent = visibleSizeEl.value + 'x' + visibleSizeEl.value;
       brightnessValue.textContent = brightnessEl.value + '%';
@@ -7244,6 +7429,7 @@
       cloudsValue.textContent = cloudsEl.value + '%';
       cloudSpeedValue.textContent = cloudSpeedEl.value + '%';
       cloudHeightValue.textContent = cloudHeightEl.value;
+      cloudShadowValue.textContent = cloudShadowEl.value + '%';
       tiltBlurValue.textContent = tiltBlurEl.value + 'px';
       tiltFocusValue.textContent = tiltFocusEl.value + '%';
       ghostOpacityValue.textContent = ghostOpacityEl.value + '%';
@@ -7255,6 +7441,7 @@
     function persistSettings() {
       localStorage.setItem(RENDER_LS.post, postProcessingEnabled ? '1' : '0');
       localStorage.setItem(RENDER_LS.resolution, renderResolutionScale.toFixed(2));
+      localStorage.setItem(RENDER_LS.smoothing, renderSmoothing.toFixed(2));
       localStorage.setItem(RENDER_LS.visibleDistance, String(renderVisibleDistance));
       localStorage.setItem(RENDER_LS.visibleSize, String(renderVisibleSize));
       localStorage.setItem(RENDER_LS.brightness, postMaterial.uniforms.brightness.value.toFixed(2));
@@ -7268,11 +7455,10 @@
       localStorage.setItem(RENDER_LS.clouds, renderCloudAmount.toFixed(2));
       localStorage.setItem(RENDER_LS.cloudSpeed, renderCloudSpeed.toFixed(2));
       localStorage.setItem(RENDER_LS.cloudHeight, renderCloudHeight.toFixed(1));
+      localStorage.setItem(RENDER_LS.cloudShadow, renderCloudShadow.toFixed(2));
       localStorage.setItem(RENDER_LS.tiltBlur, renderTiltBlur.toFixed(1));
       localStorage.setItem(RENDER_LS.tiltFocus, renderTiltFocus.toFixed(0));
-      localStorage.setItem(RENDER_LS.ghostOpacity, renderGhostOpacity.toFixed(2));
-      localStorage.setItem(RENDER_LS.floorOpacity, renderFloorOpacity.toFixed(2));
-      localStorage.setItem(RENDER_LS.objectOpacity, renderObjectOpacity.toFixed(2));
+      // ghost opacities are locked at 1 — nothing to persist
     }
 
     function applyFromControls() {
@@ -7284,6 +7470,8 @@
       else if (postProcessingEnabled !== wasPost) setCameraMode(cameraMode);
       setShadowQuality(shadowEl.value);
       setRenderResolutionScale(parseInt(resolutionEl.value, 10) / 100);
+      renderSmoothing = parseInt(smoothingEl.value, 10) / 100;
+      postMaterial.uniforms.aaStrength.value = renderSmoothing;
       setRenderVisibleDistance(parseInt(distanceEl.value, 10));
       setRenderVisibleSize(parseInt(visibleSizeEl.value, 10));
       postMaterial.uniforms.brightness.value = parseInt(brightnessEl.value, 10) / 100;
@@ -7297,14 +7485,15 @@
       renderCloudAmount = parseInt(cloudsEl.value, 10) / 100;
       renderCloudSpeed = parseInt(cloudSpeedEl.value, 10) / 100;
       renderCloudHeight = parseFloat(cloudHeightEl.value);
+      renderCloudShadow = parseInt(cloudShadowEl.value, 10) / 100;
+      if (typeof applyCloudShadowSetting === 'function') applyCloudShadowSetting();
       applyCloudSettings();
       if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderTiltBlur = parseFloat(tiltBlurEl.value);
       renderTiltFocus = parseInt(tiltFocusEl.value, 10);
       applyTiltShiftSettings();
-      renderGhostOpacity = parseInt(ghostOpacityEl.value, 10) / 100;
-      renderFloorOpacity = parseInt(floorOpacityEl.value, 10) / 100;
-      renderObjectOpacity = parseInt(objectOpacityEl.value, 10) / 100;
+      // Ghost opacities are locked at 100 % — slider inputs are hidden
+      // and reassigning these consts would throw. Intentionally a no-op.
       updateGhostRenderBubble();
       persistSettings();
       syncControls();
@@ -7350,14 +7539,13 @@
       renderCloudAmount = 0.61;
       renderCloudSpeed = 0.35;
       renderCloudHeight = 7;
+      renderCloudShadow = 0.5;
       applyCloudSettings();
       if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderTiltBlur = 3.5;
       renderTiltFocus = 18;
       applyTiltShiftSettings();
-      renderGhostOpacity = 1;
-      renderFloorOpacity = 1;
-      renderObjectOpacity = 1;
+      // ghost opacities already pinned to 1
       updateGhostRenderBubble();
       persistSettings();
       syncControls();
@@ -7760,9 +7948,27 @@
     m.transparent = true;
     m.opacity = opacity;
     m.depthWrite = false;
+    // alphaTest drives the shadow caster — pixels below the threshold
+    // are discarded by the depth pass, so the cloud's shadow becomes
+    // more or less broken-up. Higher renderCloudShadow → lower
+    // alphaTest → more puffs contribute to the shadow.
+    m.alphaTest = Math.max(0, Math.min(0.99, 1 - renderCloudShadow));
     m.userData = m.userData || {};
     m.userData.cloudInstance = true;
     return m;
+  }
+
+  function applyCloudShadowSetting() {
+    if (!clouds) return;
+    const at = Math.max(0, Math.min(0.99, 1 - renderCloudShadow));
+    for (const c of clouds) {
+      c.traverse(o => {
+        if (o.material && o.material.userData && o.material.userData.cloudInstance) {
+          o.material.alphaTest = at;
+          o.material.needsUpdate = true;
+        }
+      });
+    }
   }
 
   function makeCloud() {
@@ -7793,7 +7999,9 @@
     const base = new THREE.Mesh(roundedBox(1.5, 0.18, 1.05, 0.16), cloneCloudMat(M.cloudShade, 0.45 + Math.random() * 0.15));
     base.position.set(0, -0.22, 0);
     g.add(base);
-    g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    // Clouds cast shadows on the world below but don't catch shadows
+    // themselves (sky shouldn't show shadows from anything else).
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
     return g;
   }
 
