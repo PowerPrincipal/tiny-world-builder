@@ -15,9 +15,15 @@ Prompt principles:
 - Honour the selected generation board size. The Generate dialog can request
   any `HOME_GRID_OPTIONS` size, so prompts must include the requested
   `gridSize` and coordinate bounds instead of assuming 8x8.
+- Floating chat prompts are additive patches by default. Unless the prompt
+  explicitly asks to replace/reset/rebuild or starts with `/clear`, preserve the
+  existing board and return only complete final-state cells that should be
+  added or changed.
 - Start from a readable scene concept: village, farm, canal, ridge, market, castle, garden, or mixed landmark.
 - Use strong silhouettes: tall/short contrast, clustered houses, towers, hills, trees, walls, and clear negative space.
 - Make terrain do composition work: paths lead the eye, water creates crossings, dirt groups crops, grass gives breathing room.
+- Treat hills and mountains as elevation/height through `terrainFloors`, not
+  as a field of rock objects. Rocks are sparse landmarks or boulders only.
 - Use adjacency intentionally: house clusters merge, fences connect, bridges belong on water crossings, crops form fields.
 - Avoid noise: do not fill every board cell; leave open cells and visible paths.
 - Use `floors` as variation/intensity, including terrain stacking and object detail.

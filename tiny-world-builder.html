@@ -3875,19 +3875,14 @@
   function previewSettingsForGrid(grid, explored) {
     const g = Math.max(HOME_GRID_MIN, Math.min(HOME_GRID_MAX, grid || GRID));
     const distance = g <= 12 ? 2 : 1;
-    const visibleSize = g <= 8  ? (explored ? 12 : 8)
-                    : g <= 12 ? (explored ? 14 : 10)
-                    : g <= 20 ? (explored ? 16 : 12)
-                    : g <= 32 ? (explored ? 18 : 14)
-                              : (explored ? 20 : 16);
+    const visibleSize = explored ? Math.min(Math.round(HOME_GRID_MAX * 1.5), Math.ceil(g * 1.125)) : g;
     return { distance, visibleSize };
   }
   const initialPreviewSettings = previewSettingsForGrid(GRID, false);
   let renderVisibleDistance = Math.round(storedNumber(RENDER_LS.visibleDistance, initialPreviewSettings.distance, 1, 4));
-  // Visible-square size controls the surrounding Preview boards only; the
-  // editable home board is always fully rendered. Defaults are intentionally
-  // smaller on large boards so panning doesn't reveal/preload too many cells.
-  let renderVisibleSize = Math.round(storedNumber(RENDER_LS.visibleSize, initialPreviewSettings.visibleSize, 8, Math.round(HOME_GRID_MAX * 1.5)));
+  // Visible-square size controls the surrounding Preview boards only; it must
+  // never be smaller than the editable home grid.
+  let renderVisibleSize = Math.max(GRID, Math.round(storedNumber(RENDER_LS.visibleSize, initialPreviewSettings.visibleSize, GRID, Math.round(HOME_GRID_MAX * 1.5))));
   if (renderSettingsReset) {
     renderVisibleDistance = initialPreviewSettings.distance;
     renderVisibleSize = initialPreviewSettings.visibleSize;
@@ -3949,18 +3944,8 @@
   }
 
   function setRenderVisibleSize(value) {
-    renderVisibleSize = Math.max(8, Math.min(Math.round(HOME_GRID_MAX * 1.5), Math.round(value)));
+    renderVisibleSize = Math.max(GRID, Math.min(Math.round(HOME_GRID_MAX * 1.5), Math.round(value)));
     if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
-  }
-
-  function shouldCullHomeBoardByRenderWindow() {
-    return GRID >= 32 && renderVisibleSize < GRID;
-  }
-
-  function isWorldPositionInsideRenderWindow(x, z) {
-    const visibleHalf = renderVisibleSize / 2 + 6;
-    const dist = Math.max(Math.abs(x - target.x), Math.abs(z - target.z));
-    return dist <= visibleHalf;
   }
 
   function applyAutoPreviewSettingsForGrid(opts = {}) {
@@ -4101,7 +4086,7 @@
   const DEFAULT_VIEW_SIZE = 8.2;
   const DEFAULT_CAMERA_MODE = 'soft';
   const DEFAULT_AZIMUTH = Math.PI * 0.32;
-  const DEFAULT_POLAR = Math.PI * 0.34;
+  const DEFAULT_POLAR = Math.PI * 0.30;
   const DEFAULT_TARGET = new THREE.Vector3(0.35, 0, 0.15);
   let viewSize = DEFAULT_VIEW_SIZE;
   let cameraMode = DEFAULT_CAMERA_MODE; // 'ortho' | 'soft' | 'perspective'
@@ -4114,7 +4099,7 @@
   );
   // narrow FOV + far distance gives the "miniature/telephoto" look that
   // sits closest to the iso aesthetic while still showing real depth.
-  const softCam = new THREE.PerspectiveCamera(12, aspect0, 0.1, 300);
+  const softCam = new THREE.PerspectiveCamera(12, aspect0, 0.1, 600);
   const persCam = new THREE.PerspectiveCamera(28, aspect0, 0.1, 200);
   let camera = softCam;
 
@@ -4126,7 +4111,7 @@
   const panForward = new THREE.Vector3();
 
   function updateCamera() {
-    const r = cameraMode === 'ortho' ? 14 : (cameraMode === 'soft' ? viewSize * 9.6 : viewSize * 4.2);
+    const r = cameraMode === 'ortho' ? 14 : (cameraMode === 'soft' ? viewSize * 5.6 : viewSize * 4.2);
     const isTopdown = cameraMode === 'ortho' && polar < 0.05;
     if (isTopdown) {
       camera.up.set(0, 0, -1);
@@ -7489,10 +7474,7 @@
   //    "is it currently in the visible window?" question.
   function opacityAtWorldPosition(x, z) {
     const homeHalf = GRID / 2;
-    if (Math.abs(x) <= homeHalf && Math.abs(z) <= homeHalf) {
-      if (!shouldCullHomeBoardByRenderWindow()) return 1;
-      return isWorldPositionInsideRenderWindow(x, z) ? 1 : 0;
-    }
+    if (Math.abs(x) <= homeHalf && Math.abs(z) <= homeHalf) return 1;
     const visibleHalf = renderVisibleSize / 2;
     const dist = Math.max(Math.abs(x - target.x), Math.abs(z - target.z));
     return dist <= visibleHalf ? 1 : 0;
@@ -8870,10 +8852,10 @@
     layout['4,1'] = { terrain: 'grass', kind: 'tuft' };
     layout['7,3'] = { terrain: 'grass', kind: 'tuft' };
 
-    // Diagonal sweep — small (x+z) lands first, far corner lands last.
-    // Objects land slightly after their tile so it feels like layers stacking.
-    const TILE_STAGGER = 0.035;
-    const OBJECT_OFFSET = 0.22;
+    // Board tiles are the stage: render them immediately. Props/buildings
+    // still land in a diagonal sweep so initial load has motion without the
+    // ground itself popping in cell by cell.
+    const OBJECT_STAGGER = 0.035;
     for (let x = 0; x < GRID; x++) {
       for (let z = 0; z < GRID; z++) {
         const cell = layout[x + ',' + z];
@@ -8899,17 +8881,16 @@
     for (let x = 0; x < GRID; x++) {
       for (let z = 0; z < GRID; z++) {
         renderCellTile(x, z, {
-          animate: true,
-          delay: (x + z) * TILE_STAGGER,
+          animate: false,
         });
       }
     }
     for (let x = 0; x < GRID; x++) {
       for (let z = 0; z < GRID; z++) {
-        const baseDelay = (x + z) * TILE_STAGGER;
+        const baseDelay = (x + z) * OBJECT_STAGGER;
         renderCellObject(x, z, {
           animate: true,
-          delay: baseDelay + OBJECT_OFFSET,
+          delay: baseDelay,
           impactDust: false,
         });
       }
@@ -10872,6 +10853,7 @@
       shadowEl.value = renderShadowQuality;
       resolutionEl.value = String(Math.round(renderResolutionScale * 100));
       distanceEl.value = String(renderVisibleDistance);
+      visibleSizeEl.min = String(GRID);
       visibleSizeEl.value = String(renderVisibleSize);
       if (homeGridEl) homeGridEl.value = String(GRID);
       brightnessEl.value = String(Math.round(renderBrightness * 100));
@@ -13088,9 +13070,9 @@
     'Primitive assembly rules:',
     '- You cannot invent new object kinds, meshes, labels, or custom geometry in JSON. Build every requested thing by arranging the available Tiny World primitives: terrain cells, raised terrainFloors, houses/buildingType variants, trees, fences/fenceSide, rocks, bridges, crop kinds, and tufts.',
     '- Translate real-world objects into readable low-poly tile assemblies. Example: skate park = path/dirt plaza + raised terrain ramps + rocks as boulders/ramps + fences as rails/edges + tufts/trees as landscaping.',
-    '- Use terrain as the base primitive: grass=open space, path=paved/concrete, dirt=earth/fields, water=canals/ponds. Use terrainFloors for platforms, terraces, steps, banks, ramps, plinths, and cliffs.',
+    '- Use terrain as the base primitive: grass=open space, path=paved/concrete, dirt=earth/fields, water=canals/ponds. Use terrainFloors for platforms, terraces, steps, banks, ramps, plinths, hills, mountains, and cliffs.',
     '- Use fences as line primitives: rails, walls, borders, pens, queue barriers, garden edging, pier rails, road gates, and castle-wall components. Set fenceSide deliberately.',
-    '- Use rocks as sculptural primitives: ramps, monuments, boulders, skate obstacles, cliffs, rubble, stepping stones, and focal landmarks. Increase floors for larger/more detailed forms.',
+    '- Use rocks as sparse sculptural props only: boulders, monuments, rubble, stepping stones, and focal landmarks. Do not use rock props to represent broad hills or mountains.',
     '- Use houses and variants as massing primitives: cottages for small buildings, manors for civic buildings, towers/turrets for vertical landmarks, high-rise for modern tall structures. Adjacent null-buildingType houses assemble into larger footprints.',
     '- Buildings must sit directly on flat grass or dirt. Do not put houses on path, water, lava, raised terrain, decks, bridges, platforms, posts, or stilts.',
     '- Use crops/tufts/trees as texture primitives: fields, hedges, gardens, park planting, wild edges, orchards, and scale cues.',
@@ -13114,6 +13096,7 @@
       'Think like a low-poly diorama designer, not a random tile filler: start from a readable scene concept, use strong silhouettes, and leave negative space.',
       'Use low-poly worldbuilding cues: readable silhouettes, a few landmark cells, modular clusters, paths that lead the eye, and color-blocked terrain.',
       'Terrain should compose the scene: paths lead the eye, water creates crossings, dirt groups crops, grass creates breathing room, and raised terrain can imply mesas or Monument Valley-style landforms.',
+      'Hills and mountains are raised terrain: use terrainFloors on mostly bare terrain cells. Do not cover mountain or hill regions with rock objects.',
       'Rock is a scenic landmark prop. Bridge may sit on water and auto-orients toward nearby path or land; other water cells should not host any kind.',
       'Crops (crop, corn, wheat, pumpkin, carrot, sunflower) imply terrain=dirt; the renderer enforces that, but you may set terrain explicitly.',
       'Trees and tufts read best on grass. Rocks work as edges, overlooks, or focal points.',
@@ -13182,6 +13165,48 @@
         })) : null,
       })),
     }, null, 2);
+  }
+
+  function floatingAgentIntent(text) {
+    const raw = String(text || '').trim();
+    if (/^\/clear\b/i.test(raw)) {
+      return {
+        mode: 'replace',
+        clearFirst: true,
+        prompt: raw.replace(/^\/clear\b\s*/i, '').trim(),
+      };
+    }
+    const replaceRequested =
+      /\b(replace|rebuild|redesign|reset|wipe)\b/i.test(raw) ||
+      /\b(start over|from scratch|new world|new map|new board|full world|entire board)\b/i.test(raw) ||
+      /\bclear (?:the )?(world|board|map)\b/i.test(raw);
+    return {
+      mode: replaceRequested ? 'replace' : 'add',
+      clearFirst: false,
+      prompt: raw,
+    };
+  }
+
+  function buildFloatingAdditionPrompt(userPrompt) {
+    const maxCoord = GRID - 1;
+    return [
+      'Mode: ADDITION PATCH.',
+      'Treat the user request as an addition to the existing Tiny World. Do not replace, reset, clear, or redesign the world.',
+      'Return a JSON object matching the schema with "gridSize": ' + GRID + ' and only the cells that should be added or changed.',
+      'Do not emit unchanged existing cells. The app will merge your emitted cells into the current board and preserve every cell not mentioned.',
+      'Every emitted cell must be the complete final state for that coordinate: x, z, terrain, kind, floors, terrainFloors, buildingType, fenceSide, and extras if needed.',
+      'Choose empty or compatible nearby cells unless selected-cell context is provided, in which case only change cells needed for that selected scope.',
+      'Coordinate bounds for emitted cells: x in 0..' + maxCoord + ', z in 0..' + maxCoord + '.',
+      'Current world JSON:',
+      JSON.stringify({
+        v: STORAGE_VERSION,
+        gridSize: GRID,
+        cells: snapshotCells(),
+      }, null, 2),
+      '',
+      'User request:',
+      userPrompt,
+    ].join('\n');
   }
 
   function normalizeWorldCells(data) {
@@ -13551,9 +13576,9 @@
     }
     function fastBiome(x, z) { return biomeLookup[x + ',' + z] || 'grass'; }
 
-    // First pass — paint terrain by biome. Mountains override to rock
-    // when sitting on grass-style biomes, and we suppress kinds on
-    // water cells (no kinds float, per the schema).
+    // First pass — paint terrain by biome. Elevation is expressed through
+    // terrainFloors, not by blanketing the board with rock props. Water cells
+    // suppress hosted kinds (no kinds float, per the schema).
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
         const biome = fastBiome(x, z);
@@ -13585,10 +13610,7 @@
           else if (tier === 'plains' && roll < 0.30) { kind = 'sheep'; }
         } else if (biome === 'forest') {
           terrain = 'grass';
-          if (tier === 'mountains') {
-            kind = 'rock';
-            floors = 1 + Math.floor(rng() * 3);
-          } else {
+          if (tier === 'plains' || (tier === 'hills' && rng() < 0.18)) {
             kind = 'tree';
             floors = 1 + Math.floor(rng() * 3);
           }
@@ -13602,27 +13624,12 @@
           }
         }
 
-        // Mountains on water stay water; everywhere else mountains can
-        // become rocky outcrops if the biome rolled to leave a kind unset.
-        if (tier === 'mountains' && terrain !== 'water' && !kind) {
-          kind = 'rock';
-          floors = 2 + Math.floor(rng() * 3);
-        }
-
         // Suppress kinds on water + lava (bridges are placed later if needed).
         if (terrain === 'water' || terrain === 'lava') { kind = null; bType = null; }
 
-        // Rare lava pockets inside mountain biomes — a small volcanic
-        // accent, only on bare elevated cells.
-        if (!kind && tier === 'mountains' && terrain === 'stone' && rng() < 0.08) {
-          terrain = 'lava';
-        }
-
         // Stilts fix — any kind that isn't 'rock' sits on flat ground.
         // Elevation manifests as raised BARE terrain cells (grass / stone
-        // hills, snow caps), not as pillars under objects.  Rock is the
-        // one kind that can ride elevated terrain because it reads as a
-        // mountain outcrop.
+        // hills, snow caps), not as pillars under objects.
         let effectiveTf = tf;
         if (kind && kind !== 'rock') effectiveTf = 1;
 
@@ -13630,6 +13637,14 @@
         // hills actually read as different material, not just taller grass.
         if (!kind && tier === 'mountains' && terrain === 'grass') {
           terrain = (rng() < 0.65) ? 'stone' : 'snow';
+        }
+        if (!kind && tier === 'hills' && terrain === 'grass' && rng() < 0.22) {
+          terrain = 'stone';
+        }
+        // Rare lava pockets inside mountain biomes — a small volcanic
+        // accent, only on bare elevated cells.
+        if (!kind && tier === 'mountains' && terrain === 'stone' && rng() < 0.08) {
+          terrain = 'lava';
         }
         // Beach band: water-edge plains become sand cells.
         if (!kind && tier === 'plains' && terrain === 'grass') {
@@ -14293,7 +14308,8 @@
         '- "forest" composition share should be expressed via tree placements on grass.\n' +
         '- "settlement" share should be expressed via house clusters connected by path.\n' +
         '- Use water cells for water share, dirt cells for farmland, grass for the rest.\n' +
-        '- Raise hills/mountains using terrainFloors (1=plains, 2-3=hills, 4-8=mountains).'
+        '- Raise hills/mountains using terrainFloors (1=plains, 2-3=hills, 4-8=mountains).\n' +
+        '- Do not express hills or mountains by filling the map with rock objects. Use rock only as occasional landmark/boulder cells.'
       );
 
       if (modelEl.value.trim() !== model) {
@@ -14477,7 +14493,13 @@
         role = role || 'assistant';
         const node = addAgentMessage(role, text);
         setInputProgress(text);
-        fireToast();
+        const keepOpen = pinnedOpen && !panel.classList.contains('collapsed');
+        if (keepOpen) {
+          showPanel();
+          messages.scrollTop = messages.scrollHeight;
+        } else {
+          fireToast();
+        }
         setTimeout(() => {
           if (input.placeholder === text) clearInputProgress();
         }, AUTO_HIDE_MS + 600);
@@ -14499,7 +14521,7 @@
     }
 
     // Toggle button: manual collapse/expand. Expanding manually pins it open
-    // until the user collapses again or sends a new prompt.
+    // until the user collapses it again.
     toggle.addEventListener('click', e => {
       e.stopPropagation();
       const willCollapse = !panel.classList.contains('collapsed');
@@ -14734,11 +14756,12 @@
       e.preventDefault();
       const userText = input.value.trim();
       if (!userText || send.disabled) return;
+      const intent = floatingAgentIntent(userText);
       // If there's an active selection, prepend its context so the agent
       // scopes its work to those cells.
       const sel = window.__tinyworldSelection;
       const summary = sel && sel.summary();
-      let prompt = userText;
+      let prompt = intent.prompt || userText;
       if (summary) {
         const cellList = Array.from(sel.cells).slice(0, 64).join(', ');
         const kindParts = Object.entries(summary.kinds)
@@ -14748,6 +14771,8 @@
           '[Selected ' + summary.cellCount + ' tile(s): ' + kindParts +
           ' at cells (x,z) ' + cellList + ']\n' + userText;
       }
+      setPanelCollapsed(false, { pin: true });
+      sugBox.hidden = true;
       // User message lives only in the conversation history; no toast.
       addAgentMessage('user', userText);
       input.value = '';
@@ -14756,13 +14781,27 @@
       setInputProgress('Working on it…');
       send.disabled = true;
       try {
+        if (intent.clearFirst && !intent.prompt) {
+          doClear();
+          thinking.textContent = 'World cleared.';
+          window.__tinyworldAgent && window.__tinyworldAgent.done && window.__tinyworldAgent.done('World cleared.');
+          return;
+        }
         const cfg = getAIProviderState();
         if (!cfg.key) throw new Error('Add an API key in Settings → AI first.');
-        const data = await generateWorld(cfg.provider, cfg.model, cfg.key, prompt);
-        if (!applyState(data)) throw new Error('The generated world was rejected by the renderer.');
+        if (intent.clearFirst) doClear();
+        const requestPrompt = intent.mode === 'add' ? buildFloatingAdditionPrompt(prompt) : prompt;
+        const data = await generateWorld(cfg.provider, cfg.model, cfg.key, requestPrompt, GRID);
+        const ok = intent.mode === 'add' ? applyStatePatch(data) : applyState(data);
+        if (!ok) {
+          throw new Error(intent.mode === 'add'
+            ? 'The generated additions were rejected by the renderer.'
+            : 'The generated world was rejected by the renderer.');
+        }
         // Record final state in history + fire the toast.
-        thinking.textContent = 'Building completed.';
-        window.__tinyworldAgent && window.__tinyworldAgent.done && window.__tinyworldAgent.done('Building completed.');
+        const doneText = intent.mode === 'add' ? 'Added to world.' : 'Building completed.';
+        thinking.textContent = doneText;
+        window.__tinyworldAgent && window.__tinyworldAgent.done && window.__tinyworldAgent.done(doneText);
       } catch (err) {
         const msg = String(err.message || err).slice(0, 180);
         thinking.className = 'agent-msg error';
@@ -15058,9 +15097,25 @@
           rotationY: 0,
           offsetX: 0,
           offsetZ: 0,
+          animate: false,
           forceTile: true,
         });
         return;
+      }
+      if (item.phase === 'full') {
+        setCell(x, z, {
+          ...base,
+          kind: null,
+          floors: 1,
+          buildingType: null,
+          fenceSide: null,
+          extras: [],
+          rotationY: 0,
+          offsetX: 0,
+          offsetZ: 0,
+          animate: false,
+          forceTile: true,
+        });
       }
       setCell(x, z, {
         ...base,
@@ -15072,8 +15127,12 @@
         rotationY: o ? o.rotationY : 0,
         offsetX: o ? o.offsetX : 0,
         offsetZ: o ? o.offsetZ : 0,
-        forceTile: item.phase !== 'detail',
+        animate: item.phase !== 'full' || !!(o && (o.kind || (o.extras && o.extras.length))),
+        forceTile: item.phase !== 'detail' && item.phase !== 'full',
       });
+      if (item.phase === 'full' && o && !o.kind && o.extras && o.extras.length) {
+        renderCellExtras(x, z, { animateFrom: 0 });
+      }
     }
 
     function finishApplyState() {
@@ -15172,6 +15231,75 @@
 
     buildOneChunk(0);
     return true;
+  }
+
+  function cellPatchFromEntry(entry) {
+    let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform;
+    if (Array.isArray(entry)) {
+      [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform] = entry;
+    } else if (entry && typeof entry === 'object') {
+      ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform } = entry);
+    }
+    if (!Number.isInteger(x) || !Number.isInteger(z)) return null;
+    if (x < 0 || x >= GRID || z < 0 || z >= GRID) return null;
+    let rotationY = 0, offsetX = 0, offsetZ = 0;
+    if (Array.isArray(transform) && transform.length >= 3) {
+      rotationY = +transform[0] || 0;
+      offsetX   = +transform[1] || 0;
+      offsetZ   = +transform[2] || 0;
+    } else if (transform && typeof transform === 'object') {
+      rotationY = +transform.rotationY || 0;
+      offsetX   = +transform.offsetX   || 0;
+      offsetZ   = +transform.offsetZ   || 0;
+    }
+    return {
+      x, z,
+      terrain: terrain || 'grass',
+      terrainFloors: terrainFloors || 1,
+      kind: kind || null,
+      floors: floors || 1,
+      buildingType: buildingType || null,
+      fenceSide: kind === 'fence' ? normalizeFenceSide(fenceSide) : null,
+      extras: Array.isArray(extras) ? extras : [],
+      rotationY, offsetX, offsetZ,
+    };
+  }
+
+  function applyStatePatch(data) {
+    if (!data || !Array.isArray(data.cells)) return false;
+    normalizeWorldCells(data);
+    const err = validateWorld(data);
+    if (err) {
+      console.warn('[applyStatePatch] rejected world patch:', err, data);
+      return false;
+    }
+    let applied = 0;
+    suppressSave = true;
+    try {
+      for (const entry of data.cells) {
+        const c = cellPatchFromEntry(entry);
+        if (!c) continue;
+        setCell(c.x, c.z, {
+          terrain: c.terrain,
+          terrainFloors: c.terrainFloors,
+          kind: c.kind,
+          floors: c.floors,
+          buildingType: c.buildingType,
+          fenceSide: c.fenceSide,
+          extras: c.extras,
+          rotationY: c.rotationY,
+          offsetX: c.offsetX,
+          offsetZ: c.offsetZ,
+          animate: true,
+          impactDust: false,
+        });
+        applied++;
+      }
+    } finally {
+      suppressSave = false;
+    }
+    saveState();
+    return applied > 0;
   }
 
   // -------- API / webhooks / SSE bridge --------
@@ -15402,7 +15530,9 @@
       if (!raw) return false;
       data = JSON.parse(raw);
     } catch (_) { return false; }
-    return applyState(data);
+    const ok = applyState(data, { keepCamera: true });
+    if (ok) resetCameraDefaults();
+    return ok;
   }
 
   // -------- welcome dialog --------

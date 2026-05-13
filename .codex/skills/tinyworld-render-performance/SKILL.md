@@ -19,10 +19,6 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
 - `geomCache` memoizes `roundedSlab` / `roundedBox` ExtrudeGeometries by their numeric args. Geometries are tagged `userData.cached = true` and shared across every mesh that asks for the same shape. Disposal goes through `safeDisposeGeometry(geo)` — never call `geo.dispose()` directly on these. If you add a new geometry helper that's called more than a handful of times, cache it the same way.
 - `fadeMatCache` shares fade materials in `FADE_BUCKETS = 16` opacity buckets keyed by (base material UUID, grayscale flag, bucket). `prepareFadeable` and `applyElementOpacity` look up via `pickFadeMaterial(baseMat, grayscale, displayOpacity)` instead of cloning per mesh. Cached materials are tagged `userData.cachedFade = true` and must never be mutated or disposed — they're shared by every mesh in their bucket. If you need a per-instance opacity (e.g. squash anim), clone the material yourself and tag it so it gets disposed individually.
 - Ghost boards are built incrementally via `pendingGhostBoards` queue, drained inside `animate()` by `processGhostBoardQueue(budgetMs)` with a small per-frame budget. `ensureGhostBoardsAroundTarget` only enqueues — it must never build synchronously, or load/reset/visible-distance changes hitch the main thread.
-- Large home boards (`GRID >= 32`) use the same render-window visibility
-  bubble for far home cells. Keep visibility changes routed through
-  `opacityAtWorldPosition()` / `updateHomeBoardFade()` so hidden roots leave
-  the draw and raycast paths without deleting world intent.
 - Per-frame object work is set-based: `animatedCellObjects` tracks swaying
   trees/tufts and `smokeHouseObjects` tracks chimney sources. Do not return to
   scanning every `cellMeshes` entry each frame for these effects.
@@ -30,6 +26,10 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
 - The final generated/imported settle pass should only rebuild
   adjacency-sensitive terrain (paths, water/shore neighbours, bridges), not the
   entire board.
+- Initial/full-scene render paths should render board tiles immediately and
+  animate only props/buildings/extras. Do not reintroduce tile drop-in for the
+  starter board, saved-state restore, import, or generated-world base pass; the
+  terrain is the stage, not part of the entrance animation.
 - Stats overlay (`?stats=1` or backtick key) reads `renderer.info` and reports FPS, draws, tris, geoms, mats, programs, textures, ghost-board count + queue depth. Use it to measure any rendering change.
 - Default color grade should stay neutral: brightness 1, saturation 1, contrast 1.
 - Render settings are user-adjustable and persisted in `localStorage` under `tinyworld:render:*`.
@@ -38,7 +38,7 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
   routed through `markCameraMoving()` so the expensive blur pseudo-element is
   hidden during interaction and restored after the idle delay.
 - Scene/screen controls must keep working in the direct-render path: resolution, shadow quality, lighting, visible distance, visible size, clouds, tilt-shift blur/focus, and ghost opacity.
-- Preview window is the reveal square around the camera target in tile-width units. It auto-scales by board size (large boards get a tighter window for performance) and can be user-adjusted. Do not subtract half a tile from this radius, or the board edge starts fading inside the requested size.
+- Preview window is the reveal square around the camera target in tile-width units. It auto-scales by board size and can be user-adjusted, but it must never be smaller than `GRID`. Do not subtract half a tile from this radius, or the board edge starts fading inside the requested size.
 - Preview opacity / floors / objects are user-adjustable display multipliers for surrounding preview boards. The home board stays fully opaque regardless of those controls.
 - Do not reintroduce post-only shader controls unless the user explicitly asks for a post pipeline.
 - Shadow maps should stay modest unless a visual defect proves otherwise.
