@@ -88,40 +88,68 @@
   canvas.dragging { cursor: grabbing; }
 
   .brand {
-    position: fixed;
-    top: 26px; left: 28px;
-    pointer-events: none;
-    z-index: 10;
+    display: none;
   }
   .brand .title {
-    font-family: 'Fraunces', Georgia, serif;
-    font-weight: 500;
-    font-size: 28px;
-    letter-spacing: -0.02em;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 0;
     line-height: 1;
   }
+  .brand .title::before {
+    content: '';
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    margin-right: 10px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #a6ca53, #75a83a);
+    box-shadow: inset 0 -3px 0 rgba(63, 98, 29, 0.2), 0 1px 2px rgba(60, 40, 10, 0.14);
+    vertical-align: -8px;
+  }
+  .brand .title::after {
+    content: '';
+    position: absolute;
+    left: 27px;
+    top: 24px;
+    width: 12px;
+    height: 10px;
+    border: 2px solid #fff;
+    border-top: 0;
+    border-radius: 0 0 2px 2px;
+    box-sizing: border-box;
+  }
   .brand .title em {
-    font-style: italic;
-    font-weight: 400;
-    color: #a08454;
+    display: none;
   }
   .brand .sub {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 6px;
-    letter-spacing: 0.02em;
+    display: none;
   }
 
   .controls {
     position: fixed;
-    top: 26px; right: 28px;
+    top: 30px; right: max(18px, calc(50% - 900px));
     display: flex;
-    gap: 8px;
-    z-index: 10;
+    align-items: center;
+    gap: 4px;
+    min-height: 62px;
+    max-width: min(520px, calc(50vw - 110px));
+    padding: 0 16px 0 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: rgba(255, 255, 255, 0.93);
+    border: 1px solid rgba(218, 208, 190, 0.82);
+    border-left: 0;
+    border-radius: 0 31px 31px 0;
+    box-shadow: 0 18px 48px -28px rgba(64, 48, 24, 0.45);
+    backdrop-filter: blur(14px);
+    z-index: 12;
   }
+  .controls::-webkit-scrollbar { display: none; }
   .btn {
-    background: var(--panel);
-    border: 1px solid var(--line);
+    background: transparent;
+    border: 1px solid transparent;
     padding: 9px 14px;
     border-radius: 10px;
     font-family: inherit;
@@ -132,7 +160,7 @@
     box-shadow: 0 1px 0 rgba(60, 40, 10, 0.04);
     transition: background 0.12s, transform 0.08s;
   }
-  .btn:hover { background: #faf5ea; }
+  .btn:hover { background: #f7f1e5; }
   .btn:active { transform: translateY(1px); }
   .btn.on {
     background: #f4ecd8;
@@ -147,12 +175,12 @@
   }
   .btn.icon {
     padding: 0;
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--ink);
+    color: #8d887d;
   }
   .btn.icon.disabled {
     opacity: 0.4;
@@ -170,7 +198,9 @@
   }
   .btn.icon.on::before { content: none; }
   .btn.icon.on {
-    box-shadow: inset 0 0 0 1px #d8c79e, 0 0 0 3px rgba(217, 168, 43, 0.12);
+    color: var(--ink);
+    background: #f4ecd8;
+    box-shadow: inset 0 0 0 1px #d8c79e, 0 0 0 3px rgba(217, 168, 43, 0.10);
   }
   .btn.icon.locked {
     position: relative;
@@ -178,16 +208,16 @@
     opacity: 0.78;
   }
   .btn.icon.locked::after {
-    content: '🔒';
+    content: '';
     position: absolute;
     bottom: -2px;
     right: -2px;
-    font-size: 10px;
-    line-height: 1;
+    width: 9px;
+    height: 7px;
     background: var(--panel);
-    border-radius: 50%;
-    padding: 2px 3px;
-    box-shadow: 0 0 0 1px var(--line);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    box-shadow: 0 -5px 0 -3px var(--line);
     pointer-events: none;
   }
 
@@ -295,46 +325,105 @@
     bottom: 28px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--panel);
-    padding: 10px 12px;
-    border-radius: 18px;
+    min-height: 62px;
+    background: rgba(255, 255, 255, 0.93);
+    padding: 0 18px;
+    border: 1px solid rgba(218, 208, 190, 0.82);
+    border-radius: 31px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    box-shadow: var(--shadow);
-    z-index: 10;
+    gap: 5px;
+    box-shadow: 0 18px 48px -28px rgba(64, 48, 24, 0.45);
+    backdrop-filter: blur(14px);
+    z-index: 12;
     max-width: calc(100vw - 32px);
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .toolbar-world-slot {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px 0 0;
+    margin-right: 8px;
+    border-right: 1px solid rgba(218, 208, 190, 0.92);
+    flex: 0 0 auto;
+  }
+  .toolbar .brand-title-btn {
+    position: relative;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 2px 0 0;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    letter-spacing: 0;
+    line-height: 1;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .toolbar .brand-title-btn::before {
+    content: '';
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #a6ca53, #75a83a);
+    box-shadow: inset 0 -3px 0 rgba(63, 98, 29, 0.2), 0 1px 2px rgba(60, 40, 10, 0.14);
+    flex: 0 0 auto;
+  }
+  .toolbar .brand-title-btn::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 17px;
+    width: 11px;
+    height: 9px;
+    border: 2px solid #fff;
+    border-top: 0;
+    border-radius: 0 0 2px 2px;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+  .toolbar .brand-title-btn em { display: none; }
+  .toolbar .brand-title-btn .brand-chevron {
+    width: 11px;
+    height: 11px;
+    margin-left: 1px;
+    color: #8d887d;
   }
   .tool-group-btn {
-    width: 82px;
-    height: 78px;
+    width: 78px;
+    height: 60px;
     border: 1px solid transparent;
-    border-radius: 12px;
+    border-radius: 18px;
     background: transparent;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     font-family: inherit;
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: 600;
+    font-size: 12px;
+    color: #8d887d;
+    font-weight: 700;
     transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.08s;
     flex-shrink: 0;
-    padding: 4px 2px;
+    padding: 5px 4px 4px;
   }
-  .tool-group-btn:hover { background: var(--line-soft); color: var(--ink); }
+  .tool-group-btn:hover { background: #f7f1e5; color: var(--ink); }
   .tool-group-btn.active {
-    background: #f4ecd8;
-    border-color: #d8c79e;
+    background: #f3ead7;
+    border-color: transparent;
     color: var(--ink);
   }
   .tool-group-btn .tool-thumb {
-    width: 48px;
-    height: 48px;
+    width: 34px;
+    height: 34px;
     display: block;
     pointer-events: none;
     image-rendering: -webkit-optimize-contrast;
@@ -342,14 +431,14 @@
   }
   .toolbar-divider {
     width: 1px;
-    height: 58px;
-    background: var(--line);
-    margin: 0 2px;
+    height: 42px;
+    background: rgba(218, 208, 190, 0.92);
+    margin: 0 10px;
     flex: 0 0 auto;
   }
   .toolbar .audio-panel {
     position: static;
-    min-width: 170px;
+    min-width: 150px;
     box-shadow: none;
     border: none;
     background: transparent;
@@ -359,7 +448,7 @@
     z-index: auto;
   }
   .toolbar .audio-row {
-    grid-template-columns: 22px 96px 34px;
+    grid-template-columns: 22px 80px 30px;
     gap: 6px;
   }
   .toolbar .audio-mute {
@@ -371,10 +460,10 @@
     height: 14px;
   }
   .tool {
-    width: 68px;
-    height: 78px;
+    width: 70px;
+    height: 60px;
     border: 1px solid transparent;
-    border-radius: 12px;
+    border-radius: 18px;
     background: transparent;
     cursor: pointer;
     display: flex;
@@ -383,17 +472,17 @@
     justify-content: center;
     gap: 3px;
     font-family: inherit;
-    font-size: 11px;
-    color: #6f685c;
-    font-weight: 650;
+    font-size: 12px;
+    color: #8d887d;
+    font-weight: 700;
     transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.08s;
     flex-shrink: 0;
-    padding: 4px 2px;
+    padding: 5px 4px 4px;
   }
-  .tool:hover { background: var(--line-soft); color: var(--ink); }
+  .tool:hover { background: #f7f1e5; color: var(--ink); }
   .tool.active {
-    background: #f4ecd8;
-    border-color: #d8c79e;
+    background: #f3ead7;
+    border-color: transparent;
     color: var(--ink);
   }
   .tool:active { transform: translateY(1px); }
@@ -418,8 +507,8 @@
     filter: contrast(1.45) brightness(0.78) saturate(1.28);
   }
   .tool .tool-thumb {
-    width: 48px;
-    height: 48px;
+    width: 34px;
+    height: 34px;
     display: block;
     pointer-events: none;
     /* Crisp pixel-accurate downsample for the WebGL bitmap. */
@@ -559,7 +648,6 @@
     gap: 4px;
     box-shadow: var(--shadow);
     z-index: 11;
-    /* Anchor below the flyout center so spring scales from the toolbar. */
     transform-origin: bottom center;
     transform: translate(-50%, 14px) scale(0.94);
     opacity: 0;
@@ -1845,18 +1933,43 @@
   .tab-bar button.active { background: var(--ink); color: var(--panel); border-color: var(--ink); }
   .save-empty { text-align: center; padding: 30px 10px; color: var(--muted); font-size: 13px; }
   @media (max-width: 600px) {
-    .brand .title { font-size: 22px; }
     .help { display: none; }
-    .controls { top: 20px; right: 20px; }
-    .brand { top: 20px; left: 20px; }
-    .toolbar { bottom: 16px; padding: 6px; gap: 4px; }
-    .tool-group-btn { width: 64px; height: 70px; font-size: 10px; padding: 3px 2px; }
-    .tool-group-btn .tool-thumb { width: 42px; height: 42px; }
+    .controls {
+      top: 12px;
+      right: 12px;
+      min-height: 54px;
+      max-width: 34vw;
+      padding: 0 10px;
+    }
+    .toolbar {
+      top: auto;
+      bottom: 16px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      min-height: 54px;
+      max-width: calc(100vw - 24px);
+      padding: 0 8px;
+      gap: 3px;
+    }
+    .toolbar-world-slot {
+      height: 44px;
+      padding-right: 8px;
+      margin-right: 5px;
+    }
+    .toolbar .brand-title-btn {
+      height: 38px;
+      font-size: 12px;
+    }
+    .toolbar .brand-title-btn::before { width: 24px; height: 24px; }
+    .toolbar .brand-title-btn::after { left: 7px; top: 15px; width: 10px; height: 8px; }
+    .tool-group-btn { width: 58px; height: 52px; font-size: 10px; padding: 3px 2px; border-radius: 15px; }
+    .tool-group-btn .tool-thumb { width: 28px; height: 28px; }
     .toolbar .audio-panel { min-width: 130px; }
     .toolbar .audio-row { grid-template-columns: 22px 70px 28px; }
-    .tool { width: 60px; height: 70px; font-size: 10px; padding: 3px 2px; }
+    .tool { width: 56px; height: 52px; font-size: 10px; padding: 3px 2px; border-radius: 15px; }
     .tool .swatch { width: 22px; height: 22px; }
-    .tool .tool-thumb { width: 42px; height: 42px; }
+    .tool .tool-thumb { width: 28px; height: 28px; }
     .unsaved-banner { bottom: 90px; font-size: 11.5px; padding: 7px 12px 7px 10px; }
   }
   @media (hover: none), (pointer: coarse) {
@@ -1891,7 +2004,7 @@
 
   <div class="brand">
     <button type="button" class="title brand-title-btn" id="world-menu-btn" aria-haspopup="menu" aria-expanded="false">
-      <span id="world-menu-label">Tiny World <em>Builder</em></span>
+      <span id="world-menu-label">My world</span>
       <svg class="brand-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
     <div class="sub">Tap to place · drag to orbit · pinch or scroll to zoom</div>
@@ -2557,7 +2670,7 @@
               </select>
             </label>
             <label>Model
-              <input id="gen-model" list="gen-model-list" autocomplete="off" spellcheck="false" placeholder="gpt-5.2" />
+              <input id="gen-model" list="gen-model-list" autocomplete="off" spellcheck="false" placeholder="gpt-5.5" />
               <datalist id="gen-model-list"></datalist>
               <div class="profile-hint" style="margin-top:4px;">Type any model name your key has access to. Suggestions are just shortcuts.</div>
             </label>
@@ -4355,7 +4468,7 @@
   }
 
   function isUnderpassTerrain(terrain) {
-    return terrain === 'path' || terrain === 'water';
+    return false;
   }
 
   function wrapHouseForUnderpass(house, terrain) {
@@ -7116,6 +7229,7 @@
     let nextKind = kind || null;
     if (nextKind === 'bridge') nextTerrain = 'water';
     else if (CROP_KINDS.has(nextKind)) nextTerrain = 'dirt';
+    else if (nextKind === 'house' && (nextTerrain === 'water' || nextTerrain === 'path' || nextTerrain === 'lava')) nextTerrain = 'grass';
     else if (nextTerrain === 'water' && nextKind !== 'house' && nextKind !== 'rock') nextKind = null;
     else if (nextTerrain === 'lava' && nextKind !== 'rock') nextKind = null;
 
@@ -7658,10 +7772,12 @@
   ];
 
   const TOOL_GROUPS = [
-    { id: 'terrain', label: 'Terrain', toolIds: ['grass', 'path', 'dirt', 'water', 'stone', 'lava', 'sand', 'snow', 'rock', 'tuft'], iconTool: 'grass' },
-    { id: 'build', label: 'Build', toolIds: ['house', 'fence', 'bridge'], iconTool: 'house' },
-    { id: 'grow', label: 'Grow', toolIds: ['tree', 'flower', 'bush', 'crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower'], iconTool: 'tree' },
-    { id: 'animals', label: 'Animals', toolIds: ['cow', 'sheep'], iconTool: 'cow' },
+    { id: 'terrain', label: 'Terrain', toolIds: ['grass', 'path', 'dirt', 'water', 'stone', 'lava', 'sand', 'snow', 'rock'], iconTool: 'grass' },
+    { id: 'plants', label: 'Plants', toolIds: ['tree', 'tuft', 'flower', 'bush'], iconTool: 'tree' },
+    { id: 'build', label: 'Build', toolIds: ['house'], iconTool: 'house' },
+    { id: 'infra', label: 'Infra', toolIds: ['fence', 'bridge'], iconTool: 'fence' },
+    { id: 'farm', label: 'Farm', toolIds: ['crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower'], iconTool: 'wheat' },
+    { id: 'life', label: 'Life', toolIds: ['cow', 'sheep'], iconTool: 'cow' },
   ];
 
   function groupForTool(tool) {
@@ -7941,6 +8057,13 @@
     bar.innerHTML = '';
     thumbScenes.forEach(t => { try { t.scene.traverse(o => safeDisposeGeometry(o.geometry)); } catch(_) {} });
     thumbScenes.clear();
+    const worldBtn = document.getElementById('world-menu-btn');
+    if (worldBtn) {
+      const slot = document.createElement('div');
+      slot.className = 'toolbar-world-slot';
+      slot.appendChild(worldBtn);
+      bar.appendChild(slot);
+    }
     const select = TOOLS.find(t => t.id === 'select');
     if (select) bar.appendChild(buildToolButton(select));
 
@@ -8094,6 +8217,7 @@
   function positionFlyout(btn, flyoutEl) {
     const r = btn.getBoundingClientRect();
     flyoutEl.style.left   = (r.left + r.width / 2) + 'px';
+    flyoutEl.style.top    = 'auto';
     flyoutEl.style.bottom = (window.innerHeight - r.top + 8) + 'px';
   }
 
@@ -10811,28 +10935,24 @@
   // localStorage under tinyworld:ai:* — never sent anywhere except the chosen
   // provider. Three providers supported out of the box.
   const AI_DEFAULTS = {
-    // Verified against provider docs/search 2026-05-13. Prefer the
-    // provider-maintained "latest" aliases where available so this app
-    // doesn't silently age back to last year's models.
+    // Suggestions only. The input remains free text so users can type any
+    // provider-side model that their key has access to.
     openai: {
-      model: 'gpt-5.2',
+      model: 'gpt-5.5',
       endpoint: 'https://api.openai.com/v1/chat/completions',
-      // Suggestions only — the input is a free-text field; type any
-      // model your key has access to.  Provider-maintained "-latest"
-      // aliases first so this list doesn't silently age out.
       models: [
+        'gpt-5.5', 'chat-latest',
         'gpt-5.2', 'gpt-5.2-chat-latest',
-        'gpt-5.1', 'gpt-5.1-chat-latest', 'gpt-5.1-mini',
       ],
     },
     anthropic: {
-      model: 'claude-opus-4-1-20250805',
+      model: 'claude-opus-4-7',
       endpoint: 'https://api.anthropic.com/v1/messages',
       models: [
+        'claude-opus-4-7',
+        'claude-sonnet-4-6',
         'claude-opus-4-1-20250805',
-        'claude-opus-4-20250514',
         'claude-sonnet-4-20250514',
-        'claude-3-7-sonnet-latest',
       ],
     },
     xai: {
@@ -10925,6 +11045,7 @@
     '- Use fences as line primitives: rails, walls, borders, pens, queue barriers, garden edging, pier rails, road gates, and castle-wall components. Set fenceSide deliberately.',
     '- Use rocks as sculptural primitives: ramps, monuments, boulders, skate obstacles, cliffs, rubble, stepping stones, and focal landmarks. Increase floors for larger/more detailed forms.',
     '- Use houses and variants as massing primitives: cottages for small buildings, manors for civic buildings, towers/turrets for vertical landmarks, high-rise for modern tall structures. Adjacent null-buildingType houses assemble into larger footprints.',
+    '- Buildings must sit directly on flat grass or dirt. Do not put houses on path, water, lava, raised terrain, decks, bridges, platforms, posts, or stilts.',
     '- Use crops/tufts/trees as texture primitives: fields, hedges, gardens, park planting, wild edges, orchards, and scale cues.',
     '- Prefer 3–5 clear assembled features over scattering many single unrelated cells. Make the construction legible from the default isometric camera.',
   ].join('\n');
@@ -10936,6 +11057,7 @@
       'Grid coordinates: x in 0..7 (left-right), z in 0..7 (front-back). Default cell is grass with no object.',
       'Only emit cells that differ from defaults — the renderer fills the rest.',
       'Houses cluster automatically when buildingType is null: adjacent houses merge into linear, L/T/+, or 2x2 forms. To force a single-cell variant set buildingType to cottage|manor|tower|skyscraper.',
+      'Buildings must sit directly on flat grass or dirt. Do not put houses on path, water, lava, raised terrain, decks, bridges, platforms, posts, or stilts.',
       'Repeat-tapping the same object increases floors/intensity: houses grow upward; trees, rocks, bridges, fences, tufts, and crops become larger, denser, or more detailed.',
       'A fence is a single side/leaf, not a full square. Set fenceSide to n|s|e|w for tile edges or center-x|center-z for centre-line walls.',
       'Fences placed on two perpendicular sides of a house can promote it to a castle turret and turn connected fence cells into stone wall — use this for castles.',
@@ -11097,27 +11219,31 @@
   }
 
   async function callOpenAI(endpoint, key, model, system, user) {
+    const isOpenAI = /api\.openai\.com/.test(endpoint);
+    const body = {
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: user },
+      ],
+      response_format: { type: 'json_object' },
+    };
+    // OpenAI's newer GPT models can reject legacy/non-default generation
+    // controls. Keep the OpenAI payload minimal and use the newer completion
+    // cap; xAI keeps the older chat-completions controls.
+    if (isOpenAI) {
+      body.max_completion_tokens = 16000;
+    } else {
+      body.temperature = 0.6;
+      body.max_tokens = 16000;
+    }
     const r = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'authorization': 'Bearer ' + key,
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user',   content: user },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.6,
-        // Lift the default output cap so large grids don't truncate
-        // mid-JSON.  48x48 = 2304 cells, each ~60 tokens of object form
-        // → up to ~140k output tokens worst case.  16k is a safe value
-        // for everyday 8-32 grids on gpt-5.x; users on capped tiers
-        // can dial down via the model picker.
-        max_tokens: 16000,
-      }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (await r.text()).slice(0, 200));
     const j = await r.json();
@@ -11572,7 +11698,7 @@
         normalized.buildingType = cell.buildingType || null;
       }
     }
-    if (normalized.kind === 'house' && cell.terrain === 'water') normalized.terrain = 'grass';
+      if (normalized.kind === 'house' && (cell.terrain === 'water' || cell.terrain === 'path' || cell.terrain === 'lava')) normalized.terrain = 'grass';
     return normalized;
   }
 
@@ -12339,6 +12465,9 @@
         'house','fence','bridge','tree','tuft','flower','bush','cow','sheep',
         'crop','corn','wheat','pumpkin','carrot','sunflower',
       ]);
+      if (normalizedKind === 'house' && (terrain === 'water' || terrain === 'path' || terrain === 'lava')) {
+        terrain = 'grass';
+      }
       if (normalizedKind && FLAT_REQUIRED.has(normalizedKind) && normalizedTerrainFloors > 1) {
         normalizedTerrainFloors = 1;
       }
@@ -13857,8 +13986,8 @@
 
     function paintLabel() {
       const active = findActiveWorld();
-      const name = active && active.name ? active.name : 'Tiny World <em>Builder</em>';
-      labelEl.innerHTML = name === 'Tiny World <em>Builder</em>' ? name : escapeName(name);
+      const name = active && active.name ? active.name : 'My world';
+      labelEl.innerHTML = escapeName(name);
       nameInput.value = (active && active.name) || '';
       nameInput.placeholder = (active && active.name) || 'Untitled world';
     }
@@ -13953,6 +14082,12 @@
 
     function open() {
       paintLabel(); paintList();
+      const r = trigger.getBoundingClientRect();
+      const width = menu.offsetWidth || 320;
+      const left = Math.max(12, Math.min(window.innerWidth - width - 12, r.left));
+      menu.style.left = left + 'px';
+      menu.style.top = 'auto';
+      menu.style.bottom = (window.innerHeight - r.top + 10) + 'px';
       menu.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
     }
