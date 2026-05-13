@@ -4376,6 +4376,7 @@
     const terrainN = (neighbors && neighbors.terrain) || { n: null, s: null, e: null, w: null };
     const rise = terrainRiseForLevel(level);
     const topY = rise + TOP_H;
+    g.userData.weatherSurfaceY = topY + 0.03;
 
     // Dirt block (sides + bottom of tile). Slightly overlap neighbours so
     // shallow camera angles can't see background through per-tile bevel gaps
@@ -7321,6 +7322,7 @@
         tile.userData.boardX = boardX;
         tile.userData.boardZ = boardZ;
         tile.userData.fadeRole = 'tile';
+        applyWeatherTileEffect(tile);
         prepareFadeable(tile, { ghost: true, grayscale: true, opacity: opacityAtWorldPosition(tile.position.x, tile.position.z) });
         board.add(tile);
 
@@ -8022,6 +8024,72 @@
     return FENCE_SIDES.has(side) ? side : 'n';
   }
 
+  // -------- weather tile effects --------
+  // Rain/snow particles are local to the camera, but the weather state itself
+  // should read across every rendered tile. These overlays are cheap shared
+  // slabs added to home + preview tile groups and refreshed when weather flips.
+  var tileWeatherMode = 'clear';
+  let weatherTileAssets = null;
+  function ensureWeatherTileAssets() {
+    if (weatherTileAssets) return weatherTileAssets;
+    const geo = new THREE.BoxGeometry(0.86, 0.012, 0.86);
+    geo.userData.cached = true;
+    weatherTileAssets = {
+      geo,
+      rain: new THREE.MeshBasicMaterial({ color: 0x6f8494, transparent: true, opacity: 0.16, depthWrite: false }),
+      snow: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false }),
+    };
+    applyWeatherTileOpacity();
+    return weatherTileAssets;
+  }
+  function applyWeatherTileOpacity() {
+    if (!weatherTileAssets) return;
+    const k = Math.max(0.25, Math.min(1, weatherIntensity || 0.25));
+    weatherTileAssets.rain.opacity = 0.06 + 0.14 * k;
+    weatherTileAssets.snow.opacity = 0.10 + 0.22 * k;
+  }
+  function clearWeatherTileEffect(tile) {
+    const fx = tile && tile.userData && tile.userData.weatherFx;
+    if (!fx) return;
+    tile.remove(fx);
+    safeDisposeGeometry(fx.geometry);
+    tile.userData.weatherFx = null;
+    tile.userData.weatherFxMode = null;
+  }
+  function applyWeatherTileEffect(tile) {
+    if (!tile || !tile.userData || tile.userData.fadeRole !== 'tile') return;
+    const mode = tileWeatherMode;
+    if (mode !== 'rain' && mode !== 'snow') {
+      clearWeatherTileEffect(tile);
+      return;
+    }
+    if (tile.userData.weatherFx && tile.userData.weatherFxMode === mode) return;
+    clearWeatherTileEffect(tile);
+    const assets = ensureWeatherTileAssets();
+    const fx = new THREE.Mesh(assets.geo, mode === 'snow' ? assets.snow : assets.rain);
+    fx.name = 'weatherTileFx';
+    fx.position.y = tile.userData.weatherSurfaceY || (TOP_H + 0.03);
+    fx.renderOrder = mode === 'snow' ? 5 : 4;
+    fx.castShadow = false;
+    fx.receiveShadow = false;
+    tile.add(fx);
+    tile.userData.weatherFx = fx;
+    tile.userData.weatherFxMode = mode;
+  }
+  function updateWeatherTileEffects() {
+    for (const key in cellMeshes) {
+      const entry = cellMeshes[key];
+      if (entry && entry.tile) applyWeatherTileEffect(entry.tile);
+    }
+    if (typeof ghostBoards !== 'undefined') {
+      for (const board of ghostBoards.values()) {
+        board.traverse(o => {
+          if (o && o.userData && o.userData.fadeRole === 'tile') applyWeatherTileEffect(o);
+        });
+      }
+    }
+  }
+
   // -------- low-level renderers (build the actual meshes from world state) --------
   function renderCellTile(x, z, opts) {
     if (!shouldRenderCellMesh(x, z)) return;
@@ -8044,6 +8112,7 @@
     tile.userData.gx = x;
     tile.userData.gz = z;
     tile.userData.fadeRole = 'tile';
+    applyWeatherTileEffect(tile);
     prepareFadeable(tile, { opacity: opacityAtWorldPosition(p.x, p.z), grayscale: isOutsideHomeGrid(x, z) });
     worldGroup.add(tile);
     entry.tile = tile;
@@ -11498,11 +11567,14 @@
 
   function setWeatherMode(mode) {
     weatherMode = mode;
+    tileWeatherMode = mode;
+    updateWeatherTileEffects();
     setPrecipActive(rainMesh, mode === 'rain' ? Math.round(420 * weatherIntensity) : 0);
     setPrecipActive(snowMesh, mode === 'snow' ? Math.round(320 * weatherIntensity) : 0);
   }
   function setWeatherIntensity(value) {
     weatherIntensity = Math.max(0.25, Math.min(1, Number.isFinite(value) ? value : 0.25));
+    applyWeatherTileOpacity();
     setWeatherMode(weatherMode);
   }
   function setWeatherSplashIntensity(value) {
