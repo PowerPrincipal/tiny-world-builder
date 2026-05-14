@@ -4,6 +4,7 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'tiny-world-builder.html'), 'utf8');
+const devServer = fs.readFileSync(path.join(root, 'tools/dev-server.js'), 'utf8');
 
 function fail(message) {
   console.error('smoke failed:', message);
@@ -21,6 +22,16 @@ requireIncludes('function renderCellObject(', 'object renderer');
 requireIncludes('function applyTool(', 'tool application');
 requireIncludes('function doClear(', 'clear action');
 requireIncludes('function togglePerspective(', 'camera toggle');
+requireIncludes('function runSeededVehicleDemo(', 'shareable vehicle seed demo');
+requireIncludes('VEHICLE_DEMO_DEFAULT_SEED', 'vehicle demo default seed');
+requireIncludes('vehicle-demo-badge', 'visible vehicle demo badge');
+requireIncludes('M_VEHICLE.beacon', 'visible vehicle beacon marker');
+requireIncludes('VEHICLE_COLLISION_RADIUS', 'vehicle collision radius');
+requireIncludes('function getVehicleCollisionRisk(', 'vehicle collision risk check');
+requireIncludes('function rerouteVehicleAroundTraffic(', 'traffic-aware vehicle reroute');
+requireIncludes('function isVehicleDrivableCell(', 'object-aware vehicle drivable cell check');
+requireIncludes('function refreshVehiclesForWorldObstacleChange(', 'vehicle reroute on world obstacle edits');
+requireIncludes('__getVehicleRuntimeSnapshot', 'vehicle runtime debug snapshot');
 requireIncludes('function makeCloud(', 'voxel cloud factory');
 requireIncludes('function openTinyModal(', 'modal focus helper');
 requireIncludes('customDepthMaterial', 'cloud shadow depth material');
@@ -46,6 +57,16 @@ for (const asset of [
   'vendor/three/GLTFLoader.r128.js',
 ]) {
   if (!fs.existsSync(path.join(root, asset))) fail('missing local asset ' + asset);
+}
+
+if (!devServer.includes("const vehicleDemoPath = '/tiny-world-builder?demo=vehicles&seed=tide-ridge-428'")) {
+  fail('dev server root does not define the vehicle demo redirect path');
+}
+if (!devServer.includes("if (pathname === '/') return { redirect: vehicleDemoPath };")) {
+  fail('dev server bare root does not redirect to the vehicle demo');
+}
+if (!devServer.includes("if (pathname === '/tiny-world-builder' && !parsed.search) return { redirect: vehicleDemoPath };")) {
+  fail('dev server /tiny-world-builder without query does not redirect to the vehicle demo');
 }
 
 console.log('smoke ok');

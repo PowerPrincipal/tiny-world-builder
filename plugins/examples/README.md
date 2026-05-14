@@ -111,3 +111,64 @@ Example MCP server config:
 
 Start `sse-command-relay.js` before calling mutation tools from MCP. Start
 `webhook-receiver.js` if you want MCP to read outbound events.
+
+## Watchable Vehicle Road Demo
+
+For a shareable browser-only seeded demo, open:
+
+```text
+http://localhost:3000/tiny-world-builder?demo=vehicles&seed=tide-ridge-428
+```
+
+That path does not require the SSE relay: the app itself creates the seeded map,
+places cars, assigns one target per car, and starts them driving.
+
+`vehicle-road-demo.js` is a no-dependency MCP client that talks to
+`mcp-stdio-bridge.js`, paints a road/water/bridge network through the SSE relay,
+spawns runtime vehicles, then keeps retargeting them so the browser stays
+visibly active.
+
+Terminal A:
+
+```bash
+npm run dev
+```
+
+Terminal B:
+
+```bash
+node plugins/examples/sse-command-relay.js
+```
+
+Optional webhook capture:
+
+```bash
+node plugins/examples/webhook-receiver.js
+```
+
+In the app Developer panel, set:
+
+```text
+Inbound SSE relay URL: http://localhost:8788/sse
+Outbound webhook URL: http://localhost:8787/webhook
+```
+
+Then run:
+
+```bash
+npm run demo:vehicles
+```
+
+Useful variants:
+
+```bash
+# run exactly two retarget cycles, useful for smoke checks
+node plugins/examples/vehicle-road-demo.js --cycles 2 --paint-delay 0
+
+# keep the existing road layout and respawn/retarget vehicles only
+node plugins/examples/vehicle-road-demo.js --skip-layout
+```
+
+The script waits for at least one connected browser SSE client by default. Use
+`--no-wait-client` only when deliberately sending commands into an unattended
+relay.

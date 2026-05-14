@@ -16,6 +16,8 @@ The app has browser-local integration points, not a backend API:
   SSE URL. Each SSE `data:` payload must be one JSON command accepted by
   `applyRemoteCommand`.
 - Supported inbound ops include `place` / `set_cell`, `clear`, `reset`, plus runtime-only vehicle controls: `vehicle_spawn`, `vehicle_set_goal`, `vehicle_controls`, `vehicle_remove`, and `vehicle_clear`.
+- Runtime vehicles must not pass through each other. Keep traffic behavior in the runtime layer: collision radius + yield radius, brake when another vehicle is inside the envelope, and reroute around occupied road cells after a short blockage when an alternate road path exists.
+- Placed objects on paths are live traffic blockers. `isVehicleDrivableCell` should allow path cells only when the main `kind`/extras do not occupy the tile, while bridge cells remain drivable. Call `refreshVehiclesForWorldObstacleChange` from world edit paths so active auto vehicles reroute immediately when the user drops or removes an obstacle.
 
 Examples live under `plugins/examples/`:
 
@@ -25,5 +27,17 @@ Examples live under `plugins/examples/`:
 - `send-command.js` is a small CLI for the relay.
 - `mcp-stdio-bridge.js` is a dependency-free MCP stdio server that calls the
   relay and reads the webhook log.
+- `vehicle-road-demo.js` is a dependency-free MCP client/demo runner that talks
+  to `mcp-stdio-bridge.js`, paints a visible road/water/bridge network, spawns
+  runtime vehicles, and retargets them in a loop so the browser remains
+  watchably active.
+- The app also supports a browser-native shareable vehicle demo URL:
+  `?demo=vehicles&seed=tide-ridge-428`. It creates the map, places cars,
+  assigns targets, and starts driving without requiring the SSE relay. Keep this
+  demo visually self-identifying: show an active badge, hide overlays that cover
+  the road network, and make vehicles obvious with beacons/markers. During local
+  demo work, `tools/dev-server.js` should make bare `http://localhost:3000/`
+  and no-query `http://localhost:3000/tiny-world-builder` redirect to that seed
+  so the user can simply open the port or remembered app URL and watch it.
 
 When changing command shape, update the app bridge and these examples together.

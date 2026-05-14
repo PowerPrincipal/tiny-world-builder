@@ -31,13 +31,25 @@ function send(res, status, body, headers = {}) {
   res.end(body);
 }
 
-function fileForRequest(reqUrl) {
+const vehicleDemoPath = '/tiny-world-builder?demo=vehicles&seed=tide-ridge-428';
+
+function redirect(res, location) {
+  res.writeHead(302, {
+    Location: location,
+    'Cache-Control': 'no-store',
+  });
+  res.end();
+}
+
+function routeForRequest(reqUrl) {
   const parsed = new URL(reqUrl, 'http://localhost');
-  let pathname = decodeURIComponent(parsed.pathname);
-  if (pathname === '/' || pathname === '/tiny-world-builder') pathname = '/tiny-world-builder.html';
+  const pathname = decodeURIComponent(parsed.pathname);
+  if (pathname === '/') return { redirect: vehicleDemoPath };
+  if (pathname === '/tiny-world-builder' && !parsed.search) return { redirect: vehicleDemoPath };
+  if (pathname === '/tiny-world-builder') return { file: path.resolve(root, 'tiny-world-builder.html') };
   const resolved = path.resolve(root, '.' + pathname);
   if (!resolved.startsWith(root + path.sep) && resolved !== root) return null;
-  return resolved;
+  return { file: resolved };
 }
 
 const server = http.createServer((req, res) => {
@@ -45,11 +57,16 @@ const server = http.createServer((req, res) => {
     send(res, 405, 'Method Not Allowed', { Allow: 'GET, HEAD' });
     return;
   }
-  const file = fileForRequest(req.url);
-  if (!file) {
+  const route = routeForRequest(req.url);
+  if (!route) {
     send(res, 403, 'Forbidden');
     return;
   }
+  if (route.redirect) {
+    redirect(res, route.redirect);
+    return;
+  }
+  const file = route.file;
   fs.stat(file, (statErr, stat) => {
     if (statErr || !stat.isFile()) {
       send(res, 404, 'Not Found');
@@ -79,6 +96,7 @@ server.on('error', (err) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Tiny World dev server: http://localhost:${port}/tiny-world-builder`);
+  console.log(`Tiny World dev server: http://localhost:${port}${vehicleDemoPath}`);
+  console.log(`Bare port redirects to vehicle demo: http://localhost:${port}/`);
   console.log('Press Ctrl+C to stop.');
 });

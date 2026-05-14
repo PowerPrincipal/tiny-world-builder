@@ -49,7 +49,25 @@ netlify deploy --build
 
 ## Vehicle runtime (Road AI)
 
-You can drive runtime vehicles through the same relay/API path used by `send-command.js`.
+Shareable seeded demo:
+
+```text
+http://localhost:3000/
+# redirects to /tiny-world-builder?demo=vehicles&seed=tide-ridge-428 in the local dev server
+# /tiny-world-builder with no query redirects there too
+```
+
+Direct seeded URL:
+
+```text
+http://localhost:3000/tiny-world-builder?demo=vehicles&seed=tide-ridge-428
+```
+
+Loading that URL creates the map, places three cars, assigns a target to each
+car, and starts them driving. The seed is deterministic; change the `seed=`
+value to get the same road layout with different deterministic scenery.
+
+You can also drive runtime vehicles through the same relay/API path used by `send-command.js`.
 
 - `vehicle-spawn --x <n> --z <n> --mode auto|manual --goalX <n> --goalZ <n>`
 - `vehicle-goal --id <id> --x <n> --z <n>`
@@ -57,7 +75,13 @@ You can drive runtime vehicles through the same relay/API path used by `send-com
 - `vehicle-remove --id <id|all>`
 - `vehicle-clear`
 
-Vehicles only move on `path` cells (or bridge cells used as road bridges). If no path exists between goal and start, the car idles.
+Vehicles only move on `path` cells (or bridge cells used as road bridges). Placed objects on paths become live traffic blockers, so dropping a rock/tree/house/fence onto a road makes active cars reroute around that cell or stop if no alternate path exists. Runtime traffic checks also keep cars from passing through each other: vehicles brake/yield inside the collision envelope and, when blocked long enough, reroute around occupied road cells if the network has an alternate path.
+
+For live telemetry in the browser console:
+
+```js
+window.__getVehicleRuntimeSnapshot()
+```
 
 ## Tools
 

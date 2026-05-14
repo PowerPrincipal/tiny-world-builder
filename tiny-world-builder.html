@@ -1036,6 +1036,49 @@
     transition: transform 0.24s cubic-bezier(0.34, 1.36, 0.64, 1);
   }
 
+  .vehicle-demo-badge {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 75;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 999px;
+    background: rgba(22, 24, 28, 0.78);
+    color: #fff8e6;
+    box-shadow: 0 16px 36px rgba(36, 28, 12, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(14px) saturate(1.2);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
+  .vehicle-demo-badge strong {
+    font-weight: 800;
+    color: #8fffd8;
+  }
+  .vehicle-demo-badge span {
+    color: rgba(255, 248, 230, 0.76);
+  }
+  .vehicle-demo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #21f5ac;
+    box-shadow: 0 0 0 0 rgba(33, 245, 172, 0.52), 0 0 18px rgba(33, 245, 172, 0.82);
+    animation: vehicle-demo-pulse 1.1s ease-in-out infinite;
+  }
+  body.vehicle-demo-active .agent-input {
+    display: none;
+  }
+  @keyframes vehicle-demo-pulse {
+    0%, 100% { transform: scale(0.86); box-shadow: 0 0 0 0 rgba(33, 245, 172, 0.52), 0 0 18px rgba(33, 245, 172, 0.82); }
+    50% { transform: scale(1.12); box-shadow: 0 0 0 7px rgba(33, 245, 172, 0), 0 0 24px rgba(33, 245, 172, 0.92); }
+  }
+
   /* Suggestion chips — float under the input bar and follow it when
      dragged (positioned absolute against .agent-input). Wrap onto
      multiple rows so longer suggestions don't clip. */
@@ -6663,6 +6706,7 @@
     light:       new THREE.MeshLambertMaterial({ color: 0xffe082 }),
     tailLight:   new THREE.MeshLambertMaterial({ color: 0xd94a4a }),
     signal:      new THREE.MeshLambertMaterial({ color: 0xffffff }),
+    beacon:      new THREE.MeshBasicMaterial({ color: 0x20f7c7, transparent: true, opacity: 0.82, depthWrite: false }),
   };
 
   function makeFlower() {
@@ -6769,6 +6813,7 @@
 
   function makeVehicle() {
     const g = new THREE.Group();
+    g.scale.setScalar(1.28);
     const wheels = [];
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.62), M_VEHICLE.body);
     body.position.set(0, 0.17, 0);
@@ -6805,6 +6850,16 @@
     addWheel(0.18, 0.22);
     addWheel(-0.18, -0.22);
     addWheel(0.18, -0.22);
+
+    const beacon = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.014, 8, 32), M_VEHICLE.beacon);
+    beacon.position.set(0, 0.50, 0);
+    beacon.rotation.x = Math.PI / 2;
+    g.add(beacon);
+
+    const marker = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 4), M_VEHICLE.light);
+    marker.position.set(0, 0.74, 0);
+    marker.rotation.y = Math.PI / 4;
+    g.add(marker);
 
     g.userData = { kind: 'vehicle', wheels };
     castReceive(g);
@@ -6863,6 +6918,9 @@
   const VEHICLE_TURN_RATE = 3.1;
   const VEHICLE_WAYPOINT_EPSILON = 0.10;
   const VEHICLE_DEFAULT_SPEED = 1.6;
+  const VEHICLE_COLLISION_RADIUS = 0.84;
+  const VEHICLE_YIELD_RADIUS = 1.35;
+  const VEHICLE_LANE_WIDTH = 0.42;
   const vehicleFleet = new Map();
   let nextVehicleId = 1;
 
@@ -6894,10 +6952,52 @@
     };
   }
 
+  function hasVehicleBlockingKind(kind) {
+    return !!kind && kind !== 'bridge';
+  }
+
+  function hasVehicleBlockingExtras(cell) {
+    return !!(cell && cell.extras && cell.extras.some(extra => extra && hasVehicleBlockingKind(extra.kind)));
+  }
+
+  function isVehicleDrivableCell(cell) {
+    if (!cell) return false;
+    if (cell.kind === 'bridge') return true;
+    if (hasVehicleBlockingKind(cell.kind)) return false;
+    if (hasVehicleBlockingExtras(cell)) return false;
+    return cell.terrain === 'path';
+  }
+
   function isVehicleRoadCell(x, z) {
     if (x < 0 || x >= GRID || z < 0 || z >= GRID) return false;
-    const c = getWorldCell(x, z);
-    return !!c && (c.terrain === 'path' || c.kind === 'bridge');
+    return isVehicleDrivableCell(getWorldCell(x, z));
+  }
+
+  function refreshVehiclesForWorldObstacleChange(x, z) {
+    if (!vehicleFleet.size) return;
+    for (const state of vehicleFleet.values()) {
+      if (!state || state.remove || state.mode === 'manual') continue;
+      const currentCell = vehicleCellFromWorld(state.x, state.z);
+      if (currentCell.inside && !isVehicleRoadCell(currentCell.cellX, currentCell.cellZ)) {
+        state.speed = 0;
+        state.blockedBy = 'world:' + currentCell.cellX + ',' + currentCell.cellZ;
+        state.collisionBrake = true;
+        continue;
+      }
+      if (!state.pathGoal) continue;
+      const pathTouchesEdit = state.path.some(wp => wp && wp.cellX === x && wp.cellZ === z);
+      const pathHasObstacle = state.path.some(wp => !wp || !isVehicleRoadCell(wp.cellX, wp.cellZ));
+      const blockedByWorld = typeof state.blockedBy === 'string' && state.blockedBy.startsWith('world:');
+      if (!pathTouchesEdit && !pathHasObstacle && !blockedByWorld) continue;
+      const rerouted = updateVehicleGoal(state.id, state.pathGoal.x, state.pathGoal.z);
+      if (!rerouted || !state.path.length) {
+        state.speed = 0;
+        state.blockedBy = 'world:' + x + ',' + z;
+        state.collisionBrake = false;
+      } else {
+        clearVehicleCollisionBrake(state);
+      }
+    }
   }
 
   function vehicleRoadHeightAtCell(x, z) {
@@ -6965,7 +7065,7 @@
     return x + ',' + z;
   }
 
-  function findVehiclePath(start, goal) {
+  function findVehiclePath(start, goal, blockedCells = null) {
     const s = resolveRoadCellFromWorld(start.x, start.z, 0);
     const g = resolveRoadCellFromWorld(goal.x, goal.z, 0);
     if (!s || !g) return [];
@@ -6996,6 +7096,7 @@
       for (const [nx, nz] of candidates) {
         if (!isVehicleRoadCell(nx, nz)) continue;
         const nk = pathKey(nx, nz);
+        if (blockedCells && blockedCells.has(nk) && nk !== goalKey) continue;
         const tg = cur.g + 1;
         const prev = gScore.get(nk);
         if (prev !== undefined && tg >= prev) continue;
@@ -7059,6 +7160,10 @@
       path: [],
       pathIndex: 0,
       pathGoal: null,
+      blockedBy: null,
+      blockedFor: 0,
+      collisionBrake: false,
+      trafficRerouteCooldown: 0,
       remove: false,
     };
 
@@ -7169,7 +7274,157 @@
     return true;
   }
 
+  function vehicleDistanceSq(ax, az, bx, bz) {
+    const dx = ax - bx;
+    const dz = az - bz;
+    return dx * dx + dz * dz;
+  }
+
+  function vehicleSegmentDistanceSq(px, pz, ax, az, bx, bz) {
+    const vx = bx - ax;
+    const vz = bz - az;
+    const lenSq = vx * vx + vz * vz;
+    if (lenSq <= 0.000001) return vehicleDistanceSq(px, pz, ax, az);
+    const t = Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / lenSq));
+    const cx = ax + vx * t;
+    const cz = az + vz * t;
+    return vehicleDistanceSq(px, pz, cx, cz);
+  }
+
+  function vehiclePriorityKey(state) {
+    return String(state && state.id ? state.id : '');
+  }
+
+  function vehicleHasPriority(state, other) {
+    if (state.mode === 'manual' && other.mode !== 'manual') return true;
+    if (other.mode === 'manual' && state.mode !== 'manual') return false;
+    return vehiclePriorityKey(state) < vehiclePriorityKey(other);
+  }
+
+  function getVehicleTrafficBlockedCells(state) {
+    const blocked = new Set();
+    for (const other of vehicleFleet.values()) {
+      if (other === state || other.remove) continue;
+      const cell = vehicleCellFromWorld(other.x, other.z);
+      if (cell.inside) blocked.add(pathKey(cell.cellX, cell.cellZ));
+      const wp = other.path && other.path[other.pathIndex];
+      if (wp && Number.isFinite(wp.cellX) && Number.isFinite(wp.cellZ)) blocked.add(pathKey(wp.cellX, wp.cellZ));
+    }
+    return blocked;
+  }
+
+  function rerouteVehicleAroundTraffic(state) {
+    if (!state.pathGoal) return false;
+    const target = resolveRoadCellFromCommand(state.pathGoal.x, state.pathGoal.z, GRID);
+    if (!target) return false;
+    const goalPoint = tilePos(target.x, target.z);
+    const blockedCells = getVehicleTrafficBlockedCells(state);
+    const path = findVehiclePath({ x: state.x, z: state.z }, {
+      x: goalPoint.x,
+      z: goalPoint.z,
+    }, blockedCells);
+    if (!path.length) return false;
+    state.path = path;
+    state.pathIndex = 0;
+    state.goal = target;
+    if (path[0]) {
+      state.angle = Math.atan2(path[0].x - state.x, path[0].z - state.z);
+      state.mesh.rotation.y = state.angle;
+    }
+    return true;
+  }
+
+  function getVehicleCollisionRisk(state, nextX, nextZ) {
+    const hardSq = VEHICLE_COLLISION_RADIUS * VEHICLE_COLLISION_RADIUS;
+    const yieldSq = VEHICLE_YIELD_RADIUS * VEHICLE_YIELD_RADIUS;
+    const fx = Math.sin(state.angle);
+    const fz = Math.cos(state.angle);
+
+    for (const other of vehicleFleet.values()) {
+      if (other === state || other.remove) continue;
+      const currentSq = vehicleDistanceSq(state.x, state.z, other.x, other.z);
+      const nextSq = vehicleDistanceSq(nextX, nextZ, other.x, other.z);
+      const sweptSq = vehicleSegmentDistanceSq(other.x, other.z, state.x, state.z, nextX, nextZ);
+      if (nextSq < hardSq || sweptSq < hardSq) {
+        return { other, hard: true };
+      }
+
+      const relX = other.x - state.x;
+      const relZ = other.z - state.z;
+      const forward = relX * fx + relZ * fz;
+      const lateral = Math.abs(relX * fz - relZ * fx);
+      const directlyAhead = forward > 0 && forward < VEHICLE_YIELD_RADIUS && lateral < VEHICLE_LANE_WIDTH;
+      const closing = nextSq < currentSq;
+      if ((directlyAhead || (closing && nextSq < yieldSq)) && !vehicleHasPriority(state, other)) {
+        return { other, hard: false };
+      }
+    }
+
+    return null;
+  }
+
+  function applyVehicleCollisionBrake(state, risk, dt) {
+    state.blockedBy = risk && risk.other ? risk.other.id : null;
+    state.blockedFor += dt;
+    state.collisionBrake = !!(risk && risk.hard);
+    state.speed *= Math.max(0, 1 - state.brake * dt * (risk && risk.hard ? 2.6 : 1.4));
+    if (risk && risk.hard) state.speed = 0;
+    if (Math.abs(state.speed) < 0.04) state.speed = 0;
+    if (state.blockedFor > 0.7 && state.trafficRerouteCooldown <= 0 && rerouteVehicleAroundTraffic(state)) {
+      state.trafficRerouteCooldown = 1.4;
+      state.blockedFor = 0;
+    }
+    if (state.mesh && state.mesh.userData) {
+      state.mesh.userData.blockedBy = state.blockedBy;
+      state.mesh.userData.collisionBrake = state.collisionBrake;
+    }
+  }
+
+  function clearVehicleCollisionBrake(state) {
+    state.blockedBy = null;
+    state.blockedFor = 0;
+    state.collisionBrake = false;
+    if (state.mesh && state.mesh.userData) {
+      state.mesh.userData.blockedBy = null;
+      state.mesh.userData.collisionBrake = false;
+    }
+  }
+
+  function getVehicleRuntimeSnapshot() {
+    const vehicles = Array.from(vehicleFleet.values()).map(state => ({
+      id: state.id,
+      x: state.x,
+      z: state.z,
+      speed: state.speed,
+      mode: state.mode,
+      pathLength: state.path.length,
+      pathIndex: state.pathIndex,
+      blockedBy: state.blockedBy,
+      blockedFor: state.blockedFor,
+      collisionBrake: state.collisionBrake,
+      trafficRerouteCooldown: state.trafficRerouteCooldown,
+      visible: !!(state.mesh && state.mesh.visible),
+    }));
+    let minDistance = null;
+    for (let i = 0; i < vehicles.length; i++) {
+      for (let j = i + 1; j < vehicles.length; j++) {
+        const d = Math.hypot(vehicles[i].x - vehicles[j].x, vehicles[i].z - vehicles[j].z);
+        if (minDistance === null || d < minDistance) minDistance = d;
+      }
+    }
+    return {
+      count: vehicles.length,
+      collisionRadius: VEHICLE_COLLISION_RADIUS,
+      yieldRadius: VEHICLE_YIELD_RADIUS,
+      minDistance,
+      vehicles,
+    };
+  }
+
   function tickVehicle(state, dt) {
+    if (state.trafficRerouteCooldown > 0) {
+      state.trafficRerouteCooldown = Math.max(0, state.trafficRerouteCooldown - dt);
+    }
     const currentCell = vehicleCellFromWorld(state.x, state.z);
     if (currentCell.inside) {
       const rise = vehicleRoadHeightAtCell(currentCell.cellX, currentCell.cellZ);
@@ -7248,6 +7503,14 @@
       }
       return;
     }
+
+    const collisionRisk = getVehicleCollisionRisk(state, nextX, nextZ);
+    if (collisionRisk) {
+      applyVehicleCollisionBrake(state, collisionRisk, dt);
+      state.mesh.rotation.y = state.angle;
+      return;
+    }
+    clearVehicleCollisionBrake(state);
 
     state.x = nextX;
     state.z = nextZ;
@@ -7334,6 +7597,244 @@
       return;
     }
   }
+
+  // -------- seeded vehicle demo --------
+  const VEHICLE_DEMO_DEFAULT_SEED = 'tide-ridge-428';
+  const vehicleDemoTimers = [];
+  let vehicleDemoInterval = 0;
+  let activeVehicleDemoSeed = '';
+
+  function stopSeededVehicleDemo(opts = {}) {
+    while (vehicleDemoTimers.length) clearTimeout(vehicleDemoTimers.pop());
+    if (vehicleDemoInterval) {
+      clearInterval(vehicleDemoInterval);
+      vehicleDemoInterval = 0;
+    }
+    hideVehicleDemoBadge();
+    if (opts.clearVehicles) clearVehicleRuntime();
+  }
+
+  function queueVehicleDemoStep(fn, delay) {
+    const timer = setTimeout(() => {
+      const idx = vehicleDemoTimers.indexOf(timer);
+      if (idx >= 0) vehicleDemoTimers.splice(idx, 1);
+      fn();
+    }, delay);
+    vehicleDemoTimers.push(timer);
+    return timer;
+  }
+
+  function vehicleDemoShareUrl(seed = VEHICLE_DEMO_DEFAULT_SEED) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('demo', 'vehicles');
+    url.searchParams.set('seed', String(seed || VEHICLE_DEMO_DEFAULT_SEED));
+    return url.href;
+  }
+
+  function getVehicleDemoUrlRequest() {
+    const params = new URLSearchParams(window.location.search || '');
+    const hash = String(window.location.hash || '').replace(/^#\??/, '');
+    if (hash && hash.includes('=')) {
+      const hashParams = new URLSearchParams(hash);
+      hashParams.forEach((value, key) => { if (!params.has(key)) params.set(key, value); });
+    }
+    const demo = normalizeVehicleAction(params.get('demo') || params.get('twbDemo'));
+    const enabled = demo === 'vehicles' || demo === 'vehicle-demo' || params.get('vehicleDemo') === '1' || params.has('vehicleSeed');
+    if (!enabled) return null;
+    return {
+      seed: params.get('seed') || params.get('vehicleSeed') || params.get('worldSeed') || VEHICLE_DEMO_DEFAULT_SEED,
+    };
+  }
+
+  function showVehicleDemoBadge(seed, vehicleCount) {
+    if (!document || !document.body) return;
+    document.body.classList.add('vehicle-demo-active');
+    let badge = document.getElementById('vehicle-demo-badge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'vehicle-demo-badge';
+      badge.className = 'vehicle-demo-badge';
+      badge.setAttribute('role', 'status');
+      badge.setAttribute('aria-live', 'polite');
+      document.body.appendChild(badge);
+    }
+    badge.textContent = '';
+
+    const dot = document.createElement('i');
+    dot.className = 'vehicle-demo-dot';
+    dot.setAttribute('aria-hidden', 'true');
+
+    const title = document.createElement('strong');
+    title.textContent = 'Vehicle demo running';
+
+    const detail = document.createElement('span');
+    detail.textContent = vehicleCount + ' cars driving roads · seed ' + seed;
+
+    badge.append(dot, title, detail);
+  }
+
+  function hideVehicleDemoBadge() {
+    if (!document || !document.body) return;
+    document.body.classList.remove('vehicle-demo-active');
+    const badge = document.getElementById('vehicle-demo-badge');
+    if (badge) badge.remove();
+  }
+
+  function buildSeededVehicleDemo(seed = VEHICLE_DEMO_DEFAULT_SEED) {
+    const rng = makeMulberry32('vehicle-demo:' + seed);
+    const roadCells = new Set();
+    const waterRow = 4;
+    const bridgeCols = [1, 3, 5, 6];
+    const addRoad = (x, z) => roadCells.add(x + ',' + z);
+    for (let x = 1; x <= 6; x++) {
+      addRoad(x, 1);
+      addRoad(x, 3);
+      addRoad(x, 6);
+    }
+    for (let z = 1; z <= 6; z++) {
+      addRoad(1, z);
+      addRoad(3, z);
+      addRoad(5, z);
+      addRoad(6, z);
+    }
+    addRoad(2, 2);
+    addRoad(4, 2);
+    addRoad(2, 5);
+    addRoad(4, 5);
+
+    const cells = [];
+    const seen = new Set();
+    function pushCell(x, z, terrain, kind = null, floors = 1, terrainFloors = 1, extras = []) {
+      const key = x + ',' + z;
+      if (seen.has(key)) {
+        const idx = cells.findIndex(c => c.x === x && c.z === z);
+        if (idx >= 0) cells.splice(idx, 1);
+      }
+      seen.add(key);
+      cells.push({
+        x,
+        z,
+        terrain,
+        kind,
+        floors,
+        terrainFloors,
+        buildingType: null,
+        fenceSide: null,
+        extras,
+      });
+    }
+
+    for (let x = 0; x < 8; x++) pushCell(x, waterRow, 'water', null);
+    for (const key of roadCells) {
+      const [x, z] = key.split(',').map(Number);
+      if (z === waterRow && bridgeCols.includes(x)) pushCell(x, z, 'water', 'bridge');
+      else pushCell(x, z, 'path', null);
+    }
+
+    const occupied = new Set([...roadCells, ...Array.from({ length: 8 }, (_, x) => x + ',' + waterRow)]);
+    const decorKinds = ['tree', 'tuft', 'flower', 'bush', 'sheep'];
+    for (let x = 0; x < 8; x++) {
+      for (let z = 0; z < 8; z++) {
+        const key = x + ',' + z;
+        if (occupied.has(key)) continue;
+        const edge = x === 0 || z === 0 || x === 7 || z === 7;
+        const roll = rng();
+        if (edge && roll < 0.22) pushCell(x, z, 'grass', 'tree', 1 + Math.floor(rng() * 2));
+        else if (!edge && roll < 0.16) pushCell(x, z, 'grass', decorKinds[Math.floor(rng() * decorKinds.length)]);
+        else if (!edge && roll > 0.92) pushCell(x, z, 'grass', 'house', 1, 1, [{ kind: 'tuft', floors: 1 }]);
+      }
+    }
+
+    return {
+      seed,
+      world: {
+        v: 4,
+        gridSize: 8,
+        cameraMode: 'soft',
+        toolId: 'select',
+        cells,
+      },
+      vehicles: [
+        { id: 'seed-red', label: 'red loop', start: [1, 1], targets: [[6, 6], [1, 1], [6, 1], [1, 6]], maxSpeed: 1.35 },
+        { id: 'seed-blue', label: 'blue loop', start: [6, 6], targets: [[1, 1], [6, 6], [1, 6], [6, 1]], maxSpeed: 1.18 },
+        { id: 'seed-gold', label: 'bridge runner', start: [1, 6], targets: [[6, 1], [1, 6], [6, 6], [1, 1]], maxSpeed: 1.05 },
+      ],
+    };
+  }
+
+  function dismissWelcomeForDemo() {
+    const modal = document.getElementById('welcome-modal');
+    if (!modal || modal.hidden) return;
+    if (typeof closeTinyModal === 'function') closeTinyModal(modal);
+    else modal.hidden = true;
+  }
+
+  function applyVehicleDemoTargets(spec, cycle) {
+    for (const vehicle of spec.vehicles) {
+      const target = vehicle.targets[cycle % vehicle.targets.length];
+      updateVehicleGoal(vehicle.id, target[0], target[1]);
+    }
+  }
+
+  function runSeededVehicleDemo(seed = VEHICLE_DEMO_DEFAULT_SEED, opts = {}) {
+    const spec = buildSeededVehicleDemo(seed || VEHICLE_DEMO_DEFAULT_SEED);
+    stopSeededVehicleDemo({ clearVehicles: true });
+    activeVehicleDemoSeed = spec.seed;
+    try { localStorage.setItem('tinyworld:vehicle-demo:last-seed', spec.seed); } catch (_) {}
+    dismissWelcomeForDemo();
+    showVehicleDemoBadge(spec.seed, spec.vehicles.length);
+    if (typeof setCameraMode === 'function') setCameraMode('soft');
+    if (typeof resetCameraDefaults === 'function') resetCameraDefaults();
+
+    const startVehicles = () => {
+      dismissWelcomeForDemo();
+      if (typeof setCameraMode === 'function') setCameraMode('soft');
+      if (typeof resetCameraDefaults === 'function') resetCameraDefaults();
+      clearVehicleRuntime();
+      spec.vehicles.forEach((vehicle, index) => {
+        queueVehicleDemoStep(() => {
+          spawnVehicle({
+            id: vehicle.id,
+            x: vehicle.start[0],
+            z: vehicle.start[1],
+            mode: 'manual',
+            maxSpeed: vehicle.maxSpeed,
+          });
+        }, 280 * index);
+      });
+      queueVehicleDemoStep(() => {
+        let cycle = 0;
+        applyVehicleDemoTargets(spec, cycle);
+        vehicleDemoInterval = setInterval(() => {
+          cycle += 1;
+          applyVehicleDemoTargets(spec, cycle);
+        }, opts.interval || 4500);
+      }, 1100 + spec.vehicles.length * 280);
+      window.__lastVehicleDemo = {
+        seed: spec.seed,
+        shareUrl: vehicleDemoShareUrl(spec.seed),
+        vehicles: spec.vehicles.map(v => ({ id: v.id, start: v.start, targets: v.targets })),
+      };
+      console.info('[vehicle-demo] seed', spec.seed, window.__lastVehicleDemo.shareUrl);
+    };
+
+    const ok = applyState(spec.world, {
+      sliced: true,
+      renderOrigin: { x: 0, z: 0 },
+      onDone: startVehicles,
+    });
+    if (!ok) {
+      console.warn('[vehicle-demo] failed to apply seeded world', spec);
+      return false;
+    }
+    return true;
+  }
+
+  window.__runVehicleSeedDemo = runSeededVehicleDemo;
+  window.__stopVehicleSeedDemo = stopSeededVehicleDemo;
+  window.__vehicleDemoShareUrl = vehicleDemoShareUrl;
+  window.__vehicleDemoDefaultSeed = VEHICLE_DEMO_DEFAULT_SEED;
+  window.__getVehicleRuntimeSnapshot = getVehicleRuntimeSnapshot;
 
   function tilePos(x, z) {
     return new THREE.Vector3(x - GRID / 2 + 0.5, 0, z - GRID / 2 + 0.5);
@@ -9304,6 +9805,7 @@
         cell.extras[existingIdx].floors = Math.min((cell.extras[existingIdx].floors || 1) + 1, MAX_FLOORS);
         // Animate just the one that changed — existing siblings stay put.
         renderCellExtras(x, z, { animateFrom: existingIdx });
+        refreshVehiclesForWorldObstacleChange(x, z);
         saveState();
         return;
       }
@@ -9313,6 +9815,7 @@
     // Animate only the newly-added entry; everything before it
     // re-mounts at its resting position without a drop.
     renderCellExtras(x, z, { animateFrom: newIdx });
+    refreshVehiclesForWorldObstacleChange(x, z);
     saveState();
   }
 
@@ -9320,6 +9823,7 @@
     if (!world[x] || !world[x][z] || !world[x][z].extras || !world[x][z].extras.length) return false;
     world[x][z].extras.pop();
     renderCellExtras(x, z); // no animation — surviving extras stay put
+    refreshVehiclesForWorldObstacleChange(x, z);
     saveState();
     return true;
   }
@@ -9329,6 +9833,7 @@
   function setCell(x, z, opts) {
     const { terrain, terrainFloors, kind = null, floors, buildingType, fenceSide, tileDelay = 0, objectDelay = 0, animate = true, impactDust = true, forceTile = false, rotationY, offsetX, offsetZ } = opts;
     const prev = ensureWorldCell(x, z);
+    const prevVehicleDrivable = isVehicleDrivableCell(prev);
     let nextTerrain = terrain || 'grass';
     let nextKind = kind || null;
     if (nextKind === 'bridge') nextTerrain = 'water';
@@ -9375,6 +9880,8 @@
     const userEdited = !!(prev.userEdited || (opts && opts.userEdited));
     world[x][z] = { terrain: nextTerrain, terrainFloors: newTerrainFloors, kind: nextKind, floors: newFloors, buildingType: newBType, fenceSide: newFenceSide, extras: carriedExtras, rotationY: newRotationY, offsetX: newOffsetX, offsetZ: newOffsetZ };
     if (userEdited) world[x][z].userEdited = true;
+    const vehicleDrivableChanged = prevVehicleDrivable !== isVehicleDrivableCell(world[x][z]);
+    if (vehicleDrivableChanged) refreshVehiclesForWorldObstacleChange(x, z);
     const emitCellWebhook = () => {
       if (!suppressSave && typeof fireWebhook === 'function') fireWebhook('cell.set', { x, z, cell: world[x][z] });
     };
@@ -16925,6 +17432,10 @@
     ensureGhostBoardsAroundTarget();
     onResize();
     requestAnimationFrame(animate);
+    const vehicleDemoRequest = getVehicleDemoUrlRequest();
+    if (vehicleDemoRequest) {
+      setTimeout(() => runSeededVehicleDemo(vehicleDemoRequest.seed, { fromUrl: true }), 0);
+    }
   }
 
   // -------- minimap (ported from OWB hud.js redrawMinimap) --------
@@ -18038,6 +18549,18 @@
       items.push({ group: 'Scene', label: 'Toggle developer overlay', hint: 'FPS / draws / tris', kbd: '`', run: topBtnAction('dev-mode') });
       items.push({ group: 'World', label: 'Reset world', hint: 'back to the starter scene', run: topBtnAction('reset') });
       items.push({ group: 'World', label: 'Clear to grass', hint: 'wipe to empty grass', run: topBtnAction('clear') });
+      items.push({ group: 'World', label: 'Run vehicle seed demo', hint: 'map + cars + targets from ' + VEHICLE_DEMO_DEFAULT_SEED, run: () => {
+        runSeededVehicleDemo(VEHICLE_DEMO_DEFAULT_SEED);
+      } });
+      items.push({ group: 'World', label: 'Copy vehicle seed demo URL', hint: 'shareable cars-on-roads seed', run: async () => {
+        const url = vehicleDemoShareUrl(activeVehicleDemoSeed || VEHICLE_DEMO_DEFAULT_SEED);
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(url);
+          console.info('[vehicle-demo] copied share URL', url);
+        } catch (_) {
+          console.info('[vehicle-demo] share URL', url);
+        }
+      } });
       items.push({ group: 'World', label: 'Export world as JSON', run: topBtnAction('export') });
       items.push({ group: 'World', label: 'Import world from JSON', run: topBtnAction('import') });
       items.push({ group: 'World', label: 'Generate from prompt…', hint: 'AI generation panel', kbd: '⌘G', run: () => {
