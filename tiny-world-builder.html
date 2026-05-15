@@ -4085,11 +4085,13 @@
   function setRenderVisibleDistance(value) {
     renderVisibleDistance = Math.max(0, Math.min(maxRenderVisibleDistanceForGrid(GRID), Math.round(value)));
     syncGhostRenderBudget();
+    invalidateHomeFade();
     if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
   }
 
   function setRenderVisibleSize(value) {
     renderVisibleSize = Math.max(GRID, Math.min(maxRenderVisibleSizeForGrid(GRID), Math.round(value)));
+    invalidateHomeFade();
     if (typeof ensureGhostBoardsAroundTarget === 'function') ensureGhostBoardsAroundTarget();
   }
 
@@ -4209,7 +4211,9 @@
       'progs   ' + programs + '\n' +
       'texs    ' + m.textures + '\n' +
       'ghosts  ' + (typeof ghostBoards !== 'undefined' ? ghostBoards.size : 0) +
-        (ghostQueue ? ' (+' + ghostQueue + ')' : '');
+        (ghostQueue ? ' (+' + ghostQueue + ')' : '') + '\n' +
+      'crops   ' + (typeof cropPositions !== 'undefined' ? cropPositions.size : 0) + '\n' +
+      'maxPump ' + (typeof maxPumpkinPositions !== 'undefined' ? maxPumpkinPositions.size : 0);
   }
   function toggleStatsOverlay() {
     if (statsOverlay) removeStatsOverlay();
@@ -4400,6 +4404,24 @@
   const geomCache = new Map();
   function safeDisposeGeometry(geo) {
     if (geo && !(geo.userData && geo.userData.cached)) geo.dispose();
+  }
+
+  // Shared plain BoxGeometry for the many tiny deterministic decals inside
+  // makeTile (grass flecks, water insets/ripples, path bands/cap/scuffs).
+  // Quantized to 0.01 to keep the cache bounded even when callers pass
+  // continuous random lengths (ripples). 1 cm variation on a 1 m tile is
+  // imperceptible; we still get ~26 distinct ripple lengths.
+  function getBoxGeometry(w, h, d) {
+    const qw = Math.round(w * 100) / 100;
+    const qh = Math.round(h * 100) / 100;
+    const qd = Math.round(d * 100) / 100;
+    const key = 'boxflat|' + qw + '|' + qh + '|' + qd;
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    const g = new THREE.BoxGeometry(qw, qh, qd);
+    g.userData.cached = true;
+    geomCache.set(key, g);
+    return g;
   }
 
   // A rounded extruded slab — used for tile pieces.
@@ -4662,8 +4684,8 @@
   function edgeBand(dir, width, depth, y, mat) {
     const alongX = dir === 'n' || dir === 's';
     const geo = alongX
-      ? new THREE.BoxGeometry(width, depth, 0.05)
-      : new THREE.BoxGeometry(0.05, depth, width);
+      ? getBoxGeometry(width, depth, 0.05)
+      : getBoxGeometry(0.05, depth, width);
     const m = new THREE.Mesh(geo, mat);
     if (dir === 'n') m.position.set(0, y, -0.465);
     if (dir === 's') m.position.set(0, y,  0.465);
@@ -4748,10 +4770,7 @@
     // Tiny deterministic grass flecks. They stay put when a neighbour rerender
     // refreshes shore/path bands, so tiles no longer visually "shuffle".
     if (terrain === 'grass' && cellRand(x, z, 1) < 0.24) {
-      const fleck = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.04, 0.05),
-        M.leavesDk
-      );
+      const fleck = new THREE.Mesh(getBoxGeometry(0.05, 0.04, 0.05), M.leavesDk);
       fleck.position.set((cellRand(x, z, 2) - 0.5) * 0.6, topY + 0.01, (cellRand(x, z, 3) - 0.5) * 0.6);
       g.add(fleck);
     }
@@ -4769,12 +4788,12 @@
     }
 
     if (terrain === 'water') {
-      const inset = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.010, 0.72), M.waterDk);
+      const inset = new THREE.Mesh(getBoxGeometry(0.72, 0.010, 0.72), M.waterDk);
       inset.position.y = topY + 0.004;
       g.add(inset);
       for (let i = 0; i < 3; i++) {
         const len = 0.20 + cellRand(x, z, 10 + i) * 0.26;
-        const ripple = new THREE.Mesh(new THREE.BoxGeometry(len, 0.010, 0.018), M.waterFoam);
+        const ripple = new THREE.Mesh(getBoxGeometry(len, 0.010, 0.018), M.waterFoam);
         ripple.position.set(
           (cellRand(x, z, 20 + i) - 0.5) * 0.50,
           topY + 0.020 + i * 0.002,
@@ -4797,8 +4816,8 @@
       function band(dir) {
         const len = half;
         const geo = (dir === 'n' || dir === 's')
-          ? new THREE.BoxGeometry(W, T, len + 0.02)
-          : new THREE.BoxGeometry(len + 0.02, T, W);
+          ? getBoxGeometry(W, T, len + 0.02)
+          : getBoxGeometry(len + 0.02, T, W);
         const m = new THREE.Mesh(geo, M.pathTrim);
         const off = len / 2;
         if (dir === 'n') m.position.set(0,    yBand, -off);
@@ -4812,12 +4831,12 @@
       if (pathN.w) band('w');
       if (pathN.e) band('e');
       // Centre paver — always present. Doubles as the isolated-tile decal.
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(W, T, W), M.pathTrim);
+      const cap = new THREE.Mesh(getBoxGeometry(W, T, W), M.pathTrim);
       cap.position.y = yBand;
       g.add(cap);
 
       // Subtle deterministic scuff dimple on top, slightly off-centre.
-      const scuff = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.02, 0.07), M.pathScuff);
+      const scuff = new THREE.Mesh(getBoxGeometry(0.10, 0.02, 0.07), M.pathScuff);
       scuff.position.set((cellRand(x, z, 50) - 0.5) * 0.3, yBand + 0.008, (cellRand(x, z, 51) - 0.5) * 0.3);
       g.add(scuff);
     }
@@ -4834,7 +4853,7 @@
     // Trunk grows in both height and thickness with level.
     const trunkH = 0.5 + (L - 1) * 0.12;
     const trunkW = 0.18 + (L - 1) * 0.018;
-    const trunk = new THREE.Mesh(new THREE.BoxGeometry(trunkW, trunkH, trunkW), M.trunk);
+    const trunk = new THREE.Mesh(getBoxGeometry(trunkW, trunkH, trunkW), M.trunk);
     trunk.position.y = trunkH / 2;
     g.add(trunk);
 
@@ -4988,7 +5007,7 @@
       g.add(shard);
     }
     if (links >= 4) {
-      const moss = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.018, 0.22), M.rockMoss);
+      const moss = new THREE.Mesh(getBoxGeometry(0.34, 0.018, 0.22), M.rockMoss);
       moss.position.set(0.03, 0.50, -0.08);
       moss.rotation.y = -0.35;
       g.add(moss);
@@ -5034,11 +5053,12 @@
       g.add(plank);
     }
     for (const z of [-0.31, 0.31]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.08, 0.05), M.bridgeWoodD);
+      const rail = new THREE.Mesh(getBoxGeometry(0.96, 0.08, 0.05), M.bridgeWoodD);
       rail.position.set(0, deckY + 0.11, z);
       g.add(rail);
+      const postGeo = getBoxGeometry(0.05, 0.22, 0.05);
       for (const x of [-0.36, 0, 0.36]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.05), M.bridgeWoodD);
+        const post = new THREE.Mesh(postGeo, M.bridgeWoodD);
         post.position.set(x, deckY + 0.03, z);
         g.add(post);
       }
@@ -5065,9 +5085,10 @@
       g.add(wall);
     }
     // Corner posts under the eaves
+    const tallPost = getBoxGeometry(0.05, 0.46, 0.05);
     for (const x of [-0.44, 0.44]) {
       for (const z of [-0.32, 0.32]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, 0.05), M.bridgeWoodD);
+        const post = new THREE.Mesh(tallPost, M.bridgeWoodD);
         post.position.set(x, deckY + 0.23, z);
         g.add(post);
       }
@@ -5117,14 +5138,14 @@
       g.add(cap);
       // Small repeated balusters baked in as box pattern
       for (const bx of [-0.30, 0, 0.30]) {
-        const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.10), M.castleStoneD);
+        const pillar = new THREE.Mesh(getBoxGeometry(0.07, 0.08, 0.10), M.castleStoneD);
         pillar.position.set(bx, deckY + 0.06, z);
         g.add(pillar);
       }
     }
     // End abutments (chunky blocks at each end)
     for (const x of [-0.44, 0.44]) {
-      const abut = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.22, 0.68), M.castleStoneD);
+      const abut = new THREE.Mesh(getBoxGeometry(0.10, 0.22, 0.68), M.castleStoneD);
       abut.position.set(x, deckY - 0.04, 0);
       g.add(abut);
     }
@@ -5228,10 +5249,10 @@
       g.scale.set(s, 1, s);
       if (level >= 3) {
         for (const x of [-0.28, 0.28]) {
-          const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.24, 0.045), M.bridgeWoodD);
+          const lamp = new THREE.Mesh(getBoxGeometry(0.045, 0.24, 0.045), M.bridgeWoodD);
           lamp.position.set(x, 0.32, -0.31);
           g.add(lamp);
-          const cap = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.09), M.knob);
+          const cap = new THREE.Mesh(getBoxGeometry(0.09, 0.06, 0.09), M.knob);
           cap.position.set(x, 0.46, -0.31);
           g.add(cap);
         }
@@ -5261,7 +5282,7 @@
           mini.position.set(Math.cos(a) * r, sz * 0.45, Math.sin(a) * r);
           mini.rotation.y = a;
           g.add(mini);
-          const tinyStem = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.04, 0.025), M.pumpkinStem);
+          const tinyStem = new THREE.Mesh(getBoxGeometry(0.025, 0.04, 0.025), M.pumpkinStem);
           tinyStem.position.set(Math.cos(a) * r, sz * 0.85 + 0.02, Math.sin(a) * r);
           g.add(tinyStem);
         }
@@ -5270,7 +5291,7 @@
         // tighter than before — denser per level, no scaling.
         const innerCount = Math.min(extra * 3, 12);
         for (let i = 0; i < innerCount; i++) {
-          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.13 + (i % 3) * 0.02, 0.04), stemMat);
+          const blade = new THREE.Mesh(getBoxGeometry(0.04, 0.13 + (i % 3) * 0.02, 0.04), stemMat);
           const a = i * 0.55 + extra * 0.18;
           const r = 0.16 + (i % 2 ? 0.04 : 0);
           blade.position.set(Math.cos(a) * r, 0.06 + (i % 3) * 0.01, Math.sin(a) * r);
@@ -5280,7 +5301,7 @@
         if (extra >= 2) {
           const outerCount = Math.min((extra - 1) * 3, 12);
           for (let i = 0; i < outerCount; i++) {
-            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.17 + (i % 3) * 0.02, 0.035), stemMat);
+            const blade = new THREE.Mesh(getBoxGeometry(0.035, 0.17 + (i % 3) * 0.02, 0.035), stemMat);
             const a = i * 0.55 + 0.27 + extra * 0.1;
             blade.position.set(Math.cos(a) * 0.34, 0.08 + (i % 3) * 0.01, Math.sin(a) * 0.34);
             blade.rotation.z = (i % 2 ? 1 : -1) * 0.20;
@@ -5396,17 +5417,19 @@
       if (orientation === 'gable') {
         const door = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.48, 0.04), M.door);
         door.position.set(0, 0.24, 0); g.add(door);
-        const aL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.04), M.woodTrim); aL.position.set(-0.10, 0.24, 0.01); g.add(aL);
-        const aR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.04), M.woodTrim); aR.position.set( 0.10, 0.24, 0.01); g.add(aR);
-        const aT = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.04), M.woodTrim); aT.position.set(0,     0.50, 0.01); g.add(aT);
+        const trimV = getBoxGeometry(0.04, 0.48, 0.04);
+        const aL = new THREE.Mesh(trimV, M.woodTrim); aL.position.set(-0.10, 0.24, 0.01); g.add(aL);
+        const aR = new THREE.Mesh(trimV, M.woodTrim); aR.position.set( 0.10, 0.24, 0.01); g.add(aR);
+        const aT = new THREE.Mesh(getBoxGeometry(0.24, 0.04, 0.04), M.woodTrim); aT.position.set(0, 0.50, 0.01); g.add(aT);
         const knob = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), M.knob);
         knob.position.set(0.08, 0.24, 0.03); g.add(knob);
       } else {
         const door = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.2), M.door);
         door.position.set(0, 0.24, 0); g.add(door);
-        const aL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.04), M.woodTrim); aL.position.set(0.01, 0.24, -0.10); g.add(aL);
-        const aR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.48, 0.04), M.woodTrim); aR.position.set(0.01, 0.24,  0.10); g.add(aR);
-        const aT = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.24), M.woodTrim); aT.position.set(0.01, 0.50,  0   ); g.add(aT);
+        const trimV = getBoxGeometry(0.04, 0.48, 0.04);
+        const aL = new THREE.Mesh(trimV, M.woodTrim); aL.position.set(0.01, 0.24, -0.10); g.add(aL);
+        const aR = new THREE.Mesh(trimV, M.woodTrim); aR.position.set(0.01, 0.24,  0.10); g.add(aR);
+        const aT = new THREE.Mesh(getBoxGeometry(0.04, 0.04, 0.24), M.woodTrim); aT.position.set(0.01, 0.50, 0); g.add(aT);
         const knob = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), M.knob);
         knob.position.set(0.03, 0.24, 0.05); g.add(knob);
       }
@@ -5421,15 +5444,15 @@
       const f = size === 'small' ? 0.20 : 0.24; // frame
       const p = size === 'small' ? 0.14 : 0.17; // glass / cross length
       if (orientation === 'gable') {
-        const wf = new THREE.Mesh(new THREE.BoxGeometry(f, f, 0.04),       M.woodTrim); wf.position.set(0, 0, 0);     g.add(wf);
-        const wg = new THREE.Mesh(new THREE.BoxGeometry(p, p, 0.04),       M.windowB);  wg.position.set(0, 0, 0.015); g.add(wg);
-        const cH = new THREE.Mesh(new THREE.BoxGeometry(p, 0.012, 0.04),   M.woodTrim); cH.position.set(0, 0, 0.025); g.add(cH);
-        const cV = new THREE.Mesh(new THREE.BoxGeometry(0.012, p, 0.04),   M.woodTrim); cV.position.set(0, 0, 0.025); g.add(cV);
+        const wf = new THREE.Mesh(getBoxGeometry(f, f, 0.04), M.woodTrim); wf.position.set(0, 0, 0); g.add(wf);
+        const wg = new THREE.Mesh(getBoxGeometry(p, p, 0.04), M.windowB); wg.position.set(0, 0, 0.015); g.add(wg);
+        const cH = new THREE.Mesh(getBoxGeometry(p, 0.012, 0.04), M.woodTrim); cH.position.set(0, 0, 0.025); g.add(cH);
+        const cV = new THREE.Mesh(getBoxGeometry(0.012, p, 0.04), M.woodTrim); cV.position.set(0, 0, 0.025); g.add(cV);
       } else {
-        const wf = new THREE.Mesh(new THREE.BoxGeometry(0.04, f, f),       M.woodTrim); wf.position.set(0,     0, 0); g.add(wf);
-        const wg = new THREE.Mesh(new THREE.BoxGeometry(0.04, p, p),       M.windowB);  wg.position.set(0.015, 0, 0); g.add(wg);
-        const cH = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.012, p),   M.woodTrim); cH.position.set(0.025, 0, 0); g.add(cH);
-        const cV = new THREE.Mesh(new THREE.BoxGeometry(0.04, p, 0.012),   M.woodTrim); cV.position.set(0.025, 0, 0); g.add(cV);
+        const wf = new THREE.Mesh(getBoxGeometry(0.04, f, f), M.woodTrim); wf.position.set(0, 0, 0); g.add(wf);
+        const wg = new THREE.Mesh(getBoxGeometry(0.04, p, p), M.windowB); wg.position.set(0.015, 0, 0); g.add(wg);
+        const cH = new THREE.Mesh(getBoxGeometry(0.04, 0.012, p), M.woodTrim); cH.position.set(0.025, 0, 0); g.add(cH);
+        const cV = new THREE.Mesh(getBoxGeometry(0.04, p, 0.012), M.woodTrim); cV.position.set(0.025, 0, 0); g.add(cV);
       }
       return g;
     },
@@ -5474,9 +5497,10 @@
       const g = new THREE.Group();
       const door = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.18), M.door);
       door.position.set(0, 0.21, 0); g.add(door);
-      const aL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.04), M.woodTrim); aL.position.set(0.01, 0.21, -0.09); g.add(aL);
-      const aR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.04), M.woodTrim); aR.position.set(0.01, 0.21,  0.09); g.add(aR);
-      const aT = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), M.woodTrim); aT.position.set(0.01, 0.44, 0   ); g.add(aT);
+      const trimV = getBoxGeometry(0.04, 0.42, 0.04);
+      const aL = new THREE.Mesh(trimV, M.woodTrim); aL.position.set(0.01, 0.21, -0.09); g.add(aL);
+      const aR = new THREE.Mesh(trimV, M.woodTrim); aR.position.set(0.01, 0.21,  0.09); g.add(aR);
+      const aT = new THREE.Mesh(getBoxGeometry(0.04, 0.04, 0.22), M.woodTrim); aT.position.set(0.01, 0.44, 0); g.add(aT);
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.020, 8, 8), M.knob);
       knob.position.set(0.03, 0.21, 0.05); g.add(knob);
       return g;
@@ -5888,7 +5912,7 @@
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 8;
       const slit = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.20, 0.025),
+        getBoxGeometry(0.04, 0.20, 0.025),
         M.castleSlit
       );
       slit.position.set(Math.cos(a) * (radius + 0.005), wallH * 0.55, Math.sin(a) * (radius + 0.005));
@@ -5905,7 +5929,7 @@
     g.add(lintel);
 
     // Flag pole + flag at the apex
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.22, 0.025), M.castleStoneD);
+    const pole = new THREE.Mesh(getBoxGeometry(0.025, 0.22, 0.025), M.castleStoneD);
     pole.position.y = wallH + 0.30;
     g.add(pole);
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.02), M.flagRed);
@@ -5937,13 +5961,13 @@
     for (let i = 0; i < f; i++) {
       const yMid = (i + 0.5) * floorH;
       const glassH = 0.16;
-      const sxe = new THREE.Mesh(new THREE.BoxGeometry(0.04, glassH, D - 0.18), M.skyGlass);
+      const sxe = new THREE.Mesh(getBoxGeometry(0.04, glassH, D - 0.18), M.skyGlass);
       sxe.position.set( W / 2 - 0.005, yMid, 0); g.add(sxe);
-      const sxw = new THREE.Mesh(new THREE.BoxGeometry(0.04, glassH, D - 0.18), M.skyGlass);
+      const sxw = new THREE.Mesh(getBoxGeometry(0.04, glassH, D - 0.18), M.skyGlass);
       sxw.position.set(-W / 2 + 0.005, yMid, 0); g.add(sxw);
-      const szs = new THREE.Mesh(new THREE.BoxGeometry(W - 0.18, glassH, 0.04), M.skyGlass);
+      const szs = new THREE.Mesh(getBoxGeometry(W - 0.18, glassH, 0.04), M.skyGlass);
       szs.position.set(0, yMid,  D / 2 - 0.005); g.add(szs);
-      const szn = new THREE.Mesh(new THREE.BoxGeometry(W - 0.18, glassH, 0.04), M.skyGlass);
+      const szn = new THREE.Mesh(getBoxGeometry(W - 0.18, glassH, 0.04), M.skyGlass);
       szn.position.set(0, yMid, -D / 2 + 0.005); g.add(szn);
     }
 
@@ -5956,7 +5980,7 @@
     const hvac = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.10, 0.16), M.castleStoneD);
     hvac.position.set(-0.18, totalH + 0.10, 0.20);
     g.add(hvac);
-    const ant = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.36, 0.03), M.skyFrame);
+    const ant = new THREE.Mesh(getBoxGeometry(0.03, 0.36, 0.03), M.skyFrame);
     ant.position.set(0.20, totalH + 0.23, -0.15);
     g.add(ant);
 
@@ -6053,12 +6077,12 @@
       g.add(glass);
       const zf = z + s * 0.034;
       const bars = [
-        new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 0.024), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 0.024), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.24, 0.024), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.24, 0.024), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.014, 0.026), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.19, 0.026), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.18, 0.025, 0.024), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.18, 0.025, 0.024), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.025, 0.24, 0.024), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.025, 0.24, 0.024), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.15, 0.014, 0.026), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.014, 0.19, 0.026), M.manorTrim),
       ];
       bars[0].position.set(x, y + 0.112, zf);
       bars[1].position.set(x, y - 0.112, zf);
@@ -6074,12 +6098,12 @@
       g.add(glass);
       const xf = x + sign * 0.034;
       const bars = [
-        new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.025, 0.16), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.025, 0.16), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.22, 0.025), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.22, 0.025), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.014, 0.13), M.manorTrim),
-        new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.18, 0.014), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.024, 0.025, 0.16), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.024, 0.025, 0.16), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.024, 0.22, 0.025), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.024, 0.22, 0.025), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.026, 0.014, 0.13), M.manorTrim),
+        new THREE.Mesh(getBoxGeometry(0.026, 0.18, 0.014), M.manorTrim),
       ];
       bars[0].position.set(xf, y + 0.102, z);
       bars[1].position.set(xf, y - 0.102, z);
@@ -6177,7 +6201,7 @@
     const railR = radius + 0.10;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.10, 0.04), matStone);
+      const post = new THREE.Mesh(getBoxGeometry(0.04, 0.10, 0.04), matStone);
       post.position.set(Math.cos(a) * railR, balconyY + 0.08, Math.sin(a) * railR);
       post.rotation.y = -a;
       g.add(post);
@@ -6225,7 +6249,7 @@
     archTop.position.set(0, 0.46, radius + 0.02);
     g.add(archTop);
     // Door frame slabs
-    const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.46, 0.05), matStoneD);
+    const frameL = new THREE.Mesh(getBoxGeometry(0.04, 0.46, 0.05), matStoneD);
     frameL.position.set(-0.16, 0.23, radius + 0.005); g.add(frameL);
     const frameR = frameL.clone(); frameR.position.x = 0.16; g.add(frameR);
 
@@ -6233,7 +6257,7 @@
     for (let i = 0; i < f; i++) {
       const y = (i + 0.5) * H.WALL_H + 0.15;
       const angle = (i % 2 === 0) ? 0 : Math.PI;
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.03), M.castleSlit);
+      const win = new THREE.Mesh(getBoxGeometry(0.10, 0.18, 0.03), M.castleSlit);
       win.position.set(Math.sin(angle) * 0 + Math.cos(angle) * 0, y, Math.cos(angle) * (radius + 0.005));
       // simpler: just place at +z when even, -z when odd
       win.position.set(0, y, (i % 2 === 0) ? (radius + 0.005) : -(radius + 0.005));
@@ -6247,7 +6271,7 @@
     g.add(sideWin);
 
     // Flag on top
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.30, 0.025), matStoneD);
+    const pole = new THREE.Mesh(getBoxGeometry(0.025, 0.30, 0.025), matStoneD);
     pole.position.y = wallH + 0.85;
     g.add(pole);
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.10, 0.02), M.flagRed);
@@ -6325,7 +6349,7 @@
       for (let i = 0; i < count; i++) {
         const u = (i / (count - 1)) - 0.5;
         const merlon = new THREE.Mesh(
-          new THREE.BoxGeometry(merlonW, merlonH, merlonD),
+          getBoxGeometry(merlonW, merlonH, merlonD),
           M.castleStone
         );
         if (s.axis === 'z') {
@@ -6408,7 +6432,7 @@
       stone.position.y = pillarH + 0.20;
       g.add(stone);
       if (level >= 5) {
-        const flag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.04), M.woodTrim || M.fenceSteel);
+        const flag = new THREE.Mesh(getBoxGeometry(0.04, 0.22, 0.04), M.woodTrim || M.fenceSteel);
         flag.position.y = pillarH + 0.38;
         g.add(flag);
       }
@@ -6451,7 +6475,7 @@
       cap.position.set(offsetX, wallH + 0.027, offsetZ);
       g.add(cap);
     } else if (level === 3) {
-      const postGeo = new THREE.BoxGeometry(0.07, 0.52, 0.07);
+      const postGeo = getBoxGeometry(0.07, 0.52, 0.07);
       for (const [px, pz] of endpointOffsets()) {
         const post = new THREE.Mesh(postGeo, M.fenceSteel);
         post.position.set(px, 0.26, pz);
@@ -6459,7 +6483,7 @@
       }
       for (const y of [0.15, 0.29, 0.43]) {
         const wire = new THREE.Mesh(
-          new THREE.BoxGeometry(alongX ? 1.08 : 0.025, 0.025, alongX ? 0.025 : 1.08),
+          getBoxGeometry(alongX ? 1.08 : 0.025, 0.025, alongX ? 0.025 : 1.08),
           M.fenceWire
         );
         wire.position.set(offsetX, y, offsetZ);
@@ -6467,13 +6491,15 @@
       }
     } else {
       const fenceScale = level === 2 ? 1.28 : 1;
-      const postGeo = new THREE.BoxGeometry(0.09, 0.32 * fenceScale, 0.09);
+      const postH = 0.32 * fenceScale;
+      const postGeo = getBoxGeometry(0.09, postH, 0.09);
       for (const [px, pz] of endpointOffsets()) {
         const post = new THREE.Mesh(postGeo, M.fence);
         post.position.set(px, 0.16 * fenceScale, pz);
         g.add(post);
       }
-      const railGeo = new THREE.BoxGeometry(alongX ? 1.08 : 0.06, 0.06, alongX ? 0.06 : 1.08);
+      const railH = 0.06;
+      const railGeo = getBoxGeometry(alongX ? 1.08 : railH, railH, alongX ? railH : 1.08);
       for (const y of [0.08 * fenceScale, 0.24 * fenceScale]) {
         const rail = new THREE.Mesh(railGeo, M.fence);
         rail.position.set(offsetX, y, offsetZ);
@@ -6491,7 +6517,7 @@
     const g = new THREE.Group();
     const positions = [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]];
     positions.forEach(([x, z], i) => {
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.08), M.cropStem);
+      const stem = new THREE.Mesh(getBoxGeometry(0.08, 0.12, 0.08), M.cropStem);
       stem.position.set(x, 0.06, z);
       g.add(stem);
       const leaf = new THREE.Mesh(roundedBox(0.18, 0.16, 0.18, 0.04), M.cropLeaf);
@@ -6509,7 +6535,7 @@
     const g = new THREE.Group();
     const positions = [[-0.22, -0.20], [0.22, -0.22], [-0.20, 0.22], [0.22, 0.20]];
     positions.forEach(([x, z], i) => {
-      const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.05), M.cornStalk);
+      const stalk = new THREE.Mesh(getBoxGeometry(0.05, 0.55, 0.05), M.cornStalk);
       stalk.position.set(x, 0.275, z);
       stalk.rotation.y = i * 0.55;
       g.add(stalk);
@@ -6519,7 +6545,7 @@
       cob.position.set(x + Math.cos(ang) * 0.05, 0.32, z + Math.sin(ang) * 0.05);
       g.add(cob);
       // leafy tassel at top
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.06), M.cornLeaf);
+      const tip = new THREE.Mesh(getBoxGeometry(0.06, 0.14, 0.06), M.cornLeaf);
       tip.position.set(x, 0.61, z);
       tip.rotation.y = i * 0.55;
       g.add(tip);
@@ -6538,7 +6564,7 @@
       const x = gx * 0.20 + (Math.random() - 0.5) * 0.04;
       const z = gz * 0.20 + (Math.random() - 0.5) * 0.04;
       const h = 0.36 + Math.random() * 0.06;
-      const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.03, h, 0.03), M.wheatStalk);
+      const stalk = new THREE.Mesh(getBoxGeometry(0.03, h, 0.03), M.wheatStalk);
       stalk.position.set(x, h / 2, z);
       g.add(stalk);
       const head = new THREE.Mesh(roundedBox(0.07, 0.11, 0.07, 0.02), M.wheatHead);
@@ -6570,7 +6596,7 @@
       band.position.set(p.x, r * 0.72, p.z);
       band.rotation.y = p.rot;
       g.add(band);
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.04), M.pumpkinStem);
+      const stem = new THREE.Mesh(getBoxGeometry(0.04, 0.08, 0.04), M.pumpkinStem);
       stem.position.set(p.x, r * 1.2, p.z);
       g.add(stem);
     });
@@ -6611,18 +6637,18 @@
     const windowPane = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, 0.02), M.windowB);
     windowPane.position.set(0, bodyR * 1.15, bodyR * 0.95 + 0.03);
     g.add(windowPane);
-    const doorKnob = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.02), M.knob);
+    const doorKnob = new THREE.Mesh(getBoxGeometry(0.025, 0.025, 0.02), M.knob);
     doorKnob.position.set(0.06, bodyR * 0.92, bodyR * 0.95 + 0.04);
     g.add(doorKnob);
 
     // Curly green stem on top, then a gold finial — the storybook touch.
-    const stem = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.10, 0.05), M.pumpkinStem);
+    const stem = new THREE.Mesh(getBoxGeometry(0.05, 0.10, 0.05), M.pumpkinStem);
     stem.position.y = bodyR * 1.85;
     g.add(stem);
     const finial = new THREE.Mesh(roundedBox(0.07, 0.07, 0.07, 0.02), M.knob);
     finial.position.y = bodyR * 2.0 + 0.04;
     g.add(finial);
-    const finialTop = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.06, 0.025), M.knob);
+    const finialTop = new THREE.Mesh(getBoxGeometry(0.025, 0.06, 0.025), M.knob);
     finialTop.position.y = bodyR * 2.0 + 0.12;
     g.add(finialTop);
 
@@ -6638,7 +6664,7 @@
       wheel.position.set(x, 0.10, z);
       g.add(wheel);
       // Gold hub centred on the wheel face.
-      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.05), M.knob);
+      const hub = new THREE.Mesh(getBoxGeometry(0.055, 0.055, 0.05), M.knob);
       hub.position.set(x, 0.10, z);
       g.add(hub);
       // Spokes — three short bars across the face for a coach feel.
@@ -6670,12 +6696,12 @@
     ];
     positions.forEach(([x, z]) => {
       // orange tip just above ground
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.06), M.carrotBody);
+      const tip = new THREE.Mesh(getBoxGeometry(0.06, 0.05, 0.06), M.carrotBody);
       tip.position.set(x, 0.025, z);
       g.add(tip);
       // 3 green leafy blades fanning out
       for (let i = 0; i < 3; i++) {
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.13, 0.035), M.cropStem);
+        const blade = new THREE.Mesh(getBoxGeometry(0.035, 0.13, 0.035), M.cropStem);
         blade.position.set(x + (i - 1) * 0.025, 0.10, z);
         blade.rotation.z = (i - 1) * 0.28;
         g.add(blade);
@@ -6695,11 +6721,11 @@
       { x: -0.04, z:  0.22, h: 0.55 },
     ];
     positions.forEach(p => {
-      const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.04, p.h, 0.04), M.sunflowerStalk);
+      const stalk = new THREE.Mesh(getBoxGeometry(0.04, p.h, 0.04), M.sunflowerStalk);
       stalk.position.set(p.x, p.h / 2, p.z);
       g.add(stalk);
       // a leaf on the stalk
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.04), M.sunflowerStalk);
+      const leaf = new THREE.Mesh(getBoxGeometry(0.12, 0.06, 0.04), M.sunflowerStalk);
       leaf.position.set(p.x + 0.07, p.h * 0.55, p.z);
       leaf.rotation.z = -0.3;
       g.add(leaf);
@@ -6723,7 +6749,7 @@
     const g = new THREE.Group();
     const positions = [[0, 0], [0.08, 0.06], [-0.07, 0.04], [0.03, -0.08], [-0.04, -0.05]];
     positions.forEach(([x, z]) => {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1 + Math.random() * 0.04, 0.05), M.leaves);
+      const blade = new THREE.Mesh(getBoxGeometry(0.05, 0.1 + Math.random() * 0.04, 0.05), M.leaves);
       blade.position.set(x, blade.geometry.parameters.height / 2, z);
       g.add(blade);
     });
@@ -6771,13 +6797,13 @@
     const palettes = [M_PLANT.petalRed, M_PLANT.petalYellow, M_PLANT.petalPurple, M_PLANT.petalWhite];
     const positions = [[-0.05, -0.04], [0.05, 0.04], [0.0, 0.0]];
     positions.forEach(([x, z], i) => {
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.03), M.leavesDk);
+      const stem = new THREE.Mesh(getBoxGeometry(0.03, 0.14, 0.03), M.leavesDk);
       stem.position.set(x, 0.10, z);
       g.add(stem);
       const petals = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.05, 0.10), palettes[i % palettes.length]);
       petals.position.set(x, 0.20, z);
       g.add(petals);
-      const heart = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.04), M_PLANT.petalYellow);
+      const heart = new THREE.Mesh(getBoxGeometry(0.04, 0.03, 0.04), M_PLANT.petalYellow);
       heart.position.set(x, 0.23, z);
       g.add(heart);
     });
@@ -6799,10 +6825,10 @@
       g.add(lobe);
     });
     // Optional berries on top.
-    const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), M_PLANT.bushBerry);
+    const b1 = new THREE.Mesh(getBoxGeometry(0.05, 0.05, 0.05), M_PLANT.bushBerry);
     b1.position.set(0.05, 0.26, 0.04);
     g.add(b1);
-    const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.045), M_PLANT.bushBerry);
+    const b2 = new THREE.Mesh(getBoxGeometry(0.045, 0.045, 0.045), M_PLANT.bushBerry);
     b2.position.set(-0.06, 0.22, -0.05);
     g.add(b2);
     g.userData = { kind: 'bush' };
@@ -6825,12 +6851,12 @@
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.16), M_ANIMAL.cowWhite);
     head.position.set(0.27, 0.30, 0);
     g.add(head);
-    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.10), M_ANIMAL.cowMuzzle);
+    const muzzle = new THREE.Mesh(getBoxGeometry(0.08, 0.08, 0.10), M_ANIMAL.cowMuzzle);
     muzzle.position.set(0.36, 0.26, 0);
     g.add(muzzle);
     // Legs (4 short)
     [[0.13, -0.08], [0.13, 0.08], [-0.13, -0.08], [-0.13, 0.08]].forEach(([x, z]) => {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.16, 0.07), M_ANIMAL.hoof);
+      const leg = new THREE.Mesh(getBoxGeometry(0.07, 0.16, 0.07), M_ANIMAL.hoof);
       leg.position.set(x, 0.08, z);
       g.add(leg);
     });
@@ -6855,7 +6881,7 @@
     g.add(head);
     // Legs
     [[0.10, -0.08], [0.10, 0.08], [-0.10, -0.08], [-0.10, 0.08]].forEach(([x, z]) => {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.06), M_ANIMAL.hoof);
+      const leg = new THREE.Mesh(getBoxGeometry(0.06, 0.14, 0.06), M_ANIMAL.hoof);
       leg.position.set(x, 0.07, z);
       g.add(leg);
     });
@@ -6928,7 +6954,7 @@
     g.add(bumper);
 
     function addSideAccent(side) {
-      const accent = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.028, BODY_L - 0.06), M_VEHICLE.dark);
+      const accent = new THREE.Mesh(getBoxGeometry(0.022, 0.028, BODY_L - 0.06), M_VEHICLE.dark);
       accent.position.set(side * (BODY_W / 2 + 0.002), BODY_Y0 + BODY_LOWER_H - 0.012, 0);
       g.add(accent);
     }
@@ -7002,6 +7028,9 @@
   const cellMeshes = {}; // 'x,z' -> { tile, object }
   const animatedCellObjects = new Set();
   const smokeHouseObjects = new Set();
+  const cropPositions = new Set();        // 'x,z' strings for home-grid cells whose kind is in CROP_KINDS
+  let carriagePumpkin = null;             // {x, z} | null — current lowest-index max-floor pumpkin (Cinderella rule)
+  const maxPumpkinPositions = new Set();  // 'x,z' of all pumpkins with floors >= MAX_FLOORS (home grid)
 
   function registerRuntimeObject(obj) {
     if (!obj || !obj.userData) return;
@@ -7024,6 +7053,57 @@
 
   function runtimeRootVisible(obj) {
     return !!(obj && obj.parent && obj.visible);
+  }
+
+  // -------- live index sets for hot-path queries (avoid O(GRID²) scans) --------
+  function isCropCell(cell) { return !!(cell && CROP_KINDS.has(cell.kind)); }
+
+  function addCropPosition(x, z) { cropPositions.add(x + ',' + z); }
+  function removeCropPosition(x, z) { cropPositions.delete(x + ',' + z); }
+
+  function rebuildCropPositions() {
+    cropPositions.clear();
+    for (let x = 0; x < GRID; x++) {
+      if (!world[x]) continue;
+      for (let z = 0; z < GRID; z++) {
+        if (isCropCell(world[x][z])) cropPositions.add(x + ',' + z);
+      }
+    }
+  }
+
+  function rebuildMaxPumpkinCache() {
+    maxPumpkinPositions.clear();
+    carriagePumpkin = null;
+    let best = null;
+    for (let x = 0; x < GRID; x++) {
+      if (!world[x]) continue;
+      for (let z = 0; z < GRID; z++) {
+        const c = world[x][z];
+        if (c && c.kind === 'pumpkin' && (c.floors || 1) >= MAX_FLOORS) {
+          const key = x + ',' + z;
+          maxPumpkinPositions.add(key);
+          if (!best || x < best.x || (x === best.x && z < best.z)) best = { x, z };
+        }
+      }
+    }
+    carriagePumpkin = best;
+  }
+
+  function updateCarriageAfterChange(x, z, wasMax, isMax) {
+    const key = x + ',' + z;
+    if (wasMax && !isMax) {
+      maxPumpkinPositions.delete(key);
+      if (carriagePumpkin && carriagePumpkin.x === x && carriagePumpkin.z === z) {
+        // Winner left — recompute (rare, only when the current carriage is lowered/erased)
+        rebuildMaxPumpkinCache();
+      }
+    }
+    if (!wasMax && isMax) {
+      maxPumpkinPositions.add(key);
+      if (!carriagePumpkin || x < carriagePumpkin.x || (x === carriagePumpkin.x && z < carriagePumpkin.z)) {
+        carriagePumpkin = { x, z };
+      }
+    }
   }
 
   // Pre-allocate world[][] up to HOME_GRID_MAX so adjacency lookups for
@@ -8594,6 +8674,18 @@
   let homeRenderQueue = [];
   let homeRenderQueued = new Set();
 
+  // Fade update throttling for large-grid panning: full updateHomeBoardFade
+  // is expensive (walks every cellMesh + extras). We only need it when the
+  // camera target has moved enough to meaningfully change ghost reveal opacity.
+  let lastHomeFadeTargetX = null;
+  let lastHomeFadeTargetZ = null;
+  const HOME_FADE_UPDATE_DIST = 0.8; // tiles — full scan only when target drifts this far
+
+  function invalidateHomeFade() {
+    lastHomeFadeTargetX = null;
+    lastHomeFadeTargetZ = null;
+  }
+
   function useWindowedHomeRendering() {
     return GRID > HOME_RENDER_WINDOW_THRESHOLD;
   }
@@ -8684,7 +8776,25 @@
       built++;
     }
     if (built) {
-      updateHomeBoardFade();
+      // Smart fade update for large grids:
+      // - Newly built cells already received correct initial fade via prepareFadeable in renderCell*.
+      // - We only need a full scan of all cellMeshes when the camera target has moved
+      //   far enough that many existing ghost cells' distance-based reveal opacity changed.
+      const tx = target.x;
+      const tz = target.z;
+      const needsFullFade =
+        lastHomeFadeTargetX === null ||
+        lastHomeFadeTargetZ === null ||
+        Math.hypot(tx - lastHomeFadeTargetX, tz - lastHomeFadeTargetZ) > HOME_FADE_UPDATE_DIST;
+
+      if (needsFullFade) {
+        updateHomeBoardFade();
+        lastHomeFadeTargetX = tx;
+        lastHomeFadeTargetZ = tz;
+      }
+      // (If we didn't do a full pass, the new cells are still correctly faded because
+      // renderCellTile/Object call prepareFadeable with the live opacityAtWorldPosition.)
+
       if (typeof window.__requestMinimapRepaint === 'function') window.__requestMinimapRepaint();
     }
   }
@@ -10374,6 +10484,18 @@
     if (userEdited) world[x][z].userEdited = true;
     const vehicleDrivableChanged = prevVehicleDrivable !== isVehicleDrivableCell(world[x][z]);
     if (vehicleDrivableChanged) refreshVehiclesForWorldObstacleChange(x, z);
+
+    // Maintain live index sets so hot paths (crop duster, pumpkin carriage)
+    // never scan the full grid. Only home-grid cells (0..GRID) are tracked.
+    const wasCrop = isCropCell(prev);
+    const isCrop = isCropCell(world[x][z]);
+    if (wasCrop && !isCrop) removeCropPosition(x, z);
+    if (!wasCrop && isCrop) addCropPosition(x, z);
+
+    const wasMaxPump = (prev.kind === 'pumpkin' && (prev.floors || 1) >= MAX_FLOORS);
+    const isMaxPump = (world[x][z].kind === 'pumpkin' && (world[x][z].floors || 1) >= MAX_FLOORS);
+    if (wasMaxPump !== isMaxPump) updateCarriageAfterChange(x, z, wasMaxPump, isMaxPump);
+
     const emitCellWebhook = () => {
       if (!suppressSave && typeof fireWebhook === 'function') fireWebhook('cell.set', { x, z, cell: world[x][z] });
     };
@@ -10500,28 +10622,16 @@
 
   // Cinderella rule: only ONE pumpkin tile across the home grid is the
   // carriage at a time. The lowest-index (x,z) max-level pumpkin wins.
-  // Returns true if (x,z) is that cell, so renderCellObject can pick
-  // the carriage variant.
+  // Uses the live maxPumpkinPositions + carriagePumpkin cache so repeated
+  // renders and neighbor refreshes stay O(1) instead of O(GRID²).
   function isCarriagePumpkin(x, z) {
-    for (let xx = 0; xx < GRID; xx++) {
-      if (!world[xx]) continue;
-      for (let zz = 0; zz < GRID; zz++) {
-        const c = world[xx][zz];
-        if (c && c.kind === 'pumpkin' && (c.floors || 1) >= MAX_FLOORS) {
-          return xx === x && zz === z;
-        }
-      }
-    }
-    return false;
+    return !!(carriagePumpkin && carriagePumpkin.x === x && carriagePumpkin.z === z);
   }
 
   function eachMaxPumpkin(callback) {
-    for (let xx = 0; xx < GRID; xx++) {
-      if (!world[xx]) continue;
-      for (let zz = 0; zz < GRID; zz++) {
-        const c = world[xx][zz];
-        if (c && c.kind === 'pumpkin' && (c.floors || 1) >= MAX_FLOORS) callback(xx, zz);
-      }
+    for (const key of maxPumpkinPositions) {
+      const [xx, zz] = key.split(',').map(Number);
+      callback(xx, zz);
     }
   }
 
@@ -10548,6 +10658,9 @@
     for (const k of Object.keys(cellMeshes)) delete cellMeshes[k];
     resetHomeWorldIntent();
     dropAnims.length = 0;
+    cropPositions.clear();
+    maxPumpkinPositions.clear();
+    carriagePumpkin = null;
 
     // Build the layout in one shot so each cell only animates once.
     const layout = {};
@@ -10616,6 +10729,11 @@
         };
       }
     }
+
+    // Rebuild live index sets after the direct world write (bypasses setCell).
+    rebuildCropPositions();
+    rebuildMaxPumpkinCache();
+    invalidateHomeFade();
 
     if (useWindowedHomeRendering()) {
       requestHomeRenderWindowSync({ force: true });
@@ -12645,6 +12763,11 @@
     } catch (_) {}
 
     GRID = n;
+    // Grid size changed — old index entries may be out of range or stale.
+    // Subsequent setCell / load will repopulate via incremental updates or rebuild.
+    cropPositions.clear();
+    maxPumpkinPositions.clear();
+    carriagePumpkin = null;
     applyAutoPreviewSettingsForGrid({ explored: hasUserPanned, deferEnsure: true });
     try { localStorage.setItem('tinyworld:home-grid', String(GRID)); } catch (_) {}
     updateUnsavedCopyForGrid();
@@ -13734,7 +13857,7 @@
     mesh.visible = mesh.count > 0;
   }
 
-  const rainGeo = new THREE.BoxGeometry(0.018, 0.34, 0.018);
+  const rainGeo = getBoxGeometry(0.018, 0.34, 0.018);
   const rainMat = new THREE.MeshBasicMaterial({
     color: 0xbcd0e4, transparent: true, opacity: 0.55, depthWrite: false,
   });
@@ -14331,11 +14454,14 @@
   }
 
   function cropCellsForDusting() {
+    // Use the live cropPositions Set (maintained in setCell) instead of
+    // rescanning the entire GRID every time the duster plans a new run.
+    // This keeps planning O(crops) even on 128×128+ home boards.
     const cells = [];
-    for (let x = 0; x < GRID; x++) {
-      for (let z = 0; z < GRID; z++) {
-        const c = getWorldCell(x, z);
-        if (CROP_KINDS.has(c.kind)) cells.push({ x, z });
+    for (const key of cropPositions) {
+      const [x, z] = key.split(',').map(Number);
+      if (x >= 0 && x < GRID && z >= 0 && z < GRID) {
+        cells.push({ x, z });
       }
     }
     return cells;
@@ -14600,20 +14726,21 @@
       const planeX = cropDusterRoot.position.x;
       const planeZ = cropDusterRoot.position.z;
       const window = 0.6;
-      for (let x = 0; x < GRID; x++) {
-        for (let z = 0; z < GRID; z++) {
-          const c = getWorldCell(x, z);
-          if (!CROP_KINDS.has(c.kind)) continue;
-          const p = tilePos(x, z);
-          const along = cropDusterPassAxis === 'x' ? p.x - planeX : p.z - planeZ;
-          if (Math.abs(along) > window) continue;
-          if (cropDustParticles.length > 220) break;
-          spawnCropDust(
-            p.x + (Math.random() - 0.5) * 0.34,
-            0.72 + Math.random() * 0.10,
-            p.z + (Math.random() - 0.5) * 0.34,
-          );
-        }
+      for (const key of cropPositions) {
+        const [x, z] = key.split(',').map(Number);
+        // Only home-grid crops are tracked; ghost boards are never dusted.
+        if (x < 0 || x >= GRID || z < 0 || z >= GRID) continue;
+        const c = getWorldCell(x, z);
+        if (!CROP_KINDS.has(c.kind)) continue; // defensive
+        const p = tilePos(x, z);
+        const along = cropDusterPassAxis === 'x' ? p.x - planeX : p.z - planeZ;
+        if (Math.abs(along) > window) continue;
+        if (cropDustParticles.length > 220) break;
+        spawnCropDust(
+          p.x + (Math.random() - 0.5) * 0.34,
+          0.72 + Math.random() * 0.10,
+          p.z + (Math.random() - 0.5) * 0.34,
+        );
       }
     }
   }
@@ -17178,6 +17305,10 @@
       for (const o of overrides.values()) {
         writeWorldIntentCell(o.__x, o.__z, o, !!o.__outOfHome);
       }
+      // Bulk direct writes bypassed setCell — rebuild the live indices.
+      rebuildCropPositions();
+      rebuildMaxPumpkinCache();
+      invalidateHomeFade();
       suppressSave = false;
       if (!opts.keepCamera) {
         const okCameraMode = new Set(['ortho','topdown','soft','perspective','fp']);
