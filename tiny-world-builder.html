@@ -2182,6 +2182,10 @@
   body.tod-dusk  .world-menu,
   body.tod-night .modal-card,
   body.tod-dusk  .modal-card {
+    --ink: #2a2722;
+    --muted: #6f695f;
+    --line: rgba(120, 130, 150, 0.24);
+    --line-soft: rgba(120, 130, 150, 0.14);
     background-color: #f3f5f9 !important;
     background-image: none !important;
     border-color: rgba(120, 130, 150, 0.35) !important;
@@ -2216,7 +2220,19 @@
   body.tod-night .agent-input input,
   body.tod-dusk  .agent-input input,
   body.tod-night .modal-card,
-  body.tod-dusk  .modal-card {
+  body.tod-dusk  .modal-card,
+  body.tod-night .modal-card label,
+  body.tod-dusk  .modal-card label,
+  body.tod-night .modal-card output,
+  body.tod-dusk  .modal-card output,
+  body.tod-night .settings-section-title,
+  body.tod-dusk  .settings-section-title,
+  body.tod-night .range-row span,
+  body.tod-dusk  .range-row span,
+  body.tod-night .time-foot,
+  body.tod-dusk  .time-foot,
+  body.tod-night .modal-copy,
+  body.tod-dusk  .modal-copy {
     color: var(--ink) !important;
   }
   /* Slider chrome inside settings — keep the rail readable too. */
@@ -4413,7 +4429,7 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, BASE_DPR_CAP) * renderResolutionScale);
   applyStageSize();
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.xr.enabled = true;
@@ -4678,7 +4694,9 @@
     renderer.info.reset();
     const xrPresenting = renderer.xr && renderer.xr.isPresenting;
     const usePixelation = renderPixelSize > 1 && !xrPresenting;
-    const useShaderAA = renderShaderAntialias > 0.001 && !xrPresenting;
+    // Shader AA smears pixelated low-res samples and reveals diagonal terrain
+    // artifacts. Pixel mode must be nearest-only, regardless of AA slider.
+    const useShaderAA = renderShaderAntialias > 0.001 && !xrPresenting && !usePixelation;
     const usePost = usePixelation || useShaderAA;
     if (!usePost) {
       renderer.render(scene, camera);
@@ -4686,7 +4704,7 @@
       return;
     }
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const wantNormals = renderPixelNormalEdge > 0.001;
+    const wantNormals = usePixelation && renderPixelNormalEdge > 0.001;
     const postPixelSize = usePixelation ? renderPixelSize : 1;
     ensurePixelResources(size.x, size.y, postPixelSize, wantNormals);
     const prevTarget = renderer.getRenderTarget();
@@ -4713,7 +4731,7 @@
     uniforms.tNormal.value = wantNormals && pixelState.normalTarget ? pixelState.normalTarget.texture : null;
     uniforms.depthEdgeStrength.value = usePixelation ? renderPixelDepthEdge : 0;
     uniforms.normalEdgeStrength.value = usePixelation ? renderPixelNormalEdge : 0;
-    uniforms.antialiasStrength.value = renderShaderAntialias;
+    uniforms.antialiasStrength.value = useShaderAA ? renderShaderAntialias : 0;
     uniforms.useNormals.value = wantNormals && usePixelation ? 1.0 : 0.0;
     renderer.setRenderTarget(prevTarget);
     renderer.render(pixelState.quadScene, pixelState.quadCam);
@@ -4898,7 +4916,7 @@
   sun.shadow.camera.far = 60;
   sun.shadow.bias = -0.00025;
   sun.shadow.normalBias = 0.02;
-  sun.shadow.radius = 1.5;
+  sun.shadow.radius = 5;
   scene.add(sun);
   scene.add(sun.target);
   sun.target.position.copy(target);
@@ -4942,8 +4960,10 @@
     renderShadowQuality = ['low', 'balanced', 'high'].includes(value) ? value : 'balanced';
     const size = renderShadowQuality === 'high' ? 2048 : (renderShadowQuality === 'low' ? 512 : 1024);
     sun.shadow.mapSize.set(size, size);
-    sun.shadow.radius = renderShadowQuality === 'high' ? 3 : (renderShadowQuality === 'low' ? 1 : 2);
-    renderer.shadowMap.type = renderShadowQuality === 'low' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+    // Use filtered shadows at every quality level. BasicShadowMap makes the
+    // low-poly/isometric shadows stair-step harshly, especially in pixel mode.
+    sun.shadow.radius = renderShadowQuality === 'high' ? 7 : (renderShadowQuality === 'low' ? 3 : 5);
+    renderer.shadowMap.type = renderShadowQuality === 'low' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     if (sun.shadow.map) {
       sun.shadow.map.dispose();
       sun.shadow.map = null;
@@ -5457,13 +5477,41 @@
     // us from drawing tiles that are completely off-screen. Removing riser bottoms
     // entirely is a possible further optimization if triangle count becomes an issue.
     if (!skipTerrain) {
-      const riserSize = TILE * 0.98;
-      // All terrain tops slightly overlap their footprint. That prevents the
-      // sky/background from peeking through rasterization gaps between tiles,
-      // especially in chunky pixel mode.
-      const topSize = TILE * 1.012;
+      let riserSize = TILE * 1.04;
+      let topSize   = TILE * 0.98;
+      let riserBevel = 0.04;
+      let topBevel   = 0.06;
 
-      // top cap
+      if (terrain === 'grass' || terrain === 'path' || terrain === 'water') {
+        // Restore the physical tile look: the cap overhangs the body, so grass
+        // edges read as green first with dirt underneath.
+        riserSize  = TILE * 1.04;
+        topSize    = TILE * 1.04;
+        riserBevel = 0.02;
+        topBevel   = 0.04;
+      }
+
+      if (terrain === 'grass') {
+        const dirtGeo = getOpenBoxGeometry(riserSize, DIRT_H + rise, riserSize, true, true, skipE, skipW, skipS, skipN);
+        const riser = new THREE.Mesh(dirtGeo, M.dirt);
+        riser.position.y = -DIRT_H + (DIRT_H + rise) * 0.5;
+        g.add(riser);
+      } else {
+        let riserMat = M.dirt;
+        if (terrain === 'path')  riserMat = M.pathTrim;
+        if (terrain === 'water') riserMat = M.waterDk;
+        if (terrain === 'dirt')  riserMat = M.dirtRich;
+        if (terrain === 'stone') riserMat = M.stone;
+        if (terrain === 'lava')  riserMat = M.lava;
+        if (terrain === 'sand')  riserMat = M.sand;
+        if (terrain === 'snow')  riserMat = M.snow;
+
+        const riserGeo = getOpenBoxGeometry(riserSize, DIRT_H + rise, riserSize, true, true, skipE, skipW, skipS, skipN);
+        const riser = new THREE.Mesh(riserGeo, riserMat);
+        riser.position.y = -DIRT_H + (DIRT_H + rise) * 0.5;
+        g.add(riser);
+      }
+
       let topMat = M.grass;
       if (terrain === 'path')  topMat = M.path;
       if (terrain === 'water') topMat = M.water;
@@ -5473,52 +5521,12 @@
       if (terrain === 'sand')  topMat = M.sand;
       if (terrain === 'snow')  topMat = M.snow;
 
-      // Top surface only; exposed side walls are added separately below. This
-      // keeps same-height internal edges clean while preserving real depth at
-      // board edges and drops.
-      const top = new THREE.Mesh(getOpenBoxGeometry(topSize, TOP_H, topSize, false, true, true, true, true, true), topMat);
+      // Clean physical slab: flat top surface, vertical cap thickness, no
+      // chamfered per-tile bevels. This keeps the "settled" terrain smooth
+      // while preserving actual depth/substance at exposed edges.
+      const top = new THREE.Mesh(getBoxGeometry(topSize, TOP_H, topSize), topMat);
       top.position.y = rise + TOP_H * 0.5;
       g.add(top);
-
-      function addSideStrip(dir, y0, y1, mat) {
-        const height = y1 - y0;
-        if (height <= 0.001) return;
-        const t = 0.045;
-        const geo = (dir === 'n' || dir === 's')
-          ? getOpenBoxGeometry(topSize, height, t, true, true)
-          : getOpenBoxGeometry(t, height, topSize, true, true);
-        const side = new THREE.Mesh(geo, mat);
-        const off = topSize * 0.5 - t * 0.5;
-        const y = y0 + height * 0.5;
-        if (dir === 'n') side.position.set(0, y, -off);
-        if (dir === 's') side.position.set(0, y,  off);
-        if (dir === 'w') side.position.set(-off, y, 0);
-        if (dir === 'e') side.position.set( off, y, 0);
-        g.add(side);
-      }
-      function exposedSide(dir, neighborLevel) {
-        const neighborTop = typeof neighborLevel === 'number'
-          ? terrainRiseForLevel(neighborLevel) + TOP_H
-          : -DIRT_H;
-        if (neighborTop >= topY - 0.001) return;
-
-        if (terrain === 'grass') {
-          // Grass edge reads as grass first, then dirt underneath — like a
-          // physical tile with a green cap sitting on soil.
-          addSideStrip(dir, Math.max(neighborTop, rise), topY, M.grass);
-          addSideStrip(dir, neighborTop, rise, M.dirt);
-          return;
-        }
-
-        let sideMat = topMat;
-        if (terrain === 'path')  sideMat = M.pathTrim;
-        if (terrain === 'water') sideMat = M.waterDk;
-        addSideStrip(dir, neighborTop, topY, sideMat);
-      }
-      exposedSide('n', levelN.n);
-      exposedSide('s', levelN.s);
-      exposedSide('e', levelN.e);
-      exposedSide('w', levelN.w);
     }
 
     // Keep terrain surfaces as single clean slabs. Previous decorative
@@ -10059,12 +10067,13 @@
     if (displayOpacity >= 1) return FADE_BUCKETS;
     return Math.max(1, Math.min(FADE_BUCKETS - 1, Math.round(displayOpacity * FADE_BUCKETS)));
   }
-  function pickFadeMaterial(baseMat, grayscale, displayOpacity) {
+  function pickFadeMaterial(baseMat, grayscale, displayOpacity, keepFadeAtOpaque = false) {
     const bucket = fadeBucketFor(displayOpacity);
     // Fully opaque, non-grayscale → use the shared base material directly.
-    // This is the best case (most home-grid meshes hit it) — no clone at all.
-    if (bucket === FADE_BUCKETS && !grayscale) return baseMat;
-    const key = baseMat.uuid + '|' + (grayscale ? 1 : 0) + '|' + bucket;
+    // Terrain tiles opt out because the 100% opaque/depth-write snap exposes
+    // diagonal face artifacts that are absent at 99% in the fade path.
+    if (bucket === FADE_BUCKETS && !grayscale && !keepFadeAtOpaque) return baseMat;
+    const key = baseMat.uuid + '|' + (grayscale ? 1 : 0) + '|' + bucket + '|' + (keepFadeAtOpaque ? 1 : 0);
     const hit = fadeMatCache.get(key);
     if (hit) return hit;
     const mat = baseMat.clone();
@@ -10072,8 +10081,8 @@
     const baseOp = baseMat.opacity === undefined ? 1 : baseMat.opacity;
     const factor = bucket / FADE_BUCKETS;
     mat.opacity = baseOp * factor;
-    mat.transparent = factor < 1 || baseOp < 1;
-    mat.depthWrite = factor >= 1 && baseOp >= 1;
+    mat.transparent = keepFadeAtOpaque || factor < 1 || baseOp < 1;
+    mat.depthWrite = keepFadeAtOpaque ? false : (factor >= 1 && baseOp >= 1);
     mat.userData = mat.userData || {};
     mat.userData.cachedFade = true;
     fadeMatCache.set(key, mat);
@@ -10118,8 +10127,9 @@
       o.userData.baseMat = o.material;
       o.userData.grayMat = !!grayscale;
       o.userData.baseOpacity = o.material.opacity === undefined ? 1 : o.material.opacity;
+      o.userData.keepFadeAtOpaque = group.userData.fadeRole === 'tile';
       o.userData._fadeBucket = fadeBucketFor(displayOpacity);
-      o.material = pickFadeMaterial(o.material, !!grayscale, displayOpacity);
+      o.material = pickFadeMaterial(o.material, !!grayscale, displayOpacity, o.userData.keepFadeAtOpaque);
     });
     return group;
   }
@@ -10155,7 +10165,7 @@
       const bucket = fadeBucketFor(displayOpacity);
       if (o.userData._fadeBucket === bucket) return;
       o.userData._fadeBucket = bucket;
-      o.material = pickFadeMaterial(o.userData.baseMat, o.userData.grayMat, displayOpacity);
+      o.material = pickFadeMaterial(o.userData.baseMat, o.userData.grayMat, displayOpacity, !!o.userData.keepFadeAtOpaque);
     });
   }
 
@@ -10361,10 +10371,11 @@
   // -------- cheap ghost instancing helpers --------
   function ensureCheapGhostGeoms() {
     if (cheapGhostGeomDirt) return;
-    const size = TILE * 0.98;
+    const size = TILE * 1.04;
     cheapGhostGeomDirt = new THREE.BoxGeometry(size, DIRT_H, size);
     cheapGhostGeomDirt.translate(0, DIRT_H / 2, 0);
-    cheapGhostGeomTop = getOpenBoxGeometry(size, TOP_H, size, false, true, true, true, true, true);
+    cheapGhostGeomTop = new THREE.BoxGeometry(size, TOP_H, size);
+    cheapGhostGeomTop.translate(0, TOP_H / 2, 0);
   }
 
   function getCheapGhostTerrainBucket(terrain) {
@@ -10423,22 +10434,17 @@
 
   function _writeCheapGhostTerrainInstance(b, idx, worldX, worldZ, rise) {
     const DUMMY = new THREE.Object3D();
-    // Flat tiles should not render a hidden lower side wall. Only raised
-    // terrain gets a visible vertical column from y=0 to y=rise.
-    if (rise > 0.001) {
-      const sy = rise / DIRT_H;
-      DUMMY.scale.set(1, sy, 1);
-      DUMMY.position.set(worldX, 0, worldZ);
-    } else {
-      DUMMY.scale.set(1, 0.0001, 1);
-      DUMMY.position.set(worldX, -9999, worldZ);
-    }
+    // Dirt column: scale Y to account for elevation so the column reaches y=rise.
+    const dirtHeight = DIRT_H + rise;
+    const sy = dirtHeight / DIRT_H;
+    DUMMY.scale.set(1, sy, 1);
+    DUMMY.position.set(worldX, -DIRT_H, worldZ);
     DUMMY.updateMatrix();
     b.dirtMesh.setMatrixAt(idx, DUMMY.matrix);
 
-    // Top surface sitting on y = rise, with no hidden side/bottom faces.
+    // Top cap sitting at y = rise.
     DUMMY.scale.set(1, 1, 1);
-    DUMMY.position.set(worldX, rise + TOP_H * 0.5, worldZ);
+    DUMMY.position.set(worldX, rise, worldZ);
     DUMMY.updateMatrix();
     b.topMesh.setMatrixAt(idx, DUMMY.matrix);
   }
@@ -10525,7 +10531,7 @@
   let homeTileGeomTop = null;
   let homeTileGeomWater = null;
 
-  const HOME_TILE_LOW_DETAIL_THRESHOLD = 48; // when preview window > this, use low-detail caps
+  const HOME_TILE_LOW_DETAIL_THRESHOLD = 48; // kept for compatibility; caps are clean slabs in both modes
 
   function ensureHomeTileGeoms() {
     const wantLowDetail = (typeof renderVisibleSize === 'number' && renderVisibleSize > HOME_TILE_LOW_DETAIL_THRESHOLD);
@@ -10534,12 +10540,14 @@
 
     homeTileUseLowDetail = wantLowDetail;
 
-    const dirtSize = TILE * 0.98;
+    const dirtSize = TILE * 1.04;
     homeTileGeomDirt = new THREE.BoxGeometry(dirtSize, DIRT_H, dirtSize);
     homeTileGeomDirt.translate(0, DIRT_H / 2, 0); // bottom-anchored
 
-    homeTileGeomTop = getOpenBoxGeometry(TILE * 1.012, TOP_H, TILE * 1.012, false, true, true, true, true, true);
-    homeTileGeomWater = getOpenBoxGeometry(TILE * 1.012, TOP_H, TILE * 1.012, false, true, true, true, true, true);
+    homeTileGeomTop = new THREE.BoxGeometry(TILE * 1.0, TOP_H, TILE * 1.0);
+    homeTileGeomTop.translate(0, TOP_H / 2, 0);
+    homeTileGeomWater = new THREE.BoxGeometry(TILE * 1.0, TOP_H, TILE * 1.0);
+    homeTileGeomWater.translate(0, TOP_H / 2, 0);
   }
 
   function getHomeTileBucket(terrain) {
@@ -10593,21 +10601,16 @@
 
   function _writeHomeTileInstance(b, idx, posX, posZ, rise) {
     const DUMMY = new THREE.Object3D();
+    const dirtHeight = DIRT_H + rise;
+    const sy = dirtHeight / DIRT_H;
 
-    // Flat tiles should not render a hidden lower side wall. Only raised
-    // terrain gets a visible vertical column from y=0 to y=rise.
-    if (rise > 0.001) {
-      DUMMY.scale.set(1, rise / DIRT_H, 1);
-      DUMMY.position.set(posX, 0, posZ);
-    } else {
-      DUMMY.scale.set(1, 0.0001, 1);
-      DUMMY.position.set(posX, -9999, posZ);
-    }
+    DUMMY.scale.set(1, sy, 1);
+    DUMMY.position.set(posX, -DIRT_H, posZ);
     DUMMY.updateMatrix();
     b.dirtMesh.setMatrixAt(idx, DUMMY.matrix);
 
     DUMMY.scale.set(1, 1, 1);
-    DUMMY.position.set(posX, rise + TOP_H * 0.5, posZ);
+    DUMMY.position.set(posX, rise, posZ);
     DUMMY.updateMatrix();
     b.topMesh.setMatrixAt(idx, DUMMY.matrix);
   }
@@ -10742,8 +10745,9 @@
     if (terrain === 'sand')  mat = M.sand;
     if (terrain === 'snow')  mat = M.snow;
 
-    const slab = new THREE.Mesh(getOpenBoxGeometry(TILE * 1.012, TOP_H, TILE * 1.012, false, true, true, true, true, true), mat);
-    slab.position.y = rise + TOP_H * 0.5;
+    const height = DIRT_H + rise + TOP_H;
+    const slab = new THREE.Mesh(getBoxGeometry(TILE * 1.04, height, TILE * 1.04), mat);
+    slab.position.y = -DIRT_H + height * 0.5;
 
     slab.userData = {
       kind: 'ghostTile',
@@ -11110,20 +11114,9 @@
   function ensureGhostBoardsAroundTarget() {
     syncGhostRenderBudget();
     if (!ghostBoardsEnabledForGrid()) {
-      // Disabled means no surrounding preview boards at all: remove existing
-      // ghost meshes instead of merely hiding them, so stale off-board sheets
-      // and their seam/edge geometry cannot remain in the scene.
-      if (typeof clearGhostWorld === 'function') clearGhostWorld();
-      else {
-        clearPendingGhostBoards();
-        clearCheapGhostTerrain();
-        for (const board of ghostBoards.values()) {
-          worldGroup.remove(board);
-          disposeGroup(board);
-        }
-        ghostBoards.clear();
-        ghostBoardCells.clear();
-      }
+      clearPendingGhostBoards();
+      clearCheapGhostTerrain();
+      for (const board of ghostBoards.values()) board.visible = false;
       updateGhostRenderBubble();
       return;
     }
