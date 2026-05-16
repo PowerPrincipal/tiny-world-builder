@@ -46,7 +46,7 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
   home-tweening, or first-person walking/look-moving. Keep `markCameraMoving()`
   as a stable no-op hook for those movement paths, but do not hide or pause the
   tilt-shift pseudo-element during interaction unless the user explicitly asks.
-- Scene/screen controls must keep working in the direct-render path: resolution, shadow quality, lighting, visible distance, visible size, clouds, tilt-shift blur/focus, and ghost opacity.
+- Scene/screen controls must keep working in the direct-render path: resolution, shadow quality, lighting, visible distance, visible size, backdrop glow, clouds, tilt-shift blur/focus, and ghost opacity.
 - Preview window is the reveal square around the camera target in tile-width units. It auto-scales by board size and can be user-adjusted, but it must never be smaller than `GRID`. Do not subtract half a tile from this radius, or the board edge starts fading inside the requested size.
 - Preview opacity / floors / objects are user-adjustable display multipliers for surrounding preview boards. The home board stays fully opaque regardless of those controls.
 - Do not reintroduce post-only shader controls unless the user explicitly asks for a post pipeline.
@@ -66,9 +66,11 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
   now that there is no post pass; time-of-day hemisphere scaling should
   normalize against the day anchor (`0.90`), not the raw constructor value,
   or midday blows out.
+- Building windows can switch to `M.windowLit` at dusk/night via per-window deterministic seeds. Keep this set-based (`buildingWindowObjects`) and update on time-of-day changes, not by scanning every cell each frame.
 - Ghost boards should participate in the shadow pass — same sun, same shadows everywhere. If Preview/ghost shadows disappear, first check that `prepareFadeable` has not forced ghost meshes to `castShadow = false`, and that any merged/batched ghost terrain explicitly preserves `receiveShadow`/`castShadow` after replacing source meshes. The factory-level `castReceive` / `groundReceiveOnly` choices should apply uniformly unless there is a deliberate, visible-quality-approved LOD exception.
 - Voxel cloud visual opacity is independent from Cloud shadow. Do not drive visible cloud materials with `alphaTest`; cloud shadow breakup belongs on each puff's `customDepthMaterial` so lowering the shadow slider never hides the clouds themselves.
 - Smoke particles must be capped and must not cast/receive shadows.
+- Crop duster planes should remain ambient year-round. Only crop-dusting passes are summer/crop-gated; non-summer or no-crop states should fall back to banner flyovers rather than hiding the plane system.
 
 Validation:
 

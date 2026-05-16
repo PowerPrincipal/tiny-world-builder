@@ -22,7 +22,11 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   body {
-    background: var(--bg);
+    background:
+      radial-gradient(circle at 18% 20%, rgba(112, 169, 255, calc(var(--backdrop-strength, 0.78) * 0.46)), transparent 34%),
+      radial-gradient(circle at 82% 16%, rgba(255, 183, 106, calc(var(--backdrop-strength, 0.78) * 0.38)), transparent 32%),
+      radial-gradient(circle at 68% 86%, rgba(142, 215, 139, calc(var(--backdrop-strength, 0.78) * 0.34)), transparent 36%),
+      linear-gradient(135deg, var(--bg), color-mix(in srgb, var(--bg) 72%, #8fb8ff 28%) 45%, color-mix(in srgb, var(--bg) 70%, #ffd29a 30%));
     color: var(--ink);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -66,7 +70,11 @@
     inset: 0;
     pointer-events: none;
     z-index: 8;
+    opacity: var(--backdrop-strength, 0.78);
     background:
+      radial-gradient(circle at 14% 18%, rgba(88, 151, 255, 0.28), transparent 28%),
+      radial-gradient(circle at 86% 18%, rgba(255, 168, 94, 0.24), transparent 30%),
+      radial-gradient(circle at 70% 86%, rgba(106, 203, 140, 0.20), transparent 34%),
       radial-gradient(
         ellipse at center,
         rgba(244, 237, 224, 0) 48%,
@@ -3935,6 +3943,11 @@
               <output id="render-distance-mist-value"></output>
             </div>
             <div class="range-row">
+              <span>Backdrop glow</span>
+              <input id="render-backdrop" type="range" min="0" max="100" step="1" />
+              <output id="render-backdrop-value"></output>
+            </div>
+            <div class="range-row">
               <span>Tilt blur</span>
               <input id="render-tilt-blur" type="range" min="0" max="8" step="0.5" />
               <output id="render-tilt-blur-value"></output>
@@ -4033,16 +4046,14 @@
 
   // -------- constants --------
   // GRID is the home board edge length. Mutable: the user can resize it
-  // from tiny 8×8 dioramas up to 512×512 worlds. Tiles outside the current
+  // from tiny 8×8 dioramas up to 48×48 worlds. Tiles outside the current
   // home grid are still tracked in world[][] (used by ghost boards and
   // export) but rendered grayscale; growing GRID brings those tiles into
-  // the home area and rebuilds them in full colour. Very large boards use
-  // a camera-centred render window so world data can scale without trying
-  // to keep 262k tile meshes alive at once.
+  // the home area and rebuilds them in full colour.
   const HOME_GRID_DEFAULT = 8;
   const HOME_GRID_MIN = 8;
-  const HOME_GRID_MAX = 512;
-  const HOME_GRID_OPTIONS = [8, 12, 16, 20, 32, 48, 64, 96, 128, 256, 512];
+  const HOME_GRID_MAX = 48;
+  const HOME_GRID_OPTIONS = [8, 12, 16, 20, 32, 48];
   const HOME_GRID_OPTION_SET = new Set(HOME_GRID_OPTIONS);
   let GRID = HOME_GRID_DEFAULT;
 
@@ -4165,6 +4176,7 @@
     GRID = coerceGridSize(stored, GRID);
   } catch (_) {}
   const TILE = 1;
+  let currentTodMinutes = 720;
   const TOP_H = 0.18;     // grass slab thickness
   const WEATHER_SURFACE_PAD = 0.14;
   const WEATHER_DECAL_LIFT = 0.09;
@@ -4184,6 +4196,7 @@
     cloudHeight: 'tinyworld:render:cloudHeight',
     cloudShadow: 'tinyworld:render:cloudShadow',
     distanceMist: 'tinyworld:render:distanceMist',
+    backdrop: 'tinyworld:render:backdrop',
     tiltBlur: 'tinyworld:render:tiltBlur',
     tiltFocus: 'tinyworld:render:tiltFocus',
     ghostOpacity: 'tinyworld:render:ghostOpacity',
@@ -4191,7 +4204,7 @@
     objectOpacity: 'tinyworld:render:objectOpacity',
     version: 'tinyworld:render:version',
   };
-  const RENDER_SETTINGS_VERSION = '16';
+  const RENDER_SETTINGS_VERSION = '17';
   const RENDER_DEFAULTS = {
     // Defaults tuned to keep image quality crisp while still trimming
     // a few cheap things off the per-frame budget.
@@ -4220,6 +4233,7 @@
     cloudHeight: '6',
     cloudShadow: '0',
     distanceMist: '0.28',
+    backdrop: '0.78',
     tiltBlur: '1.0',
     tiltFocus: '65',
     ghostOpacity: '1',
@@ -4344,11 +4358,16 @@
   // denser parts of each cloud cast on the world below.
   let renderCloudShadow = storedNumber(RENDER_LS.cloudShadow, 0.5, 0, 1);
   let renderDistanceMist = storedNumber(RENDER_LS.distanceMist, 0.28, 0, 1);
+  let renderBackdrop = storedNumber(RENDER_LS.backdrop, 0.78, 0, 1);
   let renderTiltBlur = storedNumber(RENDER_LS.tiltBlur, 1.0, 0, 8);
   let renderTiltFocus = storedNumber(RENDER_LS.tiltFocus, 65, 15, 80);
   let renderGhostOpacity = storedNumber(RENDER_LS.ghostOpacity, 1, 0.05, 1);
   let renderFloorOpacity = storedNumber(RENDER_LS.floorOpacity, 1, 0.10, 1);
   let renderObjectOpacity = storedNumber(RENDER_LS.objectOpacity, 1, 0, 1);
+  function applyBackdropSettings() {
+    document.documentElement.style.setProperty('--backdrop-strength', renderBackdrop.toFixed(2));
+  }
+  applyBackdropSettings();
   const renderer = new THREE.WebGLRenderer({
     canvas: canvasEl,
     antialias: true,
@@ -4857,6 +4876,7 @@
     door:      new THREE.MeshLambertMaterial({ color: 0x7a4a2e }),
     woodTrim:  new THREE.MeshLambertMaterial({ color: 0x5c3818 }),
     windowB:   new THREE.MeshLambertMaterial({ color: 0x2a6dd1 }),
+    windowLit: new THREE.MeshLambertMaterial({ color: 0xffe18a, emissive: 0xffb74a, emissiveIntensity: 0.72 }),
     chimney:   new THREE.MeshLambertMaterial({ color: 0xc9c4ba }),
     step:      new THREE.MeshLambertMaterial({ color: 0xa9a49a }),
     knob:      new THREE.MeshLambertMaterial({ color: 0xe8c050 }),
@@ -4964,6 +4984,27 @@
       p.roofD = customMaterial(p.roofD || M.towerRoofD, shadeHexColor(a.topColor, -52));
     }
     return p;
+  }
+  function applyAppearanceToObject(root, kind, appearance) {
+    const a = normalizeAppearance(appearance);
+    if (!root || !a) return root;
+    const topBase = new Set([M.roofBlue, M.manorRoof, M.towerRoof, M.castleRoof, M.skyRoof, M.leaves]);
+    const topDark = new Set([M.roofBlueD, M.manorRoofD, M.towerRoofD, M.castleRoofD, M.leavesDk]);
+    const bodyBase = new Set([M.wallCream, M.manorBrick, M.towerStone, M.castleStone, M.skyBody, M.trunk]);
+    const bodyDark = new Set([M.wallTrim, M.manorBrickD, M.towerStoneD, M.castleStoneD]);
+    function remap(mat) {
+      if (!mat) return mat;
+      if (a.topColor && topBase.has(mat)) return customMaterial(mat, a.topColor);
+      if (a.topColor && topDark.has(mat)) return customMaterial(mat, shadeHexColor(a.topColor, -48));
+      if (a.bodyColor && bodyBase.has(mat)) return customMaterial(mat, a.bodyColor);
+      if (a.bodyColor && bodyDark.has(mat)) return customMaterial(mat, shadeHexColor(a.bodyColor, -42));
+      return mat;
+    }
+    root.traverse(node => {
+      if (!node.isMesh) return;
+      node.material = Array.isArray(node.material) ? node.material.map(remap) : remap(node.material);
+    });
+    return root;
   }
 
   const SEASON_FOLIAGE = {
@@ -7463,6 +7504,8 @@
   const cellMeshes = {}; // 'x,z' -> { tile, object }
   const animatedCellObjects = new Set();
   const smokeHouseObjects = new Set();
+  const buildingWindowObjects = new Set();
+  const buildingWindowBaseMaterials = new Set([M.windowB, M.manorWindow, M.skyGlass, M.castleSlit]);
   const cropPositions = new Set();        // 'x,z' strings for home-grid cells whose kind is in CROP_KINDS
   let carriagePumpkin = null;             // {x, z} | null — current lowest-index max-floor pumpkin (Cinderella rule)
   const maxPumpkinPositions = new Set();  // 'x,z' of all pumpkins with floors >= MAX_FLOORS (home grid)
@@ -7471,18 +7514,60 @@
     if (!obj || !obj.userData) return;
     const kind = obj.userData.kind;
     if (kind === 'tree' || kind === 'tuft') animatedCellObjects.add(obj);
-    if (kind === 'house') smokeHouseObjects.add(obj);
+    if (kind === 'house') {
+      smokeHouseObjects.add(obj);
+      buildingWindowObjects.add(obj);
+    }
   }
 
   function unregisterRuntimeObject(root) {
     if (!root) return;
     animatedCellObjects.delete(root);
     smokeHouseObjects.delete(root);
+    buildingWindowObjects.delete(root);
     if (root.traverse) {
       root.traverse(o => {
         animatedCellObjects.delete(o);
         smokeHouseObjects.delete(o);
+        buildingWindowObjects.delete(o);
       });
+    }
+  }
+
+  function windowLightProbability(min) {
+    if (min >= 1080 && min < 1260) return 0.36; // dusk: some lights pop on
+    if (min >= 1260 || min < 60) return 0.68;   // evening / just after midnight
+    if (min < 360) return 0.24;                 // late night: most are off
+    return 0;
+  }
+  function windowLightRand(seed, bucket) {
+    const n = Math.sin((seed + 1) * 127.1 + (bucket + 1) * 311.7) * 43758.5453123;
+    return n - Math.floor(n);
+  }
+  function prepareBuildingWindowLights(root, x, z) {
+    if (!root || !root.traverse) return;
+    let i = 0;
+    root.traverse(node => {
+      if (!node.isMesh || !buildingWindowBaseMaterials.has(node.material)) return;
+      node.userData.windowLightBase = node.material;
+      node.userData.windowLightSeed = cellRand(x, z, 700 + i++);
+    });
+    updateBuildingWindowLights(root);
+  }
+  function updateBuildingWindowLights(root) {
+    if (!root || !root.traverse) return;
+    const prob = windowLightProbability(currentTodMinutes);
+    const bucket = Math.floor(currentTodMinutes / 24);
+    root.traverse(node => {
+      if (!node.isMesh || !node.userData.windowLightBase) return;
+      const on = prob > 0 && windowLightRand(node.userData.windowLightSeed || 0, bucket) < prob;
+      node.material = on ? M.windowLit : node.userData.windowLightBase;
+    });
+  }
+  function updateAllBuildingWindowLights() {
+    for (const obj of buildingWindowObjects) {
+      if (!obj || !obj.parent) buildingWindowObjects.delete(obj);
+      else updateBuildingWindowLights(obj);
     }
   }
 
@@ -8281,10 +8366,10 @@
 
   // -------- seeded vehicle demo --------
   const VEHICLE_DEMO_DEFAULT_SEED = 'tide-ridge-428';
-  const VEHICLE_DEMO_LARGE_SEED = 'metro-culdesac-128';
-  const VEHICLE_DEMO_LARGE_SIZE_DEFAULT = 128;
+  const VEHICLE_DEMO_LARGE_SEED = 'metro-culdesac-48';
+  const VEHICLE_DEMO_LARGE_SIZE_DEFAULT = 48;
   const VEHICLE_DEMO_LARGE_SIZE_MIN = 12;
-  const VEHICLE_DEMO_LARGE_SIZE_MAX = 256;
+  const VEHICLE_DEMO_LARGE_SIZE_MAX = 48;
   const VEHICLE_DEMO_LARGE_CARS_DEFAULT = 36;
   const VEHICLE_DEMO_LARGE_CARS_MAX = 120;
   const vehicleDemoTimers = [];
@@ -9021,10 +9106,72 @@
     else selectedCells.add(key);
     notifySelectionChanged();
   }
+  function selectedSelectionWorldCoords() {
+    const out = [];
+    selectedCells.forEach(key => {
+      const c = parseCellKey(key);
+      out.push({ x: c.x + (c.bx || 0) * GRID, z: c.z + (c.bz || 0) * GRID });
+    });
+    return out;
+  }
+  function materializeSelectedCells() {
+    if (!selectedCells.size) return [];
+    const nextKeys = new Set();
+    selectedCells.forEach(key => {
+      const c = parseCellKey(key);
+      const gx = c.x + (c.bx || 0) * GRID;
+      const gz = c.z + (c.bz || 0) * GRID;
+      if (c.bx || c.bz) {
+        try {
+          const ghostCells = makeGhostWorld(c.bx, c.bz);
+          const ghostCell = ghostCells[c.x] && ghostCells[c.x][c.z];
+          if (ghostCell) {
+            if (!world[gx]) world[gx] = [];
+            removeGhostCellMesh(c.bx, c.bz, c.x, c.z);
+            setCell(gx, gz, {
+              ...ghostCell,
+              appearance: normalizeAppearance(ghostCell.appearance),
+              userEdited: true,
+              animate: false,
+              forceTile: true,
+              impactDust: false,
+            });
+            if (world[gx] && world[gx][gz]) world[gx][gz].userEdited = true;
+          }
+        } catch (_) {}
+        nextKeys.add(makeKey(0, 0, gx, gz));
+      } else {
+        nextKeys.add(key);
+      }
+    });
+    selectedCells.clear();
+    nextKeys.forEach(key => selectedCells.add(key));
+    return selectedSelectionWorldCoords();
+  }
+  function rotateSelectedCells(delta) {
+    if (!selectedCells.size) return false;
+    let changed = false;
+    materializeSelectedCells().forEach(({ x, z }) => {
+      const cell = getWorldCell(x, z);
+      if (!cell || !cell.kind) return;
+      setCell(x, z, {
+        ...cell,
+        rotationY: snapRot((cell.rotationY || 0) + delta),
+        animate: false,
+        impactDust: false,
+      });
+      changed = true;
+    });
+    if (changed) notifySelectionChanged();
+    return changed;
+  }
   // Expose for cross-module access (form submit pulls this in to scope prompts).
   window.__tinyworldSelection = {
     get cells() { return new Set(selectedCells); },
     clear: clearSelection,
+    rotate: rotateSelectedCells,
+    materialize: materializeSelectedCells,
+    worldCoords: selectedSelectionWorldCoords,
     summary() {
       if (!selectedCells.size) return null;
       const counts = {};
@@ -10430,7 +10577,18 @@
         // future home cells, not overrides.
         const gx = x + boardX * GRID;
         const gz = z + boardZ * GRID;
-        if (world[gx] && world[gx][gz] && world[gx][gz].userEdited) continue;
+        if (world[gx] && world[gx][gz] && world[gx][gz].userEdited) {
+          // User-edited preview cells are saved as real world cells and the
+          // ghost board must not draw over them. If a stale save/session has
+          // the userEdited flag but no live mesh yet, build the real mesh now
+          // rather than leaving a see-through hole in the preview board.
+          const editedKey = gx + ',' + gz;
+          if (!cellMeshes[editedKey] || !cellMeshes[editedKey].tile) {
+            renderCellTile(gx, gz, { animate: false });
+            if (world[gx][gz].kind) renderCellObject(gx, gz, { animate: false, impactDust: false });
+          }
+          continue;
+        }
 
         // Ghost terrain is now always full quality (makeTile) to match the restored quality objects.
         // No automatic quality reduction on ghosts — only progressive LOD when user zooms the camera out (to be implemented if needed).
@@ -11547,6 +11705,7 @@
     if (kind === 'house' && isUnderpassTerrain(cell.terrain)) {
       mesh = wrapHouseForUnderpass(mesh, cell.terrain);
     }
+    applyAppearanceToObject(mesh, kind, cell.appearance);
     const userRot     = (cell.rotationY || 0);
     const userOffsetX = (cell.offsetX   || 0);
     const userOffsetZ = (cell.offsetZ   || 0);
@@ -11557,6 +11716,7 @@
       mesh.userData.gx = x;
       mesh.userData.gz = z;
     }
+    if (kind === 'house') prepareBuildingWindowLights(mesh, x, z);
     mesh.userData.baseY = objectY;
     mesh.userData.fadeRole = 'object';
     prepareFadeable(mesh, { opacity: opacityAtWorldPosition(posX, posZ), grayscale: isOutsideHomeGrid(x, z) });
@@ -11706,6 +11866,9 @@
     const newRotationY = (rotationY !== undefined) ? rotationY : (kindIsNew ? 0 : (prev.rotationY || 0));
     const newOffsetX   = (offsetX   !== undefined) ? offsetX   : (kindIsNew ? 0 : (prev.offsetX   || 0));
     const newOffsetZ   = (offsetZ   !== undefined) ? offsetZ   : (kindIsNew ? 0 : (prev.offsetZ   || 0));
+    const transformChanged = (prev.rotationY || 0) !== newRotationY
+      || (prev.offsetX || 0) !== newOffsetX
+      || (prev.offsetZ || 0) !== newOffsetZ;
     const newAppearance = Object.prototype.hasOwnProperty.call(opts || {}, 'appearance')
       ? normalizeAppearance(appearance)
       : (kindIsNew ? null : normalizeAppearance(prev.appearance));
@@ -11759,7 +11922,7 @@
       }
       if (getWorldCell(x, z).kind === 'bridge') renderCellObject(x, z, { animate: false });
     }
-    if (!kindChanged && !floorsChanged && !terrainFloorsChanged && !bTypeChanged && !fenceSideChanged && !appearanceChanged) {
+    if (!kindChanged && !floorsChanged && !terrainFloorsChanged && !bTypeChanged && !fenceSideChanged && !appearanceChanged && !transformChanged) {
       if (terrainChanged || tileHeightChanged || forceTile) {
         saveState();
         emitCellWebhook();
@@ -13785,6 +13948,12 @@
       e.preventDefault();
       return;
     }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && window.__tinyworldSelection && window.__tinyworldSelection.cells.size) {
+      if (window.__tinyworldSelection.rotate(e.key === 'ArrowLeft' ? -Math.PI / 2 : Math.PI / 2)) {
+        e.preventDefault();
+        return;
+      }
+    }
     const shortcutTool = TOOLS.find(x => !x.hidden && x.shortcut && x.shortcut.toLowerCase() === k);
     if (shortcutTool) {
       selectTool(shortcutTool);
@@ -14108,7 +14277,7 @@
     setCameraMode(DEFAULT_CAMERA_MODE);
   }
 
-  // Resize the home board between the allowed presets (8 through 512).
+  // Resize the home board between the allowed presets (8 through 48).
   // World data outside the previous board is preserved in world[][] —
   // growing the grid brings those tiles into the home area (so the
   // existing 'outside home' grayscale is no longer applied to them).
@@ -14450,6 +14619,7 @@
     const cloudHeightEl = document.getElementById('render-cloud-height');
     const cloudShadowEl = document.getElementById('render-cloud-shadow');
     const distanceMistEl = document.getElementById('render-distance-mist');
+    const backdropEl = document.getElementById('render-backdrop');
     const tiltBlurEl = document.getElementById('render-tilt-blur');
     const tiltFocusEl = document.getElementById('render-tilt-focus');
     const ghostOpacityEl = document.getElementById('render-ghost-opacity');
@@ -14467,6 +14637,7 @@
     const cloudHeightValue = document.getElementById('render-cloud-height-value');
     const cloudShadowValue = document.getElementById('render-cloud-shadow-value');
     const distanceMistValue = document.getElementById('render-distance-mist-value');
+    const backdropValue = document.getElementById('render-backdrop-value');
     const tiltBlurValue = document.getElementById('render-tilt-blur-value');
     const tiltFocusValue = document.getElementById('render-tilt-focus-value');
     const ghostOpacityValue = document.getElementById('render-ghost-opacity-value');
@@ -14500,6 +14671,7 @@
       cloudHeightEl.value = String(renderCloudHeight);
       cloudShadowEl.value = String(Math.round(renderCloudShadow * 100));
       distanceMistEl.value = String(Math.round(renderDistanceMist * 100));
+      backdropEl.value = String(Math.round(renderBackdrop * 100));
       tiltBlurEl.value = String(renderTiltBlur);
       tiltFocusEl.value = String(Math.round(renderTiltFocus));
       ghostOpacityEl.value = String(Math.round(renderGhostOpacity * 100));
@@ -14517,6 +14689,7 @@
       cloudHeightValue.textContent = cloudHeightEl.value;
       cloudShadowValue.textContent = cloudShadowEl.value + '%';
       distanceMistValue.textContent = distanceMistEl.value + '%';
+      backdropValue.textContent = backdropEl.value + '%';
       tiltBlurValue.textContent = tiltBlurEl.value + 'px';
       tiltFocusValue.textContent = tiltFocusEl.value + '%';
       ghostOpacityValue.textContent = ghostOpacityEl.value + '%';
@@ -14539,6 +14712,7 @@
       localStorage.setItem(RENDER_LS.cloudHeight, renderCloudHeight.toFixed(1));
       localStorage.setItem(RENDER_LS.cloudShadow, renderCloudShadow.toFixed(2));
       localStorage.setItem(RENDER_LS.distanceMist, renderDistanceMist.toFixed(2));
+      localStorage.setItem(RENDER_LS.backdrop, renderBackdrop.toFixed(2));
       localStorage.setItem(RENDER_LS.tiltBlur, renderTiltBlur.toFixed(1));
       localStorage.setItem(RENDER_LS.tiltFocus, renderTiltFocus.toFixed(0));
       localStorage.setItem(RENDER_LS.ghostOpacity, renderGhostOpacity.toFixed(2));
@@ -14565,6 +14739,8 @@
       if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderDistanceMist = parseInt(distanceMistEl.value, 10) / 100;
       applyDistanceMistSettings();
+      renderBackdrop = parseInt(backdropEl.value, 10) / 100;
+      applyBackdropSettings();
       renderTiltBlur = parseFloat(tiltBlurEl.value);
       renderTiltFocus = parseInt(tiltFocusEl.value, 10);
       applyTiltShiftSettings();
@@ -14607,7 +14783,7 @@
     });
     closeBtn.addEventListener('click', () => { closeTinyModal(modal); });
     modal.addEventListener('click', e => { if (e.target === modal) closeTinyModal(modal); });
-    for (const el of [shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, cloudsEl, cloudSpeedEl, cloudHeightEl, cloudShadowEl, distanceMistEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
+    for (const el of [shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, cloudsEl, cloudSpeedEl, cloudHeightEl, cloudShadowEl, distanceMistEl, backdropEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl]) {
       if (!el) continue;
       el.addEventListener('input', applyFromControls);
       el.addEventListener('change', applyFromControls);
@@ -14637,6 +14813,8 @@
       if (typeof applyCloudHeight === 'function') applyCloudHeight();
       renderDistanceMist = 0.28;
       applyDistanceMistSettings();
+      renderBackdrop = 0.78;
+      applyBackdropSettings();
       renderTiltBlur = 3.5;
       renderTiltFocus = 18;
       applyTiltShiftSettings();
@@ -16000,7 +16178,9 @@
 
   function startNextRun() {
     const haveCrops = cropCellsForDusting().length > 0;
-    if (!haveCrops || Math.random() < FLIGHT_BANNER_CHANCE) {
+    // Crop dusting is a summer/farm-season behaviour, but the plane itself
+    // should still exist year-round as an ambient banner flyover.
+    if (activeSeason !== 'summer' || !haveCrops || Math.random() < FLIGHT_BANNER_CHANCE) {
       startBannerRun(BANNER_MESSAGES[Math.floor(Math.random() * BANNER_MESSAGES.length)]);
     } else {
       cropDusterState.variantIndex = (cropDusterState.variantIndex + 1)
@@ -16054,15 +16234,6 @@
   function updateCropDuster(dt) {
     updateCropDustParticles(dt);
     if (!cropDusterModel) return;
-    if (activeSeason !== 'summer') {
-      cropDusterRoot.visible = false;
-      if (bannerMesh) bannerMesh.visible = false;
-      if (bannerWire) bannerWire.visible = false;
-      cropDusterState.phase = 'idle';
-      cropDusterState.curve = null;
-      cropDusterState.travel = 0;
-      return;
-    }
     spinCropDusterPropeller(dt);
     cropDusterTime += dt;
 
@@ -16290,7 +16461,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://tinyworld.local/world.schema.json",
     "title": "TinyWorld",
-    "description": "Scene description for the Tiny World Builder. The renderer supports home grids from 8x8 to 512x512, plus sparse user-edited ghost-board cells outside the home grid. Each non-default cell has a terrain, optional object kind, separate object floors and terrainFloors counts, optional house buildingType, optional fenceSide, optional decorative extras, optional within-tile transform, and optional appearance overrides.",
+    "description": "Scene description for the Tiny World Builder. The renderer supports home grids from 8x8 to 48x48, plus sparse user-edited ghost-board cells outside the home grid. Each non-default cell has a terrain, optional object kind, separate object floors and terrainFloors counts, optional house buildingType, optional fenceSide, optional decorative extras, optional within-tile transform, and optional appearance overrides.",
     "type": "object",
     "additionalProperties": false,
     "required": [
@@ -16313,12 +16484,7 @@
                 16,
                 20,
                 32,
-                48,
-                64,
-                96,
-                128,
-                256,
-                512
+                48
             ],
             "description": "Optional home board edge length. Defaults to the current app grid when omitted."
         },
@@ -18403,23 +18569,24 @@
 
     function selectedWorldCoords() {
       const sel = window.__tinyworldSelection;
-      if (!sel) return [];
-      const out = [];
-      sel.cells.forEach(key => {
-        const c = parseCellKey(key);
-        out.push({ x: c.x + (c.bx || 0) * GRID, z: c.z + (c.bz || 0) * GRID });
-      });
-      return out;
+      return sel && sel.worldCoords ? sel.worldCoords() : [];
     }
 
     function applySelectionProperty(rowKey, value) {
+      if (rowKey === 'rotate') {
+        const sel = window.__tinyworldSelection;
+        if (sel && sel.rotate) sel.rotate(value === 'left' ? -Math.PI / 2 : Math.PI / 2);
+        return;
+      }
+      const selForMaterialize = window.__tinyworldSelection;
+      if (selForMaterialize && selForMaterialize.materialize) selForMaterialize.materialize();
       const coords = selectedWorldCoords();
       if (!coords.length) return;
       coords.forEach(({ x, z }) => {
         const cell = getWorldCell(x, z);
         if (!cell) return;
         if (rowKey === 'bodyColor' || rowKey === 'topColor') {
-          if (cell.kind !== 'house') return;
+          if (cell.kind !== 'house' && cell.kind !== 'tree') return;
           const appearance = Object.assign({}, normalizeAppearance(cell.appearance) || {});
           appearance[rowKey] = value;
           setCell(x, z, { ...cell, appearance, animate: false, impactDust: false });
@@ -18451,6 +18618,10 @@
       }
       const primary = entries[0][0];
       const rows = [];
+      rows.push({ key: 'rotate', label: 'Rotate', options: [
+        { label: '↺ Left', value: 'left' },
+        { label: 'Right ↻', value: 'right' },
+      ] });
       if (primary === 'house') {
         rows.push(
           { key: 'topColor', label: 'Top', color: true, options: [
@@ -18472,6 +18643,22 @@
             { label: 'Tower', value: 'tower' },
             { label: 'Castle', value: 'turret' },
             { label: 'High-rise', value: 'skyscraper' },
+          ] },
+        );
+      } else if (primary === 'tree') {
+        rows.push(
+          { key: 'topColor', label: 'Leaves', color: true, options: [
+            { label: 'Pine', value: '#4f8a2c', color: '#4f8a2c' },
+            { label: 'Bright', value: '#86d139', color: '#86d139' },
+            { label: 'Autumn', value: '#c07a2f', color: '#c07a2f' },
+            { label: 'Blossom', value: '#e9a3bd', color: '#e9a3bd' },
+            { label: 'Winter', value: '#7ba66d', color: '#7ba66d' },
+          ] },
+          { key: 'bodyColor', label: 'Trunk', color: true, options: [
+            { label: 'Brown', value: '#5c3818', color: '#5c3818' },
+            { label: 'Oak', value: '#8a5a2f', color: '#8a5a2f' },
+            { label: 'Birch', value: '#d8c8a8', color: '#d8c8a8' },
+            { label: 'Dark', value: '#3f2a18', color: '#3f2a18' },
           ] },
         );
       }
@@ -20568,9 +20755,11 @@
       return 'tod-dusk';                                 // 18:00 - 21:00
     }
     function applyTod(min) {
+      currentTodMinutes = min;
       document.body.classList.remove('tod-dawn','tod-day','tod-dusk','tod-night');
       document.body.classList.add(todClassFromMinutes(min));
       applyLights();
+      if (typeof updateAllBuildingWindowLights === 'function') updateAllBuildingWindowLights();
       if (typeof requestMinimapRepaint === 'function') requestMinimapRepaint();
     }
     function applySeason(seasonV) {
@@ -20734,7 +20923,7 @@
       return h + ':' + m;
     }
 
-    let todMinutes = 720;
+    let todMinutes = currentTodMinutes;
     let season = 'summer';
     let weather = 'clear';
     try {
@@ -21236,7 +21425,7 @@
       items.push({ group: 'World', label: 'Run vehicle seed demo', hint: 'map + cars + targets from ' + VEHICLE_DEMO_DEFAULT_SEED, run: () => {
         runSeededVehicleDemo(VEHICLE_DEMO_DEFAULT_SEED);
       } });
-      items.push({ group: 'World', label: 'Run large vehicle stress demo', hint: '128×128 roads, bridges, cul-de-sacs, 36 cars', run: () => {
+      items.push({ group: 'World', label: 'Run large vehicle stress demo', hint: '48×48 roads, bridges, cul-de-sacs, 36 cars', run: () => {
         runSeededVehicleDemo(VEHICLE_DEMO_LARGE_SEED, {
           variant: 'large',
           size: VEHICLE_DEMO_LARGE_SIZE_DEFAULT,
