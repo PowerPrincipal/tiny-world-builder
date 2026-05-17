@@ -209,7 +209,7 @@ async function handleReinterpretStamp(req, res) {
     const input = await readJsonBody(req);
     const model = String(input.model || 'gpt-5.5').trim();
     const allowedMaterials = Array.isArray(input.allowedMaterials) ? input.allowedMaterials : [];
-    const reasoningEffort = choose(input.reasoningEffort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'], 'low');
+    const reasoningEffort = choose(input.reasoningEffort, ['none', 'low', 'medium', 'high', 'xhigh'], 'low');
     const reasoningSummary = choose(input.reasoningSummary, ['off', 'auto', 'concise', 'detailed'], 'off');
     const textVerbosity = choose(input.textVerbosity, ['low', 'medium', 'high'], 'low');
     const maxOutputTokens = numberInRange(input.maxOutputTokens, 12000, 1000, 128000);
