@@ -24,8 +24,8 @@
     },
     "cameraMode": {
       "type": "string",
-      "enum": ["ortho", "topdown", "soft", "perspective", "fp"],
-      "description": "Optional preferred camera. Saved worlds usually use ortho, soft, perspective, or fp; topdown is accepted for imports."
+      "enum": ["ortho", "topdown", "perspective", "fp"],
+      "description": "Optional preferred camera. Saved worlds usually use ortho, perspective, or fp; topdown is accepted for imports."
     },
     "toolId": {
       "type": "string",

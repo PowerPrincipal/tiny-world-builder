@@ -3406,12 +3406,6 @@
       </span>
       <span class="view-body"><strong>Isometric</strong><em>angled overhead</em></span>
     </button>
-    <button class="view-option" data-view="soft" role="menuitem">
-      <span class="view-thumb" aria-hidden="true">
-        <svg viewBox="0 0 32 28" width="36" height="32"><path d="M16 7 27 12l-11 6L5 12z" fill="#cdb98a"/><path d="M16 18l11-6v8l-11 5z" fill="#a08454"/><path d="M16 18l-11-6v8l11 5z" fill="#8a6f44"/></svg>
-      </span>
-      <span class="view-body"><strong>Soft</strong><em>tilted perspective</em></span>
-    </button>
     <button class="view-option" data-view="perspective" role="menuitem">
       <span class="view-thumb" aria-hidden="true">
         <svg viewBox="0 0 32 28" width="36" height="32"><path d="M16 10 26 12l-10 4L6 12z" fill="#cdb98a"/><path d="M16 16l10-4v6l-10 4z" fill="#a08454"/><path d="M16 16l-10-4v6l10 4z" fill="#8a6f44"/></svg>
@@ -4051,6 +4045,15 @@
               <input type="checkbox" id="render-voxel-terrain" />
               <span>Voxel terrain <em class="gen-hint">flat shaded panels and path edging</em></span>
             </label>
+            <label>Terrain voxel resolution
+              <select id="render-terrain-voxel-resolution">
+                <option value="mixed">Mixed detail</option>
+                <option value="4">4 × 4</option>
+                <option value="6">6 × 6</option>
+                <option value="8">8 × 8</option>
+                <option value="12">12 × 12</option>
+              </select>
+            </label>
             <div class="range-row">
               <span>Brightness</span>
               <input id="render-brightness" type="range" min="75" max="130" step="1" />
@@ -4402,6 +4405,7 @@
     objectOpacity: 'tinyworld:render:objectOpacity',
     voxelGap: 'tinyworld:render:voxelGap',
     voxelTerrain: 'tinyworld:render:voxelTerrain',
+    terrainVoxelResolution: 'tinyworld:render:terrainVoxelResolution',
     autoExpand: 'tinyworld:render:autoExpand',
     pixelSize: 'tinyworld:render:pixelSize',
     pixelDepthEdge: 'tinyworld:render:pixelDepthEdge',
@@ -4446,6 +4450,7 @@
     objectOpacity: '1',
     voxelGap: '0',
     voxelTerrain: '1',
+    terrainVoxelResolution: 'mixed',
     autoExpand: '0',
     pixelSize: '1',
     // Keep the old-school mode as chunky colour pixels by default. The
@@ -4588,6 +4593,8 @@
   let renderObjectOpacity = storedNumber(RENDER_LS.objectOpacity, 1, 0, 1);
   let renderVoxelGap = storedNumber(RENDER_LS.voxelGap, 0, 0, 0.14);
   let renderVoxelTerrain = localStorage.getItem(RENDER_LS.voxelTerrain) !== '0';
+  let renderTerrainVoxelResolution = localStorage.getItem(RENDER_LS.terrainVoxelResolution) || 'mixed';
+  if (!['mixed', '4', '6', '8', '12'].includes(renderTerrainVoxelResolution)) renderTerrainVoxelResolution = 'mixed';
   let renderAutoExpand = localStorage.getItem(RENDER_LS.autoExpand) === '1';
   if (!renderAutoExpand) renderVisibleSize = GRID;
   function applyBackdropSettings() {
@@ -4996,14 +5003,14 @@
     }
   });
 
-  // -------- cameras (orthographic + soft + perspective) --------
+  // -------- cameras (orthographic + perspective) --------
   const DEFAULT_VIEW_SIZE = 8.2;
-  const DEFAULT_CAMERA_MODE = 'soft';
+  const DEFAULT_CAMERA_MODE = 'perspective';
   const DEFAULT_AZIMUTH = Math.PI * 0.32;
   const DEFAULT_POLAR = Math.PI * 0.30;
   const DEFAULT_TARGET = new THREE.Vector3(0.35, 0, 0.15);
   let viewSize = DEFAULT_VIEW_SIZE;
-  let cameraMode = DEFAULT_CAMERA_MODE; // 'ortho' | 'soft' | 'perspective'
+  let cameraMode = DEFAULT_CAMERA_MODE; // 'ortho' | 'perspective'
 
   const aspect0 = window.innerWidth / window.innerHeight;
   const orthoCam = new THREE.OrthographicCamera(
@@ -5011,11 +5018,8 @@
     viewSize, -viewSize,
     0.1, 200
   );
-  // narrow FOV + far distance gives the "miniature/telephoto" look that
-  // sits closest to the iso aesthetic while still showing real depth.
-  const softCam = new THREE.PerspectiveCamera(12, aspect0, 0.1, 600);
   const persCam = new THREE.PerspectiveCamera(28, aspect0, 0.1, 200);
-  let camera = softCam;
+  let camera = persCam;
 
   // orbit state
   let azimuth = DEFAULT_AZIMUTH;   // around Y
@@ -5025,7 +5029,7 @@
   const panForward = new THREE.Vector3();
 
   function updateCamera() {
-    const r = cameraMode === 'ortho' ? 14 : (cameraMode === 'soft' ? viewSize * 5.6 : viewSize * 4.2);
+    const r = cameraMode === 'ortho' ? 14 : viewSize * 4.2;
     const isTopdown = cameraMode === 'ortho' && polar < 0.05;
     if (isTopdown) {
       camera.up.set(0, 0, -1);
@@ -5205,11 +5209,11 @@
   }
 
   // Variant of getBoxGeometry that omits selected faces from the index. Use
-  // for risers (top hidden under cap, bottom underground) and tile decals
-  // (bottom hidden against the cap) so we don't render geometry the camera
-  // can't see. Cached the same way; never mutate or dispose the returned geo.
+  // for risers, terrain caps, voxel terrain panels, and tile decals so we
+  // don't render geometry the camera can't see. Cached the same way; never
+  // mutate or dispose the returned geo.
   // BoxGeometry materialIndex per face: 0=+x, 1=-x, 2=+y (top), 3=-y (bottom),
-  // 4=+z, 5=-z. We keep all side faces and only drop top/bottom on demand.
+  // 4=+z, 5=-z.
   function getOpenBoxGeometry(w, h, d, skipTop = false, skipBottom = false, skipPX = false, skipNX = false, skipPZ = false, skipNZ = false) {
     const qw = Math.round(w * 100) / 100;
     const qh = Math.round(h * 100) / 100;
@@ -5716,12 +5720,25 @@
     };
   }
 
-  function addVoxelTerrainTop(g, terrain, x, z, rise, topSize, topHeight, pathN, terrainN) {
+  function addVoxelTerrainTop(g, terrain, x, z, rise, topSize, topHeight, pathN, terrainN, hiddenSides) {
     const mats = terrainVoxelMaterials(terrain);
-    const cells = (terrain === 'path' || terrain === 'water' || terrain === 'dirt') ? 8 : 6;
+    const explicitCells = parseInt(renderTerrainVoxelResolution, 10);
+    const cells = Number.isFinite(explicitCells)
+      ? explicitCells
+      : ((terrain === 'path' || terrain === 'water' || terrain === 'dirt') ? 8 : 6);
     const cellSize = topSize / cells;
     const half = topSize * 0.5;
     const y = rise + topHeight * 0.5;
+    const buckets = new Map();
+    function queuePanel(geo, mat, px, pz) {
+      const key = (geo.id || geo.uuid) + ':' + (mat.id || mat.uuid);
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { geo, mat, positions: [] };
+        buckets.set(key, bucket);
+      }
+      bucket.positions.push(px, pz);
+    }
     for (let ix = 0; ix < cells; ix++) {
       for (let iz = 0; iz < cells; iz++) {
         const atN = iz === 0;
@@ -5750,10 +5767,33 @@
         } else if (terrain !== 'water' && r > 0.68) {
           mat = mats.scuff;
         }
-        const panel = new THREE.Mesh(getBoxGeometry(cellSize, topHeight, cellSize), mat);
-        panel.position.set(-half + cellSize * (ix + 0.5), y, -half + cellSize * (iz + 0.5));
-        g.add(panel);
+        const panelGeo = getOpenBoxGeometry(
+          cellSize,
+          topHeight,
+          cellSize,
+          false,
+          true,
+          !atE || (hiddenSides && hiddenSides.e),
+          !atW || (hiddenSides && hiddenSides.w),
+          !atS || (hiddenSides && hiddenSides.s),
+          !atN || (hiddenSides && hiddenSides.n)
+        );
+        queuePanel(panelGeo, mat, -half + cellSize * (ix + 0.5), -half + cellSize * (iz + 0.5));
       }
+    }
+    const dummy = addVoxelTerrainTop._dummy || (addVoxelTerrainTop._dummy = new THREE.Object3D());
+    for (const bucket of buckets.values()) {
+      const count = bucket.positions.length / 2;
+      const mesh = new THREE.InstancedMesh(bucket.geo, bucket.mat, count);
+      for (let i = 0; i < count; i++) {
+        dummy.position.set(bucket.positions[i * 2], y, bucket.positions[i * 2 + 1]);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      g.add(mesh);
     }
   }
 
@@ -5812,13 +5852,10 @@
     // classic dirt edges visible on every grass cliff, bank, or drop-off while
     // completely hiding the brown from above ("if it's grass it's grass").
     //
-    // Note on hidden faces: both the riser and top cap are currently full closed
-    // meshes (bottom faces + the top of the riser under the decorative cap).
-    // We explicitly set side: FrontSide on the materials so back faces are culled.
-    // The bottom of the riser is the main hidden face (underground). Higher-level
-    // culling (home render window + ghostPreloadRadius + frustum) is what keeps
-    // us from drawing tiles that are completely off-screen. Removing riser bottoms
-    // entirely is a possible further optimization if triangle count becomes an issue.
+    // Hidden faces are stripped at geometry-build time: risers drop top/bottom
+    // faces, caps/panels drop bottoms, and same-or-higher neighbours hide shared
+    // side faces. FrontSide materials handle normal back-face culling on the
+    // remaining visible faces.
     if (!skipTerrain) {
       let riserSize = TILE * 1.04;
       let topSize   = TILE * 0.98;
@@ -5870,9 +5907,15 @@
       const seamOverlap = 0.006;
       const topHeight = TOP_H + seamOverlap;
       if (renderVoxelTerrain) {
-        addVoxelTerrainTop(g, terrain, x, z, rise - seamOverlap * 0.5, topSize, topHeight, pathN, terrainN);
+        addVoxelTerrainTop(g, terrain, x, z, rise - seamOverlap * 0.5, topSize, topHeight, pathN, terrainN, {
+          e: skipE,
+          w: skipW,
+          s: skipS,
+          n: skipN,
+        });
       } else {
-        const top = new THREE.Mesh(getBoxGeometry(topSize, topHeight, topSize), topMat);
+        const topGeo = getOpenBoxGeometry(topSize, topHeight, topSize, false, true, skipE, skipW, skipS, skipN);
+        const top = new THREE.Mesh(topGeo, topMat);
         top.position.y = rise + TOP_H * 0.5 - seamOverlap * 0.5;
         g.add(top);
 
@@ -10402,7 +10445,7 @@
       world: {
         v: 4,
         gridSize: size,
-        cameraMode: 'soft',
+        cameraMode: 'perspective',
         toolId: 'select',
         cells,
       },
@@ -10489,7 +10532,7 @@
       world: {
         v: 4,
         gridSize: 8,
-        cameraMode: 'soft',
+        cameraMode: 'perspective',
         toolId: 'select',
         cells,
       },
@@ -10525,12 +10568,12 @@
     try { localStorage.setItem('tinyworld:vehicle-demo:last-seed', spec.seed); } catch (_) {}
     dismissWelcomeForDemo();
     showVehicleDemoBadge(spec.seed, spec.vehicles.length, { gridSize: activeVehicleDemoSize });
-    if (typeof setCameraMode === 'function') setCameraMode('soft');
+    if (typeof setCameraMode === 'function') setCameraMode('perspective');
     if (typeof resetCameraDefaults === 'function') resetCameraDefaults();
 
     const startVehicles = () => {
       dismissWelcomeForDemo();
-      if (typeof setCameraMode === 'function') setCameraMode('soft');
+      if (typeof setCameraMode === 'function') setCameraMode('perspective');
       if (typeof resetCameraDefaults === 'function') resetCameraDefaults();
       clearVehicleRuntime();
       const spawnDelay = Number.isFinite(spec.spawnDelay) ? spec.spawnDelay : 280;
@@ -15905,7 +15948,7 @@
   });
 
   function togglePerspective() {
-    const next = cameraMode === 'ortho' ? 'soft' : (cameraMode === 'soft' ? 'perspective' : 'ortho');
+    const next = cameraMode === 'ortho' ? 'perspective' : 'ortho';
     setCameraMode(next);
   }
 
@@ -15936,7 +15979,8 @@
   // can return to a sensible angled view instead of getting stuck flat.
   let polarBeforeTopdown = null;
   function setCameraMode(mode) {
-    const effective = ['ortho', 'topdown', 'soft', 'perspective', 'fp'].includes(mode) ? mode : 'ortho';
+    const requested = mode === 'soft' ? 'perspective' : mode;
+    const effective = ['ortho', 'topdown', 'perspective', 'fp'].includes(requested) ? requested : 'ortho';
     if (effective !== 'fp' && fp.active) exitFP();
     // 'topdown' is orthoCam with polar snapped to ~0 (straight down).
     // Internally we still store cameraMode='ortho' for everything that
@@ -15958,7 +16002,6 @@
       cameraMode = effective;
     }
     camera = cameraMode === 'ortho' ? orthoCam
-           : cameraMode === 'soft'  ? softCam
            : persCam;
     const isTopdown = (effective === 'topdown') || (cameraMode === 'ortho' && polar < 0.05);
     perspBtn.classList.toggle('on', cameraMode !== 'ortho' || isTopdown);
@@ -15966,7 +16009,6 @@
     perspBtn.setAttribute('data-tooltip',
       isTopdown              ? 'Top-down (bird\'s eye)' :
       cameraMode === 'ortho' ? 'Isometric' :
-      cameraMode === 'soft'  ? 'Soft perspective' :
       cameraMode === 'fp'    ? 'Walk (esc to exit)' : 'Perspective');
     if (effective === 'fp') enterFP();
     if (typeof updateCamera === 'function') updateCamera();
@@ -16482,6 +16524,7 @@
     const objectOpacityEl = document.getElementById('render-object-opacity');
     const voxelGapEl = document.getElementById('render-voxel-gap');
     const voxelTerrainEl = document.getElementById('render-voxel-terrain');
+    const terrainVoxelResolutionEl = document.getElementById('render-terrain-voxel-resolution');
     const resolutionValue = document.getElementById('render-resolution-value');
     const distanceValue = document.getElementById('render-distance-value');
     const visibleSizeValue = document.getElementById('render-visible-size-value');
@@ -16545,6 +16588,7 @@
       objectOpacityEl.value = String(Math.round(renderObjectOpacity * 100));
       voxelGapEl.value = String(Math.round(renderVoxelGap * 100));
       if (voxelTerrainEl) voxelTerrainEl.checked = !!renderVoxelTerrain;
+      if (terrainVoxelResolutionEl) terrainVoxelResolutionEl.value = renderTerrainVoxelResolution;
       resolutionValue.textContent = resolutionEl.value + '%';
       distanceValue.textContent = distanceEl.value;
       visibleSizeValue.textContent = visibleSizeEl.value + 'x' + visibleSizeEl.value;
@@ -16597,12 +16641,14 @@
       localStorage.setItem(RENDER_LS.objectOpacity, renderObjectOpacity.toFixed(2));
       localStorage.setItem(RENDER_LS.voxelGap, renderVoxelGap.toFixed(2));
       localStorage.setItem(RENDER_LS.voxelTerrain, renderVoxelTerrain ? '1' : '0');
+      localStorage.setItem(RENDER_LS.terrainVoxelResolution, renderTerrainVoxelResolution);
       localStorage.setItem(RENDER_LS.autoExpand, renderAutoExpand ? '1' : '0');
     }
 
     function applyFromControls() {
       const oldVoxelGap = renderVoxelGap;
       const oldVoxelTerrain = renderVoxelTerrain;
+      const oldTerrainVoxelResolution = renderTerrainVoxelResolution;
       setShadowQuality(shadowEl.value);
       setRenderResolutionScale(parseInt(resolutionEl.value, 10) / 100);
       setRenderVisibleDistance(parseInt(distanceEl.value, 10));
@@ -16635,8 +16681,9 @@
       renderObjectOpacity = parseInt(objectOpacityEl.value, 10) / 100;
       renderVoxelGap = parseInt(voxelGapEl.value, 10) / 100;
       if (voxelTerrainEl) renderVoxelTerrain = !!voxelTerrainEl.checked;
+      if (terrainVoxelResolutionEl) renderTerrainVoxelResolution = terrainVoxelResolutionEl.value;
       if (Math.abs(oldVoxelGap - renderVoxelGap) > 0.001) scheduleVoxelStampRefresh();
-      if (oldVoxelTerrain !== renderVoxelTerrain) rebuildTerrainRender();
+      if (oldVoxelTerrain !== renderVoxelTerrain || oldTerrainVoxelResolution !== renderTerrainVoxelResolution) rebuildTerrainRender();
       updateGhostRenderBubble();
       applyColorFilterFallback();
       persistSettings();
@@ -16673,7 +16720,7 @@
     });
     closeBtn.addEventListener('click', () => { closeTinyModal(modal); });
     modal.addEventListener('click', e => { if (e.target === modal) closeTinyModal(modal); });
-    for (const el of [shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, cloudsEl, cloudSpeedEl, cloudHeightEl, cloudShadowEl, distanceMistEl, backdropEl, pixelSizeEl, pixelDepthEdgeEl, pixelNormalEdgeEl, shaderAntialiasEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl, voxelGapEl, voxelTerrainEl]) {
+    for (const el of [shadowEl, resolutionEl, distanceEl, visibleSizeEl, brightnessEl, lightingEl, saturationEl, contrastEl, cloudsEl, cloudSpeedEl, cloudHeightEl, cloudShadowEl, distanceMistEl, backdropEl, pixelSizeEl, pixelDepthEdgeEl, pixelNormalEdgeEl, shaderAntialiasEl, tiltBlurEl, tiltFocusEl, ghostOpacityEl, floorOpacityEl, objectOpacityEl, voxelGapEl, voxelTerrainEl, terrainVoxelResolutionEl]) {
       if (!el) continue;
       el.addEventListener('input', applyFromControls);
       el.addEventListener('change', applyFromControls);
@@ -16717,10 +16764,12 @@
       renderObjectOpacity = 1;
       renderVoxelGap = 0;
       renderVoxelTerrain = true;
+      renderTerrainVoxelResolution = 'mixed';
       renderAutoExpand = false;
       const autoExpandEl = document.getElementById('minimap-autoexpand');
       if (autoExpandEl) autoExpandEl.checked = false;
       if (voxelTerrainEl) voxelTerrainEl.checked = true;
+      if (terrainVoxelResolutionEl) terrainVoxelResolutionEl.value = renderTerrainVoxelResolution;
       rebuildTerrainRender();
       scheduleVoxelStampRefresh();
       updateGhostRenderBubble();
@@ -19225,9 +19274,6 @@
     orthoCam.bottom = -viewSize;
     orthoCam.updateProjectionMatrix();
 
-    softCam.aspect = aspect;
-    softCam.updateProjectionMatrix();
-
     persCam.aspect = aspect;
     persCam.updateProjectionMatrix();
 
@@ -19289,11 +19335,10 @@
         "enum": [
           "ortho",
           "topdown",
-          "soft",
           "perspective",
           "fp"
         ],
-        "description": "Optional preferred camera. Saved worlds usually use ortho, soft, perspective, or fp; topdown is accepted for imports."
+        "description": "Optional preferred camera. Saved worlds usually use ortho, perspective, or fp; topdown is accepted for imports."
       },
       "toolId": {
         "type": "string",
@@ -19924,7 +19969,8 @@
     if (typeof data.v === 'string') data.v = parseInt(data.v, 10);
     if (data.v !== 1 && data.v !== 2 && data.v !== 3 && data.v !== 4) return 'unsupported v: ' + data.v;
     if (!Array.isArray(data.cells)) return 'cells must be an array';
-    const okCameraMode = new Set(['ortho','topdown','soft','perspective','fp']);
+    if (data.cameraMode === 'soft') data.cameraMode = 'perspective';
+    const okCameraMode = new Set(['ortho','topdown','perspective','fp']);
     if (data.cameraMode !== undefined && !okCameraMode.has(data.cameraMode)) return 'cameraMode invalid: ' + data.cameraMode;
     if (data.gridSize !== undefined && !isValidGridSize(data.gridSize)) return 'gridSize invalid: ' + data.gridSize;
     const okTerrain = new Set(['grass','path','dirt','water','stone','lava','sand','snow']);
@@ -21035,7 +21081,7 @@
         const receivedCells = data && Array.isArray(data.cells) ? data.cells.length : 0;
         progress.say('Received JSON with ' + receivedCells + ' cells. Switching back to perspective and slicing the build into terrain, then objects.');
         hidePlanOverlay();
-        if (typeof setCameraMode === 'function') setCameraMode('soft');
+        if (typeof setCameraMode === 'function') setCameraMode('perspective');
         const buildMsg = progress.say('Rendering terrain base layer… 0%');
         const ok = applyState(data, {
           sliced: true,
@@ -22112,7 +22158,7 @@
       invalidateHomeFade();
       suppressSave = false;
       if (!opts.keepCamera) {
-        const okCameraMode = new Set(['ortho','topdown','soft','perspective','fp']);
+        const okCameraMode = new Set(['ortho','topdown','perspective','fp']);
         if (data.cameraMode && okCameraMode.has(data.cameraMode)) setCameraMode(data.cameraMode);
         else resetCameraDefaults();
       }
@@ -22288,7 +22334,7 @@
 
       suppressSave = false;
       if (!opts.keepCamera) {
-        const okCameraMode = new Set(['ortho','topdown','soft','perspective','fp']);
+        const okCameraMode = new Set(['ortho','topdown','perspective','fp']);
         if (data.cameraMode && okCameraMode.has(data.cameraMode)) setCameraMode(data.cameraMode);
         else resetCameraDefaults();
       }
@@ -24049,9 +24095,9 @@
       document.body.classList.toggle('showcase', showcaseActive);
       if (showcaseBtn) showcaseBtn.classList.toggle('on', showcaseActive);
       if (showcaseActive) {
-        // Pop to soft perspective for a more cinematic angle.
+        // Pop to perspective for a more cinematic angle.
         if (typeof setCameraMode === 'function' && cameraMode === 'ortho') {
-          try { setCameraMode('soft'); } catch (_) {}
+          try { setCameraMode('perspective'); } catch (_) {}
         }
       }
     }
@@ -24390,7 +24436,7 @@
       } catch (_) {}
       // Top-bar buttons
       items.push({ group: 'Camera', label: 'Toggle perspective', hint: 'orbit vs orthographic', kbd: 'P', run: topBtnAction('persp') });
-      items.push({ group: 'Camera', label: 'Pick camera view…', hint: 'top-down / soft / first-person', run: topBtnAction('view-modes') });
+      items.push({ group: 'Camera', label: 'Pick camera view…', hint: 'top-down / perspective / first-person', run: topBtnAction('view-modes') });
       items.push({ group: 'Camera', label: 'Center on home grid', hint: 'frame the home board', kbd: 'H', run: topBtnAction('home') });
       // Terrain — raise/lower the hovered cell
       items.push({ group: 'Terrain', label: 'Raise terrain at cursor', hint: 'terrainFloors +1 (max 8)', kbd: 'R', run: () => {
