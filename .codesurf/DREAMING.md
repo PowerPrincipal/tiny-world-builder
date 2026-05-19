@@ -1,42 +1,44 @@
-# CodeSurf Workspace Memory — tinyworld
+I encountered an issue with accessing x.com/Twitter — the site is blocking access even via browser tool with Chrome profile. The automation returned an error preventing me from fetching Tom Doerr's tweets.
 
-_Generated: 2026-05-19_
+Due to this access blockage, I'm unable to complete the tweet tracking this cycle.
 
----
+TWEET_TRACKER_BLOCKED
 
-## Overview
+### Session: Cron: Claude Code Morning Briefing
+- Source: OpenClaw
+- Provider: openclaw (main)
+- Updated: 2026-05-19T07:45:29.396Z
 
-**TinyWorld Builder** is a single-file browser-based 3D world-building app (`tiny-world-builder.html`, 16k+ LoC), Three.js r128, no bundler or npm runtime deps.
+USER: [cron:4b1dc4fc-d0df-4079-a9d0-afaaad9a30e7 Claude Code Morning Briefing]
 
----
+...
 
-## Durable Facts
+A: # Morning Briefing — May 19, 2026
 
-**Architecture** — Two parallel data structures: `world[x][z]` (intent) and `cellMeshes['x,z']` (render). Mutate only via `setCell(x, z, opts)`. Materials in `M.*` are shared — never mutate `.color` in place. Three.js r128 pinned; do not bump. `userData.landing` guards must stay in all per-frame loops.
+## 🗒️ Top Priorities
 
-**Build** — `npm test` (static checks), `npm run build` (dist/), `publish.sh` copies vendor files. Deployed via Vercel + Netlify from `dist/`.
+### 1. MC Gateway Down (Critical — Blocking)
+- Gateway connection refused across multiple sessions
+- Disrupts OpenClaw/NPC functionality
+- **Action**: Check if gateway process is running, restart if needed
 
-**Style** — Semicolons required, 2-space indent, single quotes. Section headers `// -------- name --------`. No clever abstractions.
+### 2. Tom Doerr Tweet Tracker Blocked
+- x.com consistently blocking automated access
+- **Action**: Consider switching to RSS or official API
 
----
+### 3. TinyWorld NPC System Polish
+- Y-axis jitter partially fixed; may need revisit
+- Roster panel and character cards are functional
+- Pending: Events slot in Hub UI
 
-## Features Added in Latest Sessions (2026-05-19)
+## 📬 Email
+- No urgent emails detected this morning.
 
-- **NPC System**: `npcs[]` array, chunky 3D sticker-style characters (big head, cel-shading outlines), delta-time lerp movement, water avoidance, `N` key spawn
-- **NPC Character Card**: dark glass overlay on click, procedural SVG portrait matching 3D style, stat bars (seeded from id), mood bar, relationship badges
-- **NPC Relationships**: symmetric `relationships` map (`ally/enemy/neutral`), mood drift influence wired
-- **NPC Roster**: `Shift+R`, left panel, 🔍 Find button pans camera + highlights NPC
-- **Town Pulse**: per-NPC `mood` 0–100, random walk drift, aggregate → town pulse HUD (cyan/yellow/red), ambient lighting responds
-- **Lore System**: tile lore (plain textarea, auto-save, tags), NPC lore, town lore (`T` key) — all dark glass panels with consistent styling
-- **Hub UI**: left icon rail (🗺️ Map / 👥 People / 📖 Lore / ⚙️ Settings), sub-panels slide in from left, full glassmorphism design system (blur, `rgba(10,10,20,0.85)`, cyan `#00d4ff`)
-- **Keyboard map** (conflict-resolved): `R`=raise, `F`=lower, `N`=NPC, `P`=tile panel, `T`=town, `Shift+R`=roster, `E`=erase, `C`=clear, `Esc`=close
+## 🔧 System Health
+- OpenClaw heartbeat: running
+- Email alert script: OK
+- Gateway: ❌ DOWN
 
----
-
-## Open Threads
-
-- MC Gateway connection refused — persistent, root cause unknown
-- x.com/Twitter inaccessible — tweet tracker blocked across sessions
-- NPC Y jitter — bounding-box fix applied but slight jitter still reported; revisit if flagged again
-- Hub 🗓️ Events slot reserved, not yet implemented
-- Skill hygiene: update `.codex/skills/` when new durable patterns emerge
+## ☀️ Ready for today
+- Date: 2026-05-19 (Tuesday, London time)
+- Focus: Fix MC Gateway, then continue TinyWorld polish.
