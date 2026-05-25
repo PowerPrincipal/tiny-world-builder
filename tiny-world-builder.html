@@ -3068,41 +3068,63 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
+  #stamp-builder-modal .settings-card {
+    width: min(620px, calc(100vw - 32px));
+    min-height: 0;
+  }
+  .stamp-builder-tools {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 10px;
+  }
   .stamp-builder-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-    gap: 10px;
-    max-height: min(62vh, 560px);
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    gap: 8px;
+    max-height: min(58vh, 430px);
     overflow: auto;
     padding-right: 2px;
   }
   .stamp-card {
-    border: 1px solid rgba(68, 48, 24, 0.14);
+    border: 1px solid rgba(68, 48, 24, 0.12);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.50);
-    padding: 10px;
+    background: rgba(255, 255, 255, 0.42);
+    padding: 7px 7px 8px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-height: 148px;
+    gap: 5px;
+    min-height: 104px;
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+  }
+  .stamp-card:hover {
+    background: rgba(255, 255, 255, 0.64);
+    border-color: rgba(68, 48, 24, 0.20);
+    transform: translateY(-1px);
+  }
+  .stamp-card.selected {
+    background: rgba(255, 247, 218, 0.88);
+    border-color: rgba(178, 128, 36, 0.72);
+    box-shadow:
+      0 0 0 2px rgba(232, 190, 83, 0.22),
+      0 8px 20px rgba(86, 62, 22, 0.10);
   }
   .stamp-card canvas {
-    width: 96px;
-    height: 96px;
+    width: 72px;
+    height: 72px;
     align-self: center;
+    filter: brightness(0.82) contrast(1.16) saturate(0.96);
   }
   .stamp-card strong {
-    font-size: 12px;
-    line-height: 1.2;
+    font-size: 11px;
+    line-height: 1.15;
     color: var(--ink);
-  }
-  .stamp-card .stamp-actions {
+    min-height: 25px;
     display: flex;
-    gap: 6px;
-  }
-  .stamp-card .stamp-actions .btn {
-    flex: 1;
-    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
   }
   .stamp-creative-panel {
     display: grid;
@@ -4748,27 +4770,9 @@
         <strong id="stamp-builder-title">Stamp builder</strong>
         <button class="modal-close" id="stamp-builder-close" title="Close">×</button>
       </div>
-      <p class="modal-copy">Preview, select, generate, and refresh voxel stamp builds.</p>
-      <input id="voxel-build-image-file" class="visually-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" />
-      <div class="stamp-creative-panel">
-        <textarea id="voxel-build-prompt" placeholder="Describe a voxel stamp..."></textarea>
-        <div class="stamp-creative-actions">
-          <button class="btn" id="voxel-build-create" type="button">Create</button>
-          <label class="btn" id="voxel-build-image" for="voxel-build-image-file">Choose image</label>
-        </div>
-        <div class="stamp-image-strip" id="voxel-build-image-strip" hidden>
-          <img id="voxel-build-image-preview" alt="" />
-          <span class="stamp-image-name" id="voxel-build-image-name"></span>
-          <button class="btn" id="voxel-build-image-clear" type="button">Clear image</button>
-        </div>
-      </div>
       <input id="voxel-build-import-file" type="file" accept=".json,application/json" hidden />
-      <div class="modal-tools" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;">
+      <div class="stamp-builder-tools">
         <button class="btn" id="voxel-build-import" type="button">Import build JSON</button>
-        <button class="btn" id="voxel-build-upscale" type="button">Reinterpret 2x</button>
-        <button class="btn" id="voxel-build-enhance" type="button">AI enhance</button>
-        <button class="btn" id="voxel-build-use-selected" type="button">Use selected object</button>
-        <button class="btn" id="voxel-build-enhance-selected" type="button">Enhance selected</button>
       </div>
       <div class="stamp-builder-grid" id="stamp-builder-grid"></div>
       <div class="modal-foot">
@@ -5833,6 +5837,8 @@
   // orbit state
   let azimuth = DEFAULT_AZIMUTH;   // around Y
   let polar   = DEFAULT_POLAR;     // from +Y axis
+  const MIN_ORBIT_POLAR = 0.18;
+  const MAX_ORBIT_POLAR = Math.PI - 0.18;
   const target = DEFAULT_TARGET.clone();
   const panRight = new THREE.Vector3();
   const panForward = new THREE.Vector3();
@@ -6771,8 +6777,6 @@
   applyWorldUVs(M.manorRoof, texShingles, 2.0);
   applyWorldUVs(M.manorRoofD, texShingles, 2.0);
 
-  applyWorldUVs(M.towerStone, texBrick, 4.0);
-  applyWorldUVs(M.towerStoneD, texBrick, 4.0);
   applyWorldUVs(M.towerRoof, texShingles, 2.0);
   applyWorldUVs(M.towerRoofD, texShingles, 2.0);
 
@@ -7891,84 +7895,134 @@
     const height = Math.max(0.12, topY - bottomY);
     const half = riserSize * 0.5 + 0.018;
     const sideSpan = riserSize * 0.86;
-    const geo = getWaterfallPlaneGeometry();
 
-    function placePlane(dir, across, y, width, h, mat) {
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.scale.set(width, h, 1);
+    function sidePosition(dir, across, y, outward = 0.010) {
+      if (dir === 'n') return { x: across, y, z: -half - outward };
+      if (dir === 's') return { x: across, y, z: half + outward };
+      if (dir === 'e') return { x: half + outward, y, z: across };
+      return { x: -half - outward, y, z: across };
+    }
+
+    function placeSurfaceFlow(dir, across, along, width, length, salt) {
+      const mesh = new THREE.Mesh(getWaterfallPlaneGeometry(), M.waterfallHi);
       mesh.userData.noShadow = true;
+      if (dir === 'n') mesh.position.set(across, topY + 0.006, -half + along);
+      else if (dir === 's') mesh.position.set(across, topY + 0.006, half - along);
+      else if (dir === 'e') mesh.position.set(half - along, topY + 0.006, across);
+      else mesh.position.set(-half + along, topY + 0.006, across);
       mesh.userData.waterfall = {
-        baseY: y,
-        baseScaleY: h,
-        phase: cellRand(x + across * 31, z + y * 17, 360),
-        speed: 0.75 + cellRand(x - across * 23, z - y * 11, 380) * 0.55,
-        drift: mat === M.waterfallHi ? 0.026 : 0.045,
+        kind: 'surface',
+        dir,
+        baseX: mesh.position.x,
+        baseY: mesh.position.y,
+        baseZ: mesh.position.z,
+        baseAcross: across,
+        baseAlong: along,
+        baseScaleX: width,
+        baseScaleY: length,
+        phase: cellRand(x * 13 + salt, z * 17 - salt, 610),
+        speed: 1.8 + cellRand(x - salt, z + salt, 620) * 1.4,
+        drift: 0.055 + cellRand(x + salt, z - salt, 630) * 0.070,
       };
       mesh.renderOrder = 6;
+      mesh.rotation.x = -Math.PI / 2;
+      if (dir === 'e' || dir === 'w') mesh.rotation.z = Math.PI / 2;
+      mesh.scale.set(width, length, 1);
+      waterfallEffectMeshes.add(mesh);
+      g.add(mesh);
+    }
+
+    function placeWaterCurtain(dir, across, y, width, h, salt) {
+      const mesh = new THREE.Mesh(getWaterfallPlaneGeometry(), M.waterfall);
+      mesh.userData.noShadow = true;
+      mesh.userData.waterfall = {
+        kind: 'curtain',
+        dir,
+        baseY: y,
+        baseAcross: across,
+        baseScaleX: width,
+        baseScaleY: h,
+        phase: cellRand(x * 19 + salt, z * 23 - salt, 640),
+        speed: 1.15 + cellRand(x + salt, z - salt, 650) * 0.75,
+        drift: 0.12 + cellRand(x - salt, z + salt, 660) * 0.10,
+      };
+      mesh.renderOrder = 5;
+      mesh.scale.set(width, h, 1);
       if (dir === 'n') {
-        mesh.position.set(across, y, -half);
+        mesh.position.set(across, y, -half - 0.010);
         mesh.rotation.y = Math.PI;
       } else if (dir === 's') {
-        mesh.position.set(across, y, half);
+        mesh.position.set(across, y, half + 0.010);
       } else if (dir === 'e') {
-        mesh.position.set(half, y, across);
+        mesh.position.set(half + 0.010, y, across);
         mesh.rotation.y = Math.PI / 2;
       } else {
-        mesh.position.set(-half, y, across);
+        mesh.position.set(-half - 0.010, y, across);
         mesh.rotation.y = -Math.PI / 2;
       }
       waterfallEffectMeshes.add(mesh);
       g.add(mesh);
     }
 
-    function placeFoamPuff(dir, across, y, radius, mat, salt) {
-      const mesh = new THREE.Mesh(getWaterfallFoamGeometry(), mat);
+    function placeFoamPuff(dir, across, y, radius, salt, lane = 'fall') {
+      const mesh = new THREE.Mesh(getWaterfallFoamGeometry(), M.waterfallFoamPuff);
       const baseScale = radius * (0.82 + cellRand(x + salt, z - salt, 430) * 0.35);
-      mesh.scale.set(baseScale * 1.20, baseScale * 0.62, baseScale);
+      mesh.scale.set(baseScale * 1.15, baseScale * 0.78, baseScale);
       mesh.userData.noShadow = true;
+      const base = sidePosition(dir, across, y, 0.012 + cellRand(x + salt, z + salt, 431) * 0.026);
       mesh.userData.waterfall = {
         kind: 'foam',
-        baseY: y,
-        baseScale: baseScale,
+        lane,
+        baseX: base.x,
+        baseY: base.y,
+        baseZ: base.z,
+        baseAcross: across,
+        baseScale,
         phase: cellRand(x * 7 + salt, z * 9 - salt, 450),
-        speed: 3.3 + cellRand(x - salt, z + salt, 470) * 2.4,
-        drift: 0.030 + cellRand(x + salt, z + salt, 490) * 0.020,
+        speed: (lane === 'lip' ? 5.2 : lane === 'splash' ? 6.8 : 4.8) + cellRand(x - salt, z + salt, 470) * 3.4,
+        drift: 0.045 + cellRand(x + salt, z + salt, 490) * 0.055,
+        acrossDrift: sideSpan * (0.035 + cellRand(x - salt, z - salt, 491) * 0.075),
+        fallHeight: height * (0.72 + cellRand(x + salt, z - salt, 492) * 0.28),
       };
       mesh.renderOrder = 7;
-      if (dir === 'n') mesh.position.set(across, y, -half - 0.006);
-      else if (dir === 's') mesh.position.set(across, y, half + 0.006);
-      else if (dir === 'e') mesh.position.set(half + 0.006, y, across);
-      else mesh.position.set(-half - 0.006, y, across);
+      mesh.position.set(base.x, base.y, base.z);
       waterfallEffectMeshes.add(mesh);
       g.add(mesh);
     }
 
     function addSide(dir) {
       const seed = dir.charCodeAt(0);
+      const curtainBottomY = -DIRT_H - Math.max(1.8, GRID * 0.16);
+      const curtainH = Math.max(height + 1.15, topY - curtainBottomY);
+      const curtainY = topY - curtainH * 0.5;
       for (let i = 0; i < 5; i++) {
-        const r = cellRand(x * 17 + i, z * 19 + i, 240 + seed);
-        const across = (-0.38 + i * 0.19 + (r - 0.5) * 0.07) * sideSpan;
-        const width = sideSpan * (0.11 + cellRand(x + i, z - i, 260 + seed) * 0.08);
-        const h = height * (0.72 + cellRand(x - i, z + i, 280 + seed) * 0.25);
-        const y = topY - h * 0.5 - cellRand(x + i * 3, z + i * 5, 300 + seed) * height * 0.10;
-        placePlane(dir, across, y, width, h, i % 2 === 0 ? M.waterfallHi : M.waterfall);
-      }
-      for (let i = 0; i < 4; i++) {
-        const r = cellRand(x * 11 + i, z * 13 - i, 320 + seed);
-        const across = (-0.34 + i * 0.23 + (r - 0.5) * 0.08) * sideSpan;
-        const width = sideSpan * (0.13 + cellRand(x - i, z + i, 340 + seed) * 0.10);
-        placePlane(dir, across, topY - 0.035 - i * 0.008, width, 0.028, M.waterfallHi);
-        if (i < 3) placePlane(dir, across + sideSpan * 0.06, bottomY + 0.035 + i * 0.010, width * 0.85, 0.024, M.waterfallHi);
+        const r = cellRand(x * 29 + i, z * 31 - i, 670 + seed);
+        const across = (-0.36 + i * 0.18 + (r - 0.5) * 0.055) * sideSpan;
+        const width = sideSpan * (0.09 + cellRand(x + i, z - i, 680 + seed) * 0.08);
+        placeWaterCurtain(dir, across, curtainY, width, curtainH * (0.94 + cellRand(x - i, z + i, 690 + seed) * 0.14), seed + i * 23);
       }
       for (let i = 0; i < 7; i++) {
+        const r = cellRand(x * 37 + i, z * 39 - i, 700 + seed);
+        const across = (-0.39 + i / 6 * 0.78 + (r - 0.5) * 0.065) * sideSpan;
+        const along = 0.07 + cellRand(x + i, z - i, 710 + seed) * 0.24;
+        const width = sideSpan * (0.09 + cellRand(x - i, z + i, 720 + seed) * 0.07);
+        const length = 0.16 + cellRand(x + i, z + i, 730 + seed) * 0.16;
+        placeSurfaceFlow(dir, across, along, width, length, seed + i * 29);
+      }
+      const puffCount = 16;
+      for (let i = 0; i < puffCount; i++) {
         const r = cellRand(x * 41 + i, z * 43 - i, 520 + seed);
-        const across = (-0.40 + i * 0.13 + (r - 0.5) * 0.09) * sideSpan;
-        const atLip = i % 3 === 0;
-        const y = atLip
-          ? topY - 0.012 - cellRand(x + i, z - i, 540 + seed) * 0.020
-          : bottomY + 0.035 + cellRand(x - i, z + i, 560 + seed) * 0.060;
-        const radius = atLip ? 0.055 : 0.070;
-        placeFoamPuff(dir, across, y, radius, M.waterfallFoamPuff, seed + i * 17);
+        const across = (-0.43 + i / (puffCount - 1) * 0.86 + (r - 0.5) * 0.08) * sideSpan;
+        const lane = i % 5 === 0 ? 'lip' : (i % 4 === 0 ? 'splash' : 'fall');
+        const y = lane === 'lip'
+          ? topY - 0.020 - cellRand(x + i, z - i, 540 + seed) * 0.045
+          : lane === 'splash'
+            ? bottomY + 0.035 + cellRand(x - i, z + i, 560 + seed) * 0.080
+            : topY - height * (0.18 + cellRand(x + i * 3, z + i * 5, 580 + seed) * 0.66);
+        const radius = lane === 'splash'
+          ? 0.070 + cellRand(x + i, z + i, 590 + seed) * 0.045
+          : 0.040 + cellRand(x - i, z + i, 600 + seed) * 0.045;
+        placeFoamPuff(dir, across, y, radius, seed + i * 17, lane);
       }
     }
 
@@ -7988,12 +8042,48 @@
       const cfg = mesh.userData && mesh.userData.waterfall;
       if (!cfg) continue;
       const flow = (t * cfg.speed + cfg.phase) % 1;
+      if (cfg.kind === 'surface') {
+        const wave = Math.sin((t * cfg.speed + cfg.phase) * Math.PI * 2);
+        const slide = (flow - 0.5) * cfg.drift;
+        const cross = wave * cfg.drift * 0.38;
+        if (cfg.dir === 'n') mesh.position.set(cfg.baseX + cross, cfg.baseY, cfg.baseZ - slide);
+        else if (cfg.dir === 's') mesh.position.set(cfg.baseX + cross, cfg.baseY, cfg.baseZ + slide);
+        else if (cfg.dir === 'e') mesh.position.set(cfg.baseX + slide, cfg.baseY, cfg.baseZ + cross);
+        else mesh.position.set(cfg.baseX - slide, cfg.baseY, cfg.baseZ + cross);
+        mesh.scale.set(cfg.baseScaleX * (0.95 + Math.abs(wave) * 0.22), cfg.baseScaleY * (0.82 + flow * 0.42), 1);
+        continue;
+      }
+      if (cfg.kind === 'curtain') {
+        const wave = Math.sin((t * cfg.speed + cfg.phase) * Math.PI * 2);
+        const shimmer = Math.cos((t * cfg.speed * 1.7 + cfg.phase) * Math.PI * 2);
+        mesh.position.y = cfg.baseY - (flow - 0.5) * cfg.drift;
+        if (cfg.dir === 'n' || cfg.dir === 's') mesh.position.x = cfg.baseAcross + wave * 0.022;
+        else mesh.position.z = cfg.baseAcross + wave * 0.022;
+        mesh.scale.set(cfg.baseScaleX * (0.86 + Math.abs(shimmer) * 0.30), cfg.baseScaleY * (0.96 + wave * 0.035), 1);
+        continue;
+      }
       if (cfg.kind === 'foam') {
-        const pulse = Math.sin((flow + cfg.phase) * Math.PI * 2);
-        const side = Math.cos((flow + cfg.phase * 0.7) * Math.PI * 2);
-        mesh.position.y = cfg.baseY + pulse * cfg.drift;
-        const s = cfg.baseScale * (0.82 + (pulse + 1) * 0.16);
-        mesh.scale.set(s * (1.14 + side * 0.18), s * (0.54 + pulse * 0.10), s * (0.92 - side * 0.12));
+        const wave = Math.sin((t * cfg.speed + cfg.phase) * Math.PI * 2);
+        const wobble = Math.cos((t * (cfg.speed * 1.37) + cfg.phase * 0.7) * Math.PI * 2);
+        const burst = Math.sin((t * (cfg.speed * 1.9) + cfg.phase * 1.3) * Math.PI * 2);
+        const fall = cfg.lane === 'fall' ? flow : 0;
+        const splashBounce = cfg.lane === 'splash' ? Math.abs(wave) : 0;
+        const lipBounce = cfg.lane === 'lip' ? wave * 0.018 : 0;
+        const across = cfg.baseAcross + wobble * cfg.acrossDrift + burst * cfg.acrossDrift * 0.42;
+        if (Math.abs(cfg.baseX) > Math.abs(cfg.baseZ)) {
+          mesh.position.x = cfg.baseX + wobble * 0.018;
+          mesh.position.z = across;
+        } else {
+          mesh.position.x = across;
+          mesh.position.z = cfg.baseZ + wobble * 0.018;
+        }
+        mesh.position.y = cfg.baseY - fall * cfg.fallHeight + splashBounce * cfg.drift + lipBounce;
+        if (cfg.lane === 'fall' && mesh.position.y < -DIRT_H + 0.030) {
+          mesh.position.y += cfg.fallHeight;
+        }
+        const merge = 1 + Math.max(0, wave) * 0.62 + Math.max(0, burst) * 0.26;
+        const s = cfg.baseScale * merge;
+        mesh.scale.set(s * (1.12 + wobble * 0.28), s * (0.72 + burst * 0.22), s * (1.04 - wobble * 0.18));
         continue;
       }
       mesh.position.y = cfg.baseY - (flow - 0.5) * cfg.drift;
@@ -8050,6 +8140,8 @@
     const terrainOffset = terrainSurfaceOffset(terrain);
     const kerbDrop = Math.abs(Math.min(0, terrainOffset));
     const visualRise = rise + terrainOffset;
+    const positiveTerrainOffset = Math.max(0, terrainOffset);
+    const riserHeight = DIRT_H + rise + positiveTerrainOffset;
     const topY = visualRise + TOP_H;
     // Weather impact decals sit above the rounded/beveled slab, not at the
     // mathematical tile height, otherwise rain ripples and snow buildup hide
@@ -8087,7 +8179,7 @@
       if (hasVisibleRiser) {
         const riserMat = terrainRiserMaterial(terrain);
         if (renderVoxelTerrain) {
-          addVoxelTerrainRiserBacking(g, terrain, riserSize, DIRT_H + rise, {
+          addVoxelTerrainRiserBacking(g, terrain, riserSize, DIRT_H + rise + positiveTerrainOffset, {
             e: skipE,
             w: skipW,
             s: skipS,
@@ -8098,9 +8190,9 @@
           bottom.userData.noShadow = true;
           g.add(bottom);
         } else {
-          const riserGeo = getOpenBoxGeometry(riserSize, DIRT_H + rise, riserSize, true, true, skipE, skipW, skipS, skipN);
+          const riserGeo = getOpenBoxGeometry(riserSize, riserHeight, riserSize, true, true, skipE, skipW, skipS, skipN);
           const riser = new THREE.Mesh(riserGeo, riserMat);
-          riser.position.y = -DIRT_H + (DIRT_H + rise) * 0.5;
+          riser.position.y = -DIRT_H + riserHeight * 0.5;
           g.add(riser);
           const bottom = new THREE.Mesh(getOpenBoxGeometry(riserSize, 0.012, riserSize, false, true, true, true, true, true), riserMat);
           bottom.position.y = -DIRT_H - 0.006;
@@ -9512,9 +9604,9 @@
   // adjacency-driven and crenellated). floors scales height; min 2.
   function makeStoneTower(floors = 2, palette = null) {
     const g = new THREE.Group();
-    const f = Math.max(2, floors);
-    const wallH = H.WALL_H * f + 0.30;
-    const radius = 0.46;
+    const f = Math.max(2, Math.min(MAX_FLOORS, floors || 2));
+    const wallH = H.WALL_H * f + 0.34;
+    const radius = 0.43;
     // Allow callers to override the tower's wall + roof palette. When the
     // tower is merged with another building (e.g. an adjacent manor) the
     // caller passes that building's palette so the tower picks up matching
@@ -9524,39 +9616,36 @@
     const matRoof   = (palette && palette.roof)   || M.towerRoof;
     const matRoofD  = (palette && palette.roofD)  || M.towerRoofD;
 
-    // Stone shaft with subtle base flare
+    // Broad foundation keeps the tower grounded on one tile.
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.12, radius + 0.15, 0.16, 16), matStoneD);
+    base.position.y = 0.08;
+    g.add(base);
+
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.07, radius + 0.10, 0.10, 16), matStone);
+    plinth.position.y = 0.21;
+    g.add(plinth);
+
+    // Faceted stone shaft with subtle base flare.
     const shaft = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius, radius * 1.06, wallH, 14),
+      new THREE.CylinderGeometry(radius, radius * 1.08, wallH, 16),
       matStone
     );
-    shaft.position.y = wallH / 2;
+    shaft.position.y = wallH / 2 + 0.14;
     g.add(shaft);
 
-    // Stone ring at every floor break (dark band)
-    for (let i = 1; i < f; i++) {
-      const y = i * H.WALL_H + 0.15;
-      const ring = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius + 0.02, radius + 0.02, 0.05, 14),
-        matStoneD
-      );
-      ring.position.y = y;
-      g.add(ring);
-    }
-
-    // Balcony walkway just below the roof
-    const balconyY = wallH - 0.04;
+    // Balcony walkway just below the roof.
+    const balconyY = wallH + 0.10;
     const balcony = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius + 0.10, radius + 0.10, 0.06, 14),
+      new THREE.CylinderGeometry(radius + 0.12, radius + 0.12, 0.07, 16),
       matStoneD
     );
     balcony.position.y = balconyY;
     g.add(balcony);
-    // Balcony rail (small posts)
-    const railR = radius + 0.10;
+    const railR = radius + 0.13;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
       const post = new THREE.Mesh(getBoxGeometry(0.04, 0.10, 0.04), matStone);
-      post.position.set(Math.cos(a) * railR, balconyY + 0.08, Math.sin(a) * railR);
+      post.position.set(Math.cos(a) * railR, balconyY + 0.09, Math.sin(a) * railR);
       post.rotation.y = -a;
       g.add(post);
     }
@@ -9564,72 +9653,71 @@
       new THREE.CylinderGeometry(railR + 0.005, railR + 0.005, 0.025, 14, 1, true),
       matStoneD
     );
-    railTop.position.y = balconyY + 0.14;
+    railTop.position.y = balconyY + 0.16;
     g.add(railTop);
 
-    // Conical roof (purple slate) — built from a cone
-    const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(radius + 0.08, 0.50, 14),
-      matRoof
-    );
-    cone.position.y = wallH + 0.25;
-    g.add(cone);
-    // Cone trim ring at base
-    const coneRing = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius + 0.10, radius + 0.10, 0.04, 14),
+    // Purple slate roof: dark eave ring, faceted cone, and a tiny cap.
+    const roofBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius + 0.17, radius + 0.20, 0.10, 16),
       matRoofD
     );
-    coneRing.position.y = wallH + 0.02;
-    g.add(coneRing);
-    // Finial spike + ball at apex
+    roofBase.position.y = wallH + 0.24;
+    g.add(roofBase);
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(radius + 0.16, 0.58, 16),
+      matRoof
+    );
+    cone.position.y = wallH + 0.58;
+    g.add(cone);
+    const roofCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.18, 0.08, 8),
+      matRoofD
+    );
+    roofCap.position.y = wallH + 0.86;
+    g.add(roofCap);
+
     const finialBall = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), M.knob);
-    finialBall.position.y = wallH + 0.55;
+    finialBall.position.y = wallH + 0.95;
     g.add(finialBall);
     const finialSpike = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 6), matStoneD);
-    finialSpike.position.y = wallH + 0.69;
+    finialSpike.position.y = wallH + 1.09;
     g.add(finialSpike);
 
-    // Bigger arched front door on +z
+    // Bigger arched front door on +z.
     const door = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.46, 0.04), M.door);
-    door.position.set(0, 0.23, radius + 0.01);
+    door.position.set(0, 0.39, radius + 0.02);
     g.add(door);
-    // Door arch top
     const archTop = new THREE.Mesh(
       new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10, 1, false, 0, Math.PI),
       matStoneD
     );
     archTop.rotation.z = Math.PI / 2;
     archTop.rotation.y = Math.PI / 2;
-    archTop.position.set(0, 0.46, radius + 0.02);
+    archTop.position.set(0, 0.62, radius + 0.03);
     g.add(archTop);
-    // Door frame slabs
     const frameL = new THREE.Mesh(getBoxGeometry(0.04, 0.46, 0.05), matStoneD);
-    frameL.position.set(-0.16, 0.23, radius + 0.005); g.add(frameL);
+    frameL.position.set(-0.16, 0.39, radius + 0.015); g.add(frameL);
     const frameR = frameL.clone(); frameR.position.x = 0.16; g.add(frameR);
 
-    // Dormer windows up the shaft (small slits) on alternating sides
+    // Slit windows climb the shaft on alternating faces.
     for (let i = 0; i < f; i++) {
-      const y = (i + 0.5) * H.WALL_H + 0.15;
-      const angle = (i % 2 === 0) ? 0 : Math.PI;
+      const y = (i + 0.70) * H.WALL_H + 0.22;
+      const angle = i % 2 === 0 ? 0 : Math.PI;
       const win = new THREE.Mesh(getBoxGeometry(0.10, 0.18, 0.03), M.castleSlit);
-      win.position.set(Math.sin(angle) * 0 + Math.cos(angle) * 0, y, Math.cos(angle) * (radius + 0.005));
-      // simpler: just place at +z when even, -z when odd
-      win.position.set(0, y, (i % 2 === 0) ? (radius + 0.005) : -(radius + 0.005));
-      win.rotation.y = (i % 2 === 0) ? 0 : Math.PI;
+      win.position.set(0, y, Math.cos(angle) * (radius + 0.015));
+      win.rotation.y = angle;
       g.add(win);
     }
-
-    // Side dormer at midpoint for variety (on +x face)
     const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.20, 0.10), M.castleSlit);
-    sideWin.position.set(radius + 0.005, wallH * 0.5, 0);
+    sideWin.position.set(radius + 0.015, wallH * 0.55 + 0.12, 0);
     g.add(sideWin);
 
-    // Flag on top
+    // Flag on top.
     const pole = new THREE.Mesh(getBoxGeometry(0.025, 0.30, 0.025), matStoneD);
-    pole.position.y = wallH + 0.85;
+    pole.position.y = wallH + 1.18;
     g.add(pole);
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.10, 0.02), M.flagRed);
-    flag.position.set(0.11, wallH + 0.93, 0);
+    flag.position.set(0.11, wallH + 1.26, 0);
     g.add(flag);
 
     // No chimneys — towers get magic, not fireplaces. Empty chimneyTops keeps
@@ -11091,6 +11179,87 @@
     return g;
   }
 
+  function makeVoxelStoneTower(floors = 2, palette = null) {
+    const g = new THREE.Group();
+    const f = Math.max(2, Math.min(MAX_FLOORS, floors || 2));
+    const wallH = H.WALL_H * f + 0.20;
+    const stone = (palette && palette.stone) || M.towerStone;
+    const stoneD = (palette && palette.stoneD) || M.towerStoneD;
+    const roof = (palette && palette.roof) || M.towerRoof;
+    const roofD = (palette && palette.roofD) || M.towerRoofD;
+
+    vbox(g, 0.84, 0.10, 0.84, 0, 0.05, 0, stoneD);
+    vbox(g, 0.74, 0.08, 0.74, 0, 0.14, 0, stone);
+
+    const layerH = 0.14;
+    const layers = Math.ceil(wallH / layerH);
+    for (let i = 0; i < layers; i++) {
+      const h = i === layers - 1 ? Math.max(0.08, wallH - i * layerH) : layerH;
+      const y = 0.18 + i * layerH + h * 0.5;
+      const mat = i % 2 ? stoneD : stone;
+      vbox(g, 0.52, h, 0.52, 0, y, 0, mat);
+      vbox(g, 0.18, h, 0.60, -0.30, y, 0, mat);
+      vbox(g, 0.18, h, 0.60,  0.30, y, 0, mat);
+      vbox(g, 0.60, h, 0.18, 0, y, -0.30, mat);
+      vbox(g, 0.60, h, 0.18, 0, y,  0.30, mat);
+    }
+
+    for (let i = 1; i <= f; i++) {
+      const y = 0.18 + i * (wallH / f);
+      vbox(g, 0.74, 0.035, 0.74, 0, y, 0, stoneD);
+    }
+
+    voxelDoor(g, 0, 0.39, 'z', 0.42);
+    vbox(g, 0.35, 0.055, 0.07, 0, 0.45, 0.42, stoneD);
+    vbox(g, 0.055, 0.42, 0.07, -0.17, 0.25, 0.415, stoneD);
+    vbox(g, 0.055, 0.42, 0.07,  0.17, 0.25, 0.415, stoneD);
+
+    for (let i = 0; i < f; i++) {
+      const y = 0.42 + i * (wallH / f);
+      if (i % 2 === 0) {
+        vbox(g, 0.11, 0.18, 0.035, 0, y, -0.405, M.castleSlit);
+      } else {
+        vbox(g, 0.035, 0.18, 0.11, 0.405, y, 0, M.castleSlit);
+      }
+    }
+
+    const balconyY = wallH + 0.20;
+    vbox(g, 0.88, 0.075, 0.88, 0, balconyY, 0, stoneD);
+    for (const x of [-0.36, -0.12, 0.12, 0.36]) {
+      vbox(g, 0.055, 0.12, 0.055, x, balconyY + 0.10, 0.42, stone);
+      vbox(g, 0.055, 0.12, 0.055, x, balconyY + 0.10, -0.42, stone);
+      vbox(g, 0.055, 0.12, 0.055, 0.42, balconyY + 0.10, x, stone);
+      vbox(g, 0.055, 0.12, 0.055, -0.42, balconyY + 0.10, x, stone);
+    }
+    vbox(g, 0.92, 0.035, 0.08, 0, balconyY + 0.18, 0.44, stoneD);
+    vbox(g, 0.92, 0.035, 0.08, 0, balconyY + 0.18, -0.44, stoneD);
+    vbox(g, 0.08, 0.035, 0.92, 0.44, balconyY + 0.18, 0, stoneD);
+    vbox(g, 0.08, 0.035, 0.92, -0.44, balconyY + 0.18, 0, stoneD);
+
+    const roofY = wallH + 0.30;
+    vbox(g, 0.90, 0.08, 0.90, 0, roofY, 0, roofD);
+    const roofSteps = [
+      [0.74, 0.12, 0.74],
+      [0.58, 0.11, 0.58],
+      [0.42, 0.10, 0.42],
+      [0.26, 0.09, 0.26],
+      [0.12, 0.08, 0.12],
+    ];
+    let y = roofY + 0.10;
+    roofSteps.forEach((step, i) => {
+      y += step[1] * 0.5;
+      vbox(g, step[0], step[1], step[2], 0, y, 0, i === roofSteps.length - 1 ? roofD : roof);
+      y += step[1] * 0.5;
+    });
+    vbox(g, 0.07, 0.07, 0.07, 0, y + 0.05, 0, M.knob);
+    vbox(g, 0.025, 0.32, 0.025, 0, y + 0.23, 0, stoneD);
+    vbox(g, 0.18, 0.10, 0.025, 0.10, y + 0.32, 0, M.flagRed);
+
+    g.userData = { kind: 'house', chimneyTops: [] };
+    castReceive(g);
+    return g;
+  }
+
   function makeVoxelTurret(floors = 1, roofed = false, palette = null) {
     const g = new THREE.Group();
     const f = Math.max(1, Math.min(MAX_FLOORS, floors || 1));
@@ -11385,7 +11554,7 @@
       } else if (bType === 'manor') {
         mesh = makeVoxelManor(floors);
       } else if (bType === 'tower') {
-        mesh = makeVoxelTurret(Math.max(floors, 2), true, towerPaletteWithAppearance(getMergedBuildingPalette(x, z, 'tower'), cell.appearance));
+        mesh = makeVoxelStoneTower(Math.max(floors, 2), towerPaletteWithAppearance(getMergedBuildingPalette(x, z, 'tower'), cell.appearance));
       } else if (bType === 'turret') {
         mesh = makeVoxelTurret(floors, false);
       } else {
@@ -14441,7 +14610,7 @@
     else if (cell.kind === 'fence')     mesh = makeVoxelFence(normalizeFenceSide(cell.fenceSide), level);
     else if (cell.kind === 'house') {
       if (cell.buildingType === 'manor') mesh = makeVoxelManor(level);
-      else if (cell.buildingType === 'tower') mesh = makeVoxelTurret(Math.max(level, 2), true);
+      else if (cell.buildingType === 'tower') mesh = makeVoxelStoneTower(Math.max(level, 2));
       else if (cell.buildingType === 'turret') mesh = makeVoxelTurret(level, false);
       else if (cell.buildingType === 'skyscraper') mesh = makeVoxelSkyscraper(Math.max(level, 4));
       else mesh = makeVoxelLinearHouse(1, 'z', level);
@@ -17149,7 +17318,7 @@
       const v = tool.activeVariant;
       const bType = v && v.buildingType;
       if (bType === 'manor')      return makeVoxelManor(2);
-      if (bType === 'tower')      return makeVoxelTurret(2, true);
+      if (bType === 'tower')      return makeVoxelStoneTower(2);
       if (bType === 'turret')     return makeVoxelTurret(2, false);
       if (bType === 'skyscraper') return makeVoxelSkyscraper(4);
       return makeVoxelLinearHouse(1, 'z', 2);
@@ -17367,9 +17536,9 @@
   function renderStampBuilderThumb(tool, canvas) {
     ensureThumbRenderer();
     const scene = new THREE.Scene();
-    scene.add(new THREE.AmbientLight(0xffffff, 0.32));
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xb39879, 0.46));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.14);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb39879, 0.34));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.88);
     sun.position.set(3, 6, 2);
     scene.add(sun);
     const tile = makeTile(thumbTerrainFor(tool), { path: {}, terrain: {} }, 0, 0, 1);
@@ -17399,40 +17568,55 @@
     scene.traverse(o => safeDisposeGeometry(o.geometry));
   }
 
+  function stampBuilderSelectionKey(tool) {
+    if (!tool) return '';
+    if (tool.voxelBuildId) return 'voxel-build:' + tool.voxelBuildId;
+    const variant = tool.activeVariant && tool.activeVariant.id ? tool.activeVariant.id : '';
+    return (tool.baseTool ? tool.baseTool.id : tool.id) + ':' + variant;
+  }
+
+  function currentStampBuilderSelectionKey() {
+    if (!selectedTool) return '';
+    if (selectedTool.kind === 'voxel-build' && selectedTool.voxelBuildId) return 'voxel-build:' + selectedTool.voxelBuildId;
+    const variant = selectedTool.activeVariant && selectedTool.activeVariant.id ? selectedTool.activeVariant.id : '';
+    return selectedTool.id + ':' + variant;
+  }
+
   function renderStampBuilderCards() {
     const grid = document.getElementById('stamp-builder-grid');
     if (!grid) return;
     grid.innerHTML = '';
+    const selectedKey = currentStampBuilderSelectionKey();
     for (const tool of stampBuilderTools()) {
       const card = document.createElement('div');
-      card.className = 'stamp-card';
+      const key = stampBuilderSelectionKey(tool);
+      card.className = 'stamp-card' + (key === selectedKey ? ' selected' : '');
+      card.setAttribute('role', 'button');
+      card.tabIndex = 0;
+      card.setAttribute('aria-pressed', key === selectedKey ? 'true' : 'false');
       const canvas = document.createElement('canvas');
       const title = document.createElement('strong');
       title.textContent = tool.label;
-      const actions = document.createElement('div');
-      actions.className = 'stamp-actions';
-      const useBtn = document.createElement('button');
-      useBtn.className = 'btn';
-      useBtn.type = 'button';
-      useBtn.textContent = 'Use';
-      useBtn.addEventListener('click', () => {
+      function selectStampTool() {
         const realTool = tool.baseTool || tool;
         if (tool.baseTool && tool.activeVariant) realTool.activeVariant = tool.activeVariant;
         selectTool(realTool);
         if (tool.voxelBuildId) selectedVoxelBuildId = tool.voxelBuildId;
         const status = document.getElementById('stamp-builder-status');
         if (status) status.textContent = 'Selected ' + tool.label;
+        for (const item of grid.querySelectorAll('.stamp-card')) {
+          const isSelected = item === card;
+          item.classList.toggle('selected', isSelected);
+          item.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        }
+      }
+      card.addEventListener('click', selectStampTool);
+      card.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        selectStampTool();
       });
-      const refreshBtn = document.createElement('button');
-      refreshBtn.className = 'btn';
-      refreshBtn.type = 'button';
-      refreshBtn.textContent = 'Refresh';
-      refreshBtn.addEventListener('click', () => {
-        renderStampBuilderThumb(tool, canvas);
-        if (tool.baseTool && typeof refreshToolThumb === 'function') refreshToolThumb(tool.baseTool.id);
-      });
-      actions.append(useBtn, refreshBtn);
-      card.append(canvas, title, actions);
+      card.append(canvas, title);
       grid.appendChild(card);
       renderStampBuilderThumb(tool, canvas);
     }
@@ -18141,7 +18325,7 @@
           markCameraMoving();
           // azimuth -= ddx * 0.008;
           azimuth += ddx * 0.008;
-          polar = Math.max(0.18, Math.min(1.25, polar - ddy * 0.006));
+          polar = Math.max(MIN_ORBIT_POLAR, Math.min(MAX_ORBIT_POLAR, polar - ddy * 0.006));
           updateCamera();
         }
         // While dragging on touch, hide the hover marker so it doesn't lag.

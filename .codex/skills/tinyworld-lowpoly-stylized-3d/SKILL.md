@@ -44,6 +44,7 @@ Use this together with:
 - If a model comes with a texture atlas, set `texture.encoding = THREE.sRGBEncoding` and check `flipY` for GLTF compatibility.
 - Wear-and-tear should stay stylized: global grime/desaturation plus small batched chips/scuffs/moss beats realistic noise-heavy shader work.
 - Floating-board depth can reuse existing roof language by inverting a stepped roof form under the board: dark gray shingle-textured slabs, board-footprint width/depth, vertically compressed, and attached below the dirt body.
+- The Tower house variant has paired factories: `makeStoneTower` is the normal faceted/conical design and `makeVoxelStoneTower` is the voxel counterpart. Keep their silhouettes aligned when changing tower roof, balcony, window, door, or flag details; `makeVoxelTurret` is only for castle turrets.
 
 ## Model import hygiene
 

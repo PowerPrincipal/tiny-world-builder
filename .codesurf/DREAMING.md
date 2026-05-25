@@ -6,7 +6,7 @@ _Generated 2026-05-25. Do not edit by hand — overwritten on each dreaming run.
 
 ## Overview
 
-**tinyworld** is a single-file browser app (`tiny-world-builder.html`) — a low-poly infinite-canvas 3D world builder on Three.js r128. No bundler, no npm runtime dependencies. All CSS and JS inline (~16k LoC). Static deploy via `publish.sh` → `dist/`, served by both Vercel (`vercel.json`) and Netlify (`netlify.toml`).
+**tinyworld** is a single-file browser app (`tiny-world-builder.html`) — a low-poly infinite-canvas 3D world builder on Three.js r128. No bundler, no npm runtime dependencies. All CSS and JS inline (~29k LoC). Static deploy via `publish.sh` → `dist/`, served by both Vercel (`vercel.json`) and Netlify (`netlify.toml`).
 
 The workspace runs inside **CodeSurf** canvas with an **OpenClaw** agent infrastructure managing scheduled crons and heartbeat polling.
 
@@ -22,51 +22,66 @@ The workspace runs inside **CodeSurf** canvas with an **OpenClaw** agent infrast
 - `userData.landing` guards drop-in animations; `disposeGroup` skips shared materials
 - Grid: 8×8 default, up to 48×48; storage key `tinyworld:v1` schema v4
 
-### Procedural Material System & Cloud Optimization (committed 2026-05-24)
+### Procedural Texture System
 
-- `makeMulberry32()` seeded RNG for stable textures across reloads; `voxelBuildMaterial(hex, textureKind)` routes procedural maps
-- Commit `821faec`: cloud instances pooled via dummy reuse, particle cache reduces per-frame allocation
-- `.codex/skills/tinyworld-lowpoly-stylized-3d` needs manual update (Codex sandbox blocks `.codex/skills/` writes)
+- `makeMulberry32(seed)` seeded RNG — stable procedural textures across reloads
+- Cottage deterministic canvas textures: `texCottageGrass`, `texCottageWood`, `texCottageGlass`, `texCottageStone`, `texCottageDirt`
+- `texturedGrass` defaults **on** (`!== '0'`); UI label: "Cottage grass texture"
 
-### LandscapeEngine (pending browser visual QA — multi-cycle backlog)
+### Waterfall Effect (fully reworked — unstaged)
 
-- `LandscapeEngine.js` module gated by `landscapeMeshMode`; `landscapeHeightAtCell(x,z)` is the canonical height lookup
-- Clip planes copy to `pixelState.normalMaterial.clippingPlanes` in `renderScene`; soft gradient fading at clip boundaries
-- `npm test` passes; browser QA for outlines, cel-shading, shadows, fog, and auto-expand not yet done
+- Flat translucent plane geometry replaced entirely with **pure foam-puff system**: 16 puffs per exposed water edge, lanes `lip / fall / splash`
+- Puffs carry full position state (`baseX/Y/Z`, `acrossDrift`, `fallHeight`) and animate with per-tick non-uniform scale pulse
+- Single material: `M.waterfallFoamPuff`
 
-### Auto-Generate Panning Regression
+### Tower Building Variant (unstaged)
 
-- Root cause: `maxRenderVisibleSizeForGrid` (line 5082) returns 72 for large grids, hitting slider ceiling — only affects non-realistic/non-landscape modes; fix not applied
+- **`makeVoxelStoneTower(floors, palette)`** — new dedicated voxel factory for `buildingType === 'tower'`; replaces `makeVoxelTurret(..., true)` everywhere towers appear
+- **`makeVoxelTurret`** now reserved exclusively for castle turrets
+- SKILL.md updated: `makeStoneTower` = normal faceted/conical; `makeVoxelStoneTower` = voxel counterpart; silhouettes should stay aligned
 
----
+### Stamp Builder UI (unstaged)
 
-## Active Agent Infrastructure (OpenClaw)
+- AI/prompt controls fully removed; only "Import build JSON" remains
+- Cards clickable to select; `selected` CSS state; `stampBuilderSelectionKey()` tracks selection
+- Compact layout: `86px` min col, `104px` min card height, `72×72` thumbnails
 
-**Healthy**: Ava heartbeating `HEARTBEAT_OK`; Urgent Email Alert operationally OK (2-fail-then-succeed pattern each cycle); VibeClaw Article Generator published "Steven Rosenbaum AI-Fabricated Quotes" and "Anthropic Project Glasswing" (2026-05-25); VibeClaw Skills Scout ran at 19:00 and 02:00 UTC; VibeClaw Wallpaper Generator ran at 09:00 (neon city reflections, dark minimal tech, glowing digital circuits — DGX unreachable, completeness unknown).
+### Orbit Camera & Terrain (unstaged)
 
-**Degraded/Broken** (recurring): MC Gateway (`localhost:19789`) — connection refused every poll, needs manual restart; Tom Doerr Tweet Tracker — X.com requires authenticated Chrome profile, wacli also unauthenticated; DGX image server — unreachable across multiple article and wallpaper cycles.
+- `MIN_ORBIT_POLAR = 0.18` / `MAX_ORBIT_POLAR = Math.PI - 0.18` — camera can now go below island
+- Terrain gap fix: `positiveTerrainOffset = Math.max(0, terrainOffset)` fed into riser height — prevents exposed side panels on raised terrain
 
----
+### LandscapeEngine
 
-## Adjacent Projects
+- **Airfield config injectable** (committed `d77a172`): `_makeAirfieldConfig(airfield)`, pass `false` to disable; all constants data-driven
 
-- **grok-cli**: inline-image flicker fix attempted; Codex sandbox blocked writes; patch left at `/private/tmp` targeting `inline-image.tsx`; needs write-capable session rooted at `grok-cli`; `ai-cli` Kitty protocol is the reference
-- **hermes-agent-core-rs**: parity tests passing; sessions this cycle were idle/initialization only
-- **SmallHarness → Hermes migration**: plan exists, application unconfirmed
-- **ideation-canvas**: Catmull-Rom smoothing committed, build passes
-- **openclicky**: keychain/bridge/proxy features committed; live build verification pending
+### Git State
+
+- **2 commits ahead of `origin/main`** — not pushed
+- Working tree: unstaged changes in `tiny-world-builder.html`, `tinyworld-lowpoly-stylized-3d/SKILL.md`, `DREAMING.md`
+- `cottage.html` (481-line standalone prototype) committed; not integrated
+- `context.md` deleted; `.codex/skills/tinyworld-ghost-world-gen` added (unreviewed)
+
+### Adjacent Projects
+
+- **hermes-agent-core-rs**: Python bridge fully removed; 74 tests green; binary smoke-tested
+- **grok-cli**: inline-image patch at `/private/tmp`; needs write-capable session
+- **openclicky**: features committed; build verification pending
+- **SmallHarness → Hermes migration**: plan exists, not executed
+
+### OpenClaw Infrastructure
+
+- **Healthy**: Ava heartbeating; VibeClaw article generator and skills scout on schedule
+- **Broken**: MC Gateway (`localhost:19789`) refused; Tom Doerr Tracker (X.com auth needed); DGX image server unreachable
 
 ---
 
 ## Open Threads
 
-1. Browser visual QA for LandscapeEngine — multi-cycle backlog; needs browser-capable agent or human
-2. Auto-generate panning regression — root cause known at line 5082; fix not applied
-3. `.codex/skills/tinyworld-lowpoly-stylized-3d` — needs manual update for seeded RNG and `voxelBuildMaterial()`
-4. MC Gateway — `localhost:19789` connection refused; manual process restart needed
-5. Tom Doerr Tweet Tracker — Chrome profile needs X.com login, or switch to API/nitter/RSS; wacli needs auth
-6. grok-cli inline-image patch — at `/private/tmp`; awaiting write-capable session
-7. SmallHarness → Hermes migration — plan unexecuted
-8. openclicky live build verification — pending
-9. DGX server — down across multiple cycles; VibeClaw publishing without local hero images
-10. 1 unpushed commit on `main` — `f8254fd chore: update DREAMING.md`
+- Unstaged `tiny-world-builder.html` work needs `npm test` + browser QA before committing
+- `cottage.html` integration decision pending
+- `tinyworld-ghost-world-gen` skill contents unreviewed
+- LandscapeEngine browser QA (outlines, cel-shading, fog) backlogged
+- MC Gateway root cause uninvestigated
+- `grok-cli` patch needs a write-capable session to land
+- 2 commits not pushed to `origin/main`
