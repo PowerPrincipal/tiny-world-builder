@@ -23,9 +23,9 @@
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   body {
     background:
-      radial-gradient(circle at 86% 15%, rgba(255, 214, 154, calc(var(--backdrop-strength, 0.78) * 0.58)), transparent 32%),
-      radial-gradient(circle at 18% 18%, rgba(var(--sky-blue-strong-rgb, 26, 103, 210), calc(var(--backdrop-strength, 0.78) * var(--sky-blue-depth, 0.58) * 0.72)), transparent 36%),
-      radial-gradient(circle at 70% 86%, rgba(255, 188, 126, calc(var(--backdrop-strength, 0.78) * 0.22)), transparent 36%),
+      radial-gradient(circle at 86% 15%, rgba(255, 214, 154, min(1, calc(var(--backdrop-strength, 0.78) * 0.58))), transparent 32%),
+      radial-gradient(circle at 18% 18%, rgba(var(--sky-blue-strong-rgb, 26, 103, 210), min(1, calc(var(--backdrop-strength, 0.78) * var(--sky-blue-depth, 0.58) * 0.72))), transparent 36%),
+      radial-gradient(circle at 70% 86%, rgba(255, 188, 126, min(1, calc(var(--backdrop-strength, 0.78) * 0.22))), transparent 36%),
       linear-gradient(135deg, rgb(var(--sky-blue-base-rgb, 106, 168, 235)) 0%, rgb(var(--sky-blue-low-rgb, 188, 220, 244)) 48%, #fff0d1 100%);
     color: var(--ink);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -72,20 +72,20 @@
     z-index: 8;
     opacity: 1;
     background:
-      radial-gradient(circle at 14% 18%, rgba(var(--sky-blue-strong-rgb, 28, 99, 205), calc(var(--backdrop-strength, 0.78) * var(--sky-blue-depth, 0.58) * 0.38)), transparent 34%),
-      radial-gradient(circle at 88% 12%, rgba(255, 218, 158, calc(var(--backdrop-strength, 0.78) * 0.46)), transparent 34%),
-      radial-gradient(circle at 72% 88%, rgba(255, 190, 128, calc(var(--backdrop-strength, 0.78) * 0.16)), transparent 36%),
+      radial-gradient(circle at 14% 18%, rgba(var(--sky-blue-strong-rgb, 28, 99, 205), min(1, calc(var(--backdrop-strength, 0.78) * var(--sky-blue-depth, 0.58) * 0.38))), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(255, 218, 158, min(1, calc(var(--backdrop-strength, 0.78) * 0.46))), transparent 34%),
+      radial-gradient(circle at 72% 88%, rgba(255, 190, 128, min(1, calc(var(--backdrop-strength, 0.78) * 0.16))), transparent 36%),
       radial-gradient(
         ellipse at center,
         rgba(224, 241, 255, 0) 48%,
-        rgba(224, 241, 255, calc(var(--backdrop-strength, 0.78) * 0.24)) 78%,
-        rgba(255, 238, 212, calc(var(--backdrop-strength, 0.78) * 0.58)) 100%
+        rgba(224, 241, 255, min(1, calc(var(--backdrop-strength, 0.78) * 0.24))) 78%,
+        rgba(255, 238, 212, min(1, calc(var(--backdrop-strength, 0.78) * 0.58))) 100%
       ),
       radial-gradient(
         ellipse at center,
         rgba(5, 10, 20, 0) 46%,
-        rgba(5, 10, 20, calc(var(--backdrop-vignette, 0.18) * 0.30)) 76%,
-        rgba(5, 10, 20, calc(var(--backdrop-vignette, 0.18) * 0.72)) 100%
+        rgba(5, 10, 20, min(1, calc(var(--backdrop-vignette, 0.18) * 0.30))) 76%,
+        rgba(5, 10, 20, min(1, calc(var(--backdrop-vignette, 0.18) * 0.72))) 100%
       );
   }
   #app {
@@ -4524,7 +4524,7 @@
             </label>
             <div class="range-row">
               <span>Resolution</span>
-              <input id="render-resolution" type="range" min="55" max="150" step="5" />
+              <input id="render-resolution" type="range" min="25" max="150" step="5" />
               <output id="render-resolution-value"></output>
             </div>
             <div class="range-row">
@@ -4589,7 +4589,7 @@
             </div>
             <div class="range-row">
               <span>Tilt blur</span>
-              <input id="render-tilt-blur" type="range" min="0" max="8" step="0.5" />
+              <input id="render-tilt-blur" type="range" min="0" max="18" step="0.5" />
               <output id="render-tilt-blur-value"></output>
             </div>
             <div class="range-row">
@@ -4768,17 +4768,17 @@
             </div>
             <div class="range-row">
               <span>Atmosphere fade</span>
-              <input id="render-distance-mist" type="range" min="0" max="100" step="1" />
+              <input id="render-distance-mist" type="range" min="0" max="200" step="1" />
               <output id="render-distance-mist-value"></output>
             </div>
             <div class="range-row">
               <span>Backdrop glow</span>
-              <input id="render-backdrop" type="range" min="0" max="100" step="1" />
+              <input id="render-backdrop" type="range" min="0" max="200" step="1" />
               <output id="render-backdrop-value"></output>
             </div>
             <div class="range-row">
               <span>Backdrop vignette</span>
-              <input id="render-backdrop-vignette" type="range" min="0" max="100" step="1" />
+              <input id="render-backdrop-vignette" type="range" min="0" max="300" step="1" />
               <output id="render-backdrop-vignette-value"></output>
             </div>
           </section>
@@ -5276,7 +5276,7 @@
     return { w, h };
   }
   const BASE_DPR_CAP = window.matchMedia && window.matchMedia('(max-width: 800px)').matches ? 1.5 : 2.0;
-  let renderResolutionScale = storedNumber(RENDER_LS.resolution, 1, 0.55, 1.5);
+  let renderResolutionScale = storedNumber(RENDER_LS.resolution, 1, 0.25, 1.5);
   let renderBrightness = storedNumber(RENDER_LS.brightness, 1.0, 0.75, 1.3);
   let renderSaturation = storedNumber(RENDER_LS.saturation, 1.0, 0.8, 1.3);
   let renderContrast = storedNumber(RENDER_LS.contrast, 1.0, 0.85, 1.25);
@@ -5379,15 +5379,15 @@
   let renderUnderCloudSpread = storedNumber(RENDER_LS.underCloudSpread, 1.35, 0.7, 2.2);
   let renderSkyBlueDepth = storedNumber(RENDER_LS.skyBlueDepth, 0.58, 0, 1);
   let renderSkyBlueSaturation = storedNumber(RENDER_LS.skyBlueSaturation, 1, 0.25, 2.2);
-  let renderDistanceMist = storedNumber(RENDER_LS.distanceMist, 0.28, 0, 1);
-  let renderBackdrop = storedNumber(RENDER_LS.backdrop, 0.78, 0, 1);
-  let renderBackdropVignette = storedNumber(RENDER_LS.backdropVignette, 0.18, 0, 1);
+  let renderDistanceMist = storedNumber(RENDER_LS.distanceMist, 0.28, 0, 2);
+  let renderBackdrop = storedNumber(RENDER_LS.backdrop, 0.78, 0, 2);
+  let renderBackdropVignette = storedNumber(RENDER_LS.backdropVignette, 0.18, 0, 3);
   // Pixelation post-process. pixelSize 1 = bypass (no post pass). 2-12 chunkier.
   let renderPixelSize = Math.round(storedNumber(RENDER_LS.pixelSize, 1, 1, 12));
   let renderPixelDepthEdge = storedNumber(RENDER_LS.pixelDepthEdge, 0, 0, 1);
   let renderPixelNormalEdge = storedNumber(RENDER_LS.pixelNormalEdge, 0, 0, 1);
   let renderShaderAntialias = storedNumber(RENDER_LS.shaderAntialias, 0, 0, 1);
-  let renderTiltBlur = storedNumber(RENDER_LS.tiltBlur, 1.0, 0, 8);
+  let renderTiltBlur = storedNumber(RENDER_LS.tiltBlur, 1.0, 0, 18);
   let renderTiltFocus = storedNumber(RENDER_LS.tiltFocus, 65, 15, 80);
   let renderGhostOpacity = storedNumber(RENDER_LS.ghostOpacity, 1, 0.05, 1);
   let renderFloorOpacity = storedNumber(RENDER_LS.floorOpacity, 1, 0.10, 1);
@@ -5509,7 +5509,7 @@
   applySkyBubbleSettings();
 
   function applyDistanceMistSettings(colorHex) {
-    const amount = Math.max(0, Math.min(1, renderDistanceMist || 0));
+    const amount = Math.max(0, Math.min(2, renderDistanceMist || 0));
     // Atmospheric perspective: fade distant scenery toward the live sky
     // colour. This is a colour fade, not per-object opacity or ground mist.
     // AR needs transparent passthrough, not opaque scene fog.
@@ -5531,7 +5531,7 @@
   }
 
   function setRenderResolutionScale(value) {
-    renderResolutionScale = Math.max(0.55, Math.min(1.5, value));
+    renderResolutionScale = Math.max(0.25, Math.min(1.5, value));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, BASE_DPR_CAP) * renderResolutionScale);
   }
 
@@ -5607,7 +5607,7 @@
   }
 
   function applyTiltShiftSettings() {
-    const blur = Math.max(0, Math.min(8, renderTiltBlur));
+    const blur = Math.max(0, Math.min(18, renderTiltBlur));
     const focus = Math.max(15, Math.min(80, renderTiltFocus));
     const clearTop = (100 - focus) / 2;
     const clearBottom = 100 - clearTop;
@@ -6795,6 +6795,139 @@
     };
   }
 
+  const waterTextureFlowStates = new Map();
+
+  function waterTextureFlowState(dx = 1, dz = 0) {
+    const sx = Math.sign(dx || 0);
+    const sz = Math.sign(dz || 0);
+    const key = sx + ',' + sz;
+    if (!waterTextureFlowStates.has(key)) {
+      waterTextureFlowStates.set(key, {
+        offset: new THREE.Vector2(0, 0),
+        direction: new THREE.Vector2(sx, sz),
+        speed: 0.20,
+      });
+    }
+    return waterTextureFlowStates.get(key);
+  }
+
+  function applyFlowingWaterUVs(material, texture, textureScale = 1.0, flowState = waterTextureFlowState(1, 0)) {
+    if (!material) return;
+    material.map = texture;
+    material.userData = material.userData || {};
+    material.userData.worldTextureScale = textureScale;
+    material.needsUpdate = true;
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.waterFlowOffset = { value: flowState.offset };
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+        uniform vec2 waterFlowOffset;
+        `
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <project_vertex>',
+        `
+        #include <project_vertex>
+        vec4 worldPos = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          worldPos = instanceMatrix * worldPos;
+        #endif
+        worldPos = modelMatrix * worldPos;
+
+        vec4 localNormal = vec4(normal, 0.0);
+        #ifdef USE_INSTANCING
+          localNormal = instanceMatrix * localNormal;
+        #endif
+        vec3 worldNormal = normalize((modelMatrix * localNormal).xyz);
+
+        if (abs(worldNormal.y) > 0.5) {
+          vUv = worldPos.xz * ${textureScale.toFixed(4)} + waterFlowOffset;
+        } else if (abs(worldNormal.x) > 0.5) {
+          vUv = worldPos.zy * ${textureScale.toFixed(4)} + waterFlowOffset.yx;
+        } else {
+          vUv = worldPos.xy * ${textureScale.toFixed(4)} + waterFlowOffset;
+        }
+        `
+      );
+    };
+  }
+
+  function applyTerrainWorldUVs(name, material, texture, textureScale = 1.0) {
+    if (name === 'water' || name === 'waterDk') applyFlowingWaterUVs(material, texture, textureScale);
+    else applyWorldUVs(material, texture, textureScale);
+  }
+
+  function tickWaterTextureFlow(dt) {
+    if (!dt) return;
+    for (const state of waterTextureFlowStates.values()) {
+      state.offset.x = (state.offset.x + state.direction.x * state.speed * dt) % 1;
+      state.offset.y = (state.offset.y + state.direction.y * state.speed * dt) % 1;
+    }
+  }
+
+  const WATER_FLOW_DIRECTIONS = new Set(['auto', 'n', 's', 'e', 'w']);
+  const waterFlowMaterialCache = new Map();
+
+  function normalizeWaterFlow(value) {
+    const key = String(value || 'auto').trim().toLowerCase();
+    return WATER_FLOW_DIRECTIONS.has(key) ? key : 'auto';
+  }
+
+  function waterFlowVectorForKey(key) {
+    if (key === 'n') return { dx: 0, dz: -1 };
+    if (key === 's') return { dx: 0, dz: 1 };
+    if (key === 'e') return { dx: 1, dz: 0 };
+    if (key === 'w') return { dx: -1, dz: 0 };
+    return null;
+  }
+
+  function waterFlowAxisForCell(terrainN) {
+    const ew = terrainN && (terrainN.e === 'water' || terrainN.w === 'water');
+    const ns = terrainN && (terrainN.n === 'water' || terrainN.s === 'water');
+    if (ew && !ns) return 'x';
+    if (ns && !ew) return 'z';
+    return ew ? 'x' : 'z';
+  }
+
+  function waterFlowBridgeSplit(axis, x, z) {
+    let total = 0;
+    let count = 0;
+    for (let i = 0; i < GRID; i++) {
+      const cell = axis === 'x' ? getWorldCell(i, z) : getWorldCell(x, i);
+      if (cell && cell.terrain === 'water' && cell.kind === 'bridge') {
+        total += i;
+        count++;
+      }
+    }
+    return count ? total / count : (GRID - 1) / 2;
+  }
+
+  function waterFlowVectorForCell(x, z, terrainN) {
+    const cell = getWorldCell(x, z);
+    const forced = waterFlowVectorForKey(normalizeWaterFlow(cell && cell.waterFlow));
+    if (forced) return forced;
+    const axis = waterFlowAxisForCell(terrainN);
+    const split = waterFlowBridgeSplit(axis, x, z);
+    if (axis === 'x') return { dx: x < split ? -1 : 1, dz: 0 };
+    return { dx: 0, dz: z < split ? -1 : 1 };
+  }
+
+  function waterFlowMaterial(base, dx, dz) {
+    if (!base) return base;
+    const scale = base.userData && base.userData.worldTextureScale ? base.userData.worldTextureScale : 1;
+    const map = base.map || texRipples;
+    const color = base.color ? base.color.getHexString() : 'none';
+    const key = (base.uuid || base.id) + ':' + (map && (map.uuid || map.id)) + ':' + scale + ':' + color + ':' + Math.sign(dx || 0) + ',' + Math.sign(dz || 0);
+    if (!waterFlowMaterialCache.has(key)) {
+      const mat = base.clone();
+      applyFlowingWaterUVs(mat, map, scale, waterTextureFlowState(dx, dz));
+      waterFlowMaterialCache.set(key, mat);
+    }
+    return waterFlowMaterialCache.get(key);
+  }
+
   const texCheckered = createPixelTexture('checkered', 16);
   const texNoise = createPixelTexture('noise', 16);
   const texBrick = createPixelTexture('brick', 32);
@@ -6928,8 +7061,8 @@
   applyWorldUVs(M.dirt, texCottageDirt, 1.4);
   applyWorldUVs(M.dirtRich, texCottageDirt, 1.4);
 
-  applyWorldUVs(M.water, texRipples, 1.0);
-  applyWorldUVs(M.waterDk, texRipples, 1.0);
+  applyFlowingWaterUVs(M.water, texRipples, 1.0);
+  applyFlowingWaterUVs(M.waterDk, texRipples, 1.0);
 
   applyWorldUVs(M.wallCream, texCottageStone, 10.0);
   applyWorldUVs(M.wallTrim, texCottageStone, 10.0);
@@ -7120,7 +7253,7 @@
     const mat = M[name];
     const tex = materialTextureForKey(textureKey);
     if (!mat || !tex) return;
-    applyWorldUVs(mat, tex, scale);
+    applyTerrainWorldUVs(name, mat, tex, scale);
     if (updateBaseMaps) {
       if (terrainMaterialBaseMaps.has(name)) terrainMaterialBaseMaps.set(name, mat.map || null);
       if (terrainMaterialBaseScales.has(name)) terrainMaterialBaseScales.set(name, scale);
@@ -7233,7 +7366,7 @@
     for (const [name, map] of terrainMaterialBaseMaps.entries()) {
       const mat = M[name];
       if (mat) {
-        if (map) applyWorldUVs(mat, map, terrainMaterialBaseScales.get(name) || 1);
+        if (map) applyTerrainWorldUVs(name, mat, map, terrainMaterialBaseScales.get(name) || 1);
         else {
           mat.map = null;
           mat.needsUpdate = true;
@@ -7724,7 +7857,7 @@
     ];
   }
 
-  function terrainVoxelMaterials(terrain) {
+  function terrainVoxelMaterials(terrain, x = 0, z = 0, terrainN = null) {
     if (terrain === 'path') {
       return {
         base: M.path,
@@ -7735,12 +7868,13 @@
       };
     }
     if (terrain === 'water') {
+      const flow = waterFlowVectorForCell(x, z, terrainN);
       return {
-        base: M.water,
-        hi: terrainShadeMaterial(M.water, 16),
-        low: M.waterDk,
+        base: waterFlowMaterial(M.water, flow.dx, flow.dz),
+        hi: waterFlowMaterial(terrainShadeMaterial(M.water, 16), flow.dx, flow.dz),
+        low: waterFlowMaterial(M.waterDk, flow.dx, flow.dz),
         edge: M.waterFoam,
-        scuff: terrainShadeMaterial(M.waterDk, -10),
+        scuff: waterFlowMaterial(terrainShadeMaterial(M.waterDk, -10), flow.dx, flow.dz),
       };
     }
     if (terrain === 'dirt') {
@@ -7836,7 +7970,7 @@
   const waterfallEffectMeshes = new Set();
 
   function addVoxelTerrainTop(g, terrain, x, z, rise, topSize, topHeight, pathN, terrainN, hiddenSides) {
-    const mats = terrainVoxelMaterials(terrain);
+    const mats = terrainVoxelMaterials(terrain, x, z, terrainN);
     const cells = terrainVoxelCellCount(terrain);
     const cellSize = topSize / cells;
     const panelOverlap = Math.min(0.014, Math.max(0.006, cellSize * 0.06));
@@ -8268,6 +8402,7 @@
 
   const WATERFALL_FROTH_SPEED = 0.30;
   const WATERFALL_DROP_CUBE_SPEED = 0.86;
+  const WATERFALL_FROTH_OUTSET = 0.16;
 
   function addWaterfallRiserEffects(g, x, z, riserSize, topY, sides) {
     if (!sides || !(sides.n || sides.s || sides.e || sides.w)) return;
@@ -8350,7 +8485,7 @@
       const baseScale = radius * laneScale * (0.86 + cellRand(x + salt, z - salt, 430) * 0.38);
       mesh.scale.set(baseScale * (lane === 'lip' ? 1.55 : 1.15), baseScale * (lane === 'lip' ? 0.62 : 0.78), baseScale);
       mesh.userData.noShadow = true;
-      const base = sidePosition(dir, across, y, (lane === 'lip' ? 0.004 : 0.012) + cellRand(x + salt, z + salt, 431) * (lane === 'lip' ? 0.016 : 0.026));
+      const base = sidePosition(dir, across, y, WATERFALL_FROTH_OUTSET + (lane === 'lip' ? 0.004 : 0.012) + cellRand(x + salt, z + salt, 431) * (lane === 'lip' ? 0.016 : 0.026));
       mesh.userData.waterfall = {
         kind: 'foam',
         lane,
@@ -8543,13 +8678,15 @@
     const oy = c.offsetY || 0;
     const hasTransform = ry || ox || oz || oy;
     const appearance = normalizeAppearance(c.appearance);
-    if (c.terrain !== 'grass' || c.kind || f !== 1 || tf !== 1 || bt || fs || extras || hasTransform || appearance) {
+    const wf = normalizeWaterFlow(c.waterFlow);
+    if (c.terrain !== 'grass' || c.kind || f !== 1 || tf !== 1 || bt || fs || extras || hasTransform || appearance || wf !== 'auto') {
       const out = [x, z, c.terrain, c.kind, f, bt, tf, fs];
       // Always push extras (or null) before the transform / appearance so
       // tuple positions stay stable. Transform is [ry, ox, oz, oy].
       out.push(extras || null);
       out.push(hasTransform ? [ry, ox, oz, oy] : null);
-      if (appearance) out.push(appearance);
+      if (appearance || wf !== 'auto') out.push(appearance || null);
+      if (wf !== 'auto') out.push(wf);
       return out;
     }
     return null;
@@ -8644,7 +8781,10 @@
 
       let topMat = M.grass;
       if (terrain === 'path')  topMat = M.path;
-      if (terrain === 'water') topMat = M.water;
+      if (terrain === 'water') {
+        const flow = waterFlowVectorForCell(x, z, terrainN);
+        topMat = waterFlowMaterial(M.water, flow.dx, flow.dz);
+      }
       if (terrain === 'dirt')  topMat = M.dirtRich;
       if (terrain === 'stone') topMat = M.stone;
       if (terrain === 'lava')  topMat = M.lava;
@@ -11400,12 +11540,14 @@
     vbox(parent, Math.max(0.30, width * 0.10), layerH * 1.1, Math.max(0.30, depth * 0.10), 0, topY - totalDrop - layerH * 0.55, 0, trimMat, { noGap: true });
   }
 
-  const ISLAND_ROCKET_FLAME_SPEED = 2;
+  const ISLAND_ROCKET_FLAME_SPEED = 3;
   let islandRocketFlames = new Set();
 
   function registerIslandRocketFlame(mesh, seed, travel = 0.08) {
     mesh.userData.rocketFlame = true;
     mesh.userData.flamePhase = seed * 1.73;
+    mesh.userData.baseX = mesh.position.x;
+    mesh.userData.baseZ = mesh.position.z;
     mesh.userData.baseY = mesh.position.y;
     mesh.userData.baseScale = mesh.scale.x || 1;
     mesh.userData.travel = travel;
@@ -11490,7 +11632,11 @@
       const pulse = 0.5 + Math.sin(t * 10.5 * ISLAND_ROCKET_FLAME_SPEED + phase) * 0.5;
       const flicker = 0.86 + pulse * 0.30;
       const baseScale = mesh.userData.baseScale || 1;
-      mesh.scale.setScalar(baseScale * flicker);
+      const mirror = Math.sin(t * 3.4 * ISLAND_ROCKET_FLAME_SPEED + phase * 0.73);
+      const stretch = 0.90 + Math.abs(mirror) * 0.22;
+      mesh.scale.set(baseScale * flicker * stretch, baseScale * flicker, baseScale * flicker * (1.16 - (stretch - 0.90)));
+      mesh.position.x = (mesh.userData.baseX || 0) * mirror;
+      mesh.position.z = mesh.userData.baseZ || 0;
       mesh.position.y = mesh.userData.baseY - (mesh.userData.travel || 0.08) * pulse;
       mesh.rotation.y += 0.65 * ISLAND_ROCKET_FLAME_SPEED * (0.6 + pulse) * dt;
     }
@@ -14163,7 +14309,7 @@
   };
 
   function defaultCell() {
-    return { terrain: 'grass', terrainFloors: 1, kind: null, floors: 1, buildingType: null, fenceSide: null, extras: [], appearance: null };
+    return { terrain: 'grass', terrainFloors: 1, kind: null, floors: 1, buildingType: null, fenceSide: null, extras: [], appearance: null, waterFlow: 'auto' };
   }
 
   function cloneExtras(extras) {
@@ -14189,6 +14335,7 @@
       offsetY: (src && src.offsetY) || 0,
       offsetZ: (src && src.offsetZ) || 0,
       appearance: normalizeAppearance(src && src.appearance),
+      waterFlow: normalizeWaterFlow(src && src.waterFlow),
     };
     if (cell.kind !== 'house') cell.buildingType = null;
     if (cell.kind !== 'fence') cell.fenceSide = null;
@@ -16984,7 +17131,7 @@
   const CROP_KINDS = new Set(['crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower']);
 
   function setCell(x, z, opts) {
-    const { terrain, terrainFloors, kind = null, floors, buildingType, fenceSide, tileDelay = 0, objectDelay = 0, animate = true, impactDust = true, forceTile = false, rotationY, offsetX, offsetY, offsetZ, appearance } = opts;
+    const { terrain, terrainFloors, kind = null, floors, buildingType, fenceSide, tileDelay = 0, objectDelay = 0, animate = true, impactDust = true, forceTile = false, rotationY, offsetX, offsetY, offsetZ, appearance, waterFlow } = opts;
     const prev = ensureWorldCell(x, z);
     const prevVehicleDrivable = isVehicleDrivableCell(prev);
     let nextTerrain = terrain || 'grass';
@@ -17039,8 +17186,12 @@
       ? normalizeAppearance(appearance)
       : (kindIsNew ? null : normalizeAppearance(prev.appearance));
     const appearanceChanged = !sameAppearance(prev.appearance, newAppearance);
+    const newWaterFlow = nextTerrain === 'water'
+      ? normalizeWaterFlow(waterFlow !== undefined ? waterFlow : prev.waterFlow)
+      : 'auto';
+    const waterFlowChanged = normalizeWaterFlow(prev.waterFlow) !== newWaterFlow;
     const userEdited = !!(prev.userEdited || (opts && opts.userEdited));
-    world[x][z] = { terrain: nextTerrain, terrainFloors: newTerrainFloors, kind: nextKind, floors: newFloors, buildingType: newBType, fenceSide: newFenceSide, extras: carriedExtras, rotationY: newRotationY, offsetX: newOffsetX, offsetY: newOffsetY, offsetZ: newOffsetZ, appearance: newAppearance };
+    world[x][z] = { terrain: nextTerrain, terrainFloors: newTerrainFloors, kind: nextKind, floors: newFloors, buildingType: newBType, fenceSide: newFenceSide, extras: carriedExtras, rotationY: newRotationY, offsetX: newOffsetX, offsetY: newOffsetY, offsetZ: newOffsetZ, appearance: newAppearance, waterFlow: newWaterFlow };
     if (userEdited) world[x][z].userEdited = true;
     const vehicleDrivableChanged = prevVehicleDrivable !== isVehicleDrivableCell(world[x][z]);
     if (vehicleDrivableChanged) refreshVehiclesForWorldObstacleChange(x, z);
@@ -17067,7 +17218,7 @@
       }
     }
 
-    if (terrainChanged || tileHeightChanged || forceTile) {
+    if (terrainChanged || tileHeightChanged || waterFlowChanged || forceTile) {
       renderCellTile(x, z, { animate, delay: tileDelay });
     } else if (!hasCellTileMesh(x, z)) {
       // Defensive: if for any reason this cell has no ground mesh
@@ -17089,8 +17240,8 @@
       }
       if (getWorldCell(x, z).kind === 'bridge') renderCellObject(x, z, { animate: false });
     }
-    if (!kindChanged && !floorsChanged && !terrainFloorsChanged && !bTypeChanged && !fenceSideChanged && !appearanceChanged && !transformChanged) {
-      if (terrainChanged || tileHeightChanged || forceTile) {
+    if (!kindChanged && !floorsChanged && !terrainFloorsChanged && !bTypeChanged && !fenceSideChanged && !appearanceChanged && !transformChanged && !waterFlowChanged) {
+      if (terrainChanged || tileHeightChanged || waterFlowChanged || forceTile) {
         saveState();
         emitCellWebhook();
       }
@@ -23411,6 +23562,7 @@
     tickWeather(dt);
     tickIslandRocketEngines(t, dt);
     updateClouds(dt);
+    tickWaterTextureFlow(dt);
     updateWaterfallEffects(t);
     tickVehicles(dt);
     if (crowdEnabled && crowdLayer) crowdLayer.update(dt, camera);
@@ -24837,6 +24989,7 @@
   const PLANET_LANDSCAPE_FAR_RES = 24;
   const PLANET_LANDSCAPE_PRIME_TICKS = 2;
   const PLANET_LANDSCAPE_STREAM_INTERVAL = 0.20;
+  const PLANET_LANDSCAPE_WARMUP_INTERVAL_MS = 48;
   const PLANET_LANDSCAPE_STREAM_MOVE = 150;
   const PLANET_ATMOSPHERE_RADIUS = 180;
   const PLANET_ATMOSPHERE_LAYERS = [
@@ -24848,6 +25001,7 @@
   const planetLandscapeFocusScratch = new THREE.Vector3();
   const planetLandscapeLastStreamFocus = new THREE.Vector3(NaN, 0, NaN);
   let planetLandscapeStreamElapsed = 0;
+  let planetLandscapeWarmupTimer = 0;
 
   function normalizePlanetLandscapeBiome(raw, fallback = 'grassland') {
     const key = String(raw || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -25207,8 +25361,30 @@
   }
 
   function resetPlanetLandscapeStreamState() {
+    if (planetLandscapeWarmupTimer) {
+      clearTimeout(planetLandscapeWarmupTimer);
+      planetLandscapeWarmupTimer = 0;
+    }
     planetLandscapeStreamElapsed = PLANET_LANDSCAPE_STREAM_INTERVAL;
     planetLandscapeLastStreamFocus.set(NaN, 0, NaN);
+  }
+
+  function planetLandscapePendingCount() {
+    if (!planetLandscapeEngine) return 0;
+    const nearPending = planetLandscapeEngine.pendingChunkBuilds ? planetLandscapeEngine.pendingChunkBuilds.length : 0;
+    const farPending = planetLandscapeEngine.pendingFarChunkBuilds ? planetLandscapeEngine.pendingFarChunkBuilds.length : 0;
+    return nearPending + farPending;
+  }
+
+  function schedulePlanetLandscapeWarmup() {
+    if (!planetLandscapeEngine || planetLandscapeWarmupTimer || !planetLandscapePendingCount()) return;
+    planetLandscapeWarmupTimer = setTimeout(() => {
+      planetLandscapeWarmupTimer = 0;
+      if (!planetLandscapeEngine) return;
+      tickPlanetLandscapeStream(PLANET_LANDSCAPE_STREAM_INTERVAL);
+      if (typeof renderScene === 'function') renderScene();
+      schedulePlanetLandscapeWarmup();
+    }, PLANET_LANDSCAPE_WARMUP_INTERVAL_MS);
   }
 
   function tickPlanetLandscapeStream(dt) {
@@ -25253,6 +25429,7 @@
     configurePlanetLandscapeEngine(planetLandscapeEngine, next);
     syncPlanetAtmosphereLayout(next);
     syncPlanetAtmosphereColors();
+    schedulePlanetLandscapeWarmup();
     if (document.body.classList.contains('planet-proof-active')) enablePlanetLandscapeProofChrome(next);
     return true;
   }
@@ -25296,6 +25473,7 @@
     for (let i = 0; i < PLANET_LANDSCAPE_PRIME_TICKS; i++) {
       planetLandscapeEngine.update(landscapeMeshFocusPos(), 0);
     }
+    schedulePlanetLandscapeWarmup();
     if (document.body.classList.contains('planet-proof-active')) enablePlanetLandscapeProofChrome(next);
     return true;
   }
@@ -25322,6 +25500,7 @@
       nearRadius: planetLandscapeEngine ? planetLandscapeEngine.RENDER_RADIUS : 0,
       nearChunkRes: planetLandscapeEngine ? planetLandscapeEngine.CHUNK_RES : 0,
       farRadius: planetLandscapeEngine ? planetLandscapeEngine.FAR_RADIUS : 0,
+      farChunkSize: planetLandscapeEngine ? planetLandscapeEngine.FAR_CHUNK_SIZE : 0,
       farChunkRes: planetLandscapeEngine ? planetLandscapeEngine.FAR_CHUNK_RES : 0,
       backdropProfile: planetLandscapeEngine ? planetLandscapeEngine.BACKDROP_MODE === true : false,
       chunkBuildBudgetNear: planetLandscapeEngine ? planetLandscapeEngine.CHUNK_BUILD_BUDGET_NEAR : 0,
@@ -27534,6 +27713,9 @@
           }
         } else if (rowKey === 'terrain') {
           setCell(x, z, { ...cell, terrain: value, animate: false, impactDust: false });
+        } else if (rowKey === 'waterFlow') {
+          if (cell.terrain !== 'water') return;
+          setCell(x, z, { ...cell, waterFlow: normalizeWaterFlow(value), animate: false, impactDust: false });
         } else if (rowKey === 'terrainHeight') {
           const next = value === 'down'
             ? Math.max(1, terrainLevelForCell(cell) - 1)
@@ -27624,6 +27806,16 @@
           { label: 'Up', value: 'up' },
         ] },
       );
+      const hasWaterSelection = selectedWorldCoords().some(({ x, z }) => getWorldCell(x, z).terrain === 'water');
+      if (hasWaterSelection) {
+        rows.push({ key: 'waterFlow', label: 'Water flow', options: [
+          { label: 'Auto', value: 'auto' },
+          { label: 'North', value: 'n' },
+          { label: 'South', value: 's' },
+          { label: 'East', value: 'e' },
+          { label: 'West', value: 'w' },
+        ] });
+      }
       if (primary === 'house' || primary === 'voxel-build') {
         rows.push(
           { key: 'topColor', label: 'Top', color: true, options: SELECTION_TOP_COLOR_OPTIONS },
@@ -28116,12 +28308,12 @@
       // Accept either tuple form [x,z,terrain,kind,floors,buildingType,terrainFloors,fenceSide]
       // (storage / export) or object form {x,z,terrain,kind,floors,buildingType,terrainFloors,fenceSide}
       // (canonical schema, AI generation output).
-      let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance;
+      let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow;
       if (Array.isArray(entry)) {
         if (entry.length < 4) continue;
-        [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance] = entry;
+        [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow] = entry;
       } else if (entry && typeof entry === 'object') {
-        ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance } = entry);
+        ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow } = entry);
       } else {
         continue;
       }
@@ -28181,6 +28373,7 @@
         extras: normalizedExtras,
         rotationY, offsetX, offsetY, offsetZ,
         appearance: normalizeAppearance(appearance),
+        waterFlow: normalizeWaterFlow(waterFlow),
         __outOfHome: x < 0 || x >= GRID || z < 0 || z >= GRID,
         __x: x,
         __z: z,
@@ -28432,11 +28625,11 @@
   }
 
   function cellPatchFromEntry(entry) {
-    let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance;
+    let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow;
     if (Array.isArray(entry)) {
-      [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance] = entry;
+      [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow] = entry;
     } else if (entry && typeof entry === 'object') {
-      ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance } = entry);
+      ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow } = entry);
     }
     if (!Number.isInteger(x) || !Number.isInteger(z)) return null;
     if (x < 0 || x >= GRID || z < 0 || z >= GRID) return null;
@@ -28463,6 +28656,7 @@
       extras: Array.isArray(extras) ? extras : [],
       rotationY, offsetX, offsetY, offsetZ,
       appearance: normalizeAppearance(appearance),
+      waterFlow: normalizeWaterFlow(waterFlow),
     };
   }
 
@@ -28492,6 +28686,7 @@
           offsetX: c.offsetX,
           offsetZ: c.offsetZ,
           appearance: c.appearance,
+          waterFlow: c.waterFlow,
           animate: true,
           impactDust: false,
         });
