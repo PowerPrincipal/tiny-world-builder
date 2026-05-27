@@ -4160,6 +4160,18 @@
       || host === '[::1]'
       || host.endsWith('.local');
     if (!isLocal) return;
+    let enabled = false;
+    try {
+      const flag = window.__TWB_ENABLE_CLUSO__;
+      if (typeof flag === 'boolean') enabled = flag;
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get('cluso') === '1') enabled = true;
+      if (qs.get('cluso') === '0') enabled = false;
+      const stored = window.localStorage && window.localStorage.getItem('tinyworld:features:cluso');
+      if (stored === '1') enabled = true;
+      if (stored === '0') enabled = false;
+    } catch (_) {}
+    if (!enabled) return;
     window.__CLUSO_EMBEDDED_CONFIG__ = {
       defaultActive: false,
       showToolbar: true,
@@ -11719,6 +11731,21 @@
     generic: [0xd4b483, 0x8fb07a, 0x5d86a6, 0xbe6a4a, 0xf0d69c, 0x3b4458],
   };
 
+  function modelStampApiEnabled() {
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return false;
+    try {
+      const flag = window.__TWB_MODEL_STAMP_API_ENABLED__;
+      if (typeof flag === 'boolean') return flag;
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get('modelApi') === '1' || qs.get('modelStampApi') === '1') return true;
+      if (qs.get('modelApi') === '0' || qs.get('modelStampApi') === '0') return false;
+      const stored = window.localStorage && window.localStorage.getItem('tinyworld:features:model-stamp-api');
+      return stored === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   function modelStampIdSafe(id) {
     const clean = String(id || '').trim();
     return /^[a-z0-9][a-z0-9_-]{0,95}$/i.test(clean) ? clean : null;
@@ -11756,7 +11783,7 @@
   function persistModelStampDefaults() {
     const payload = { version: 1, stamps: modelStampDefaults };
     try { localStorage.setItem(MODEL_STAMP_DEFAULTS_LS, JSON.stringify(payload)); } catch (_) {}
-    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    if (modelStampApiEnabled()) {
       fetch('/api/model-stamp-defaults', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -11766,7 +11793,7 @@
   }
 
   async function loadModelStampDefaultsConfig() {
-    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return;
+    if (!modelStampApiEnabled()) return;
     try {
       const res = await fetch('/api/model-stamp-defaults?ts=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) return;
@@ -11886,7 +11913,7 @@
 
   async function refreshModelStampManifest() {
     const endpoints = [];
-    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    if (modelStampApiEnabled()) {
       endpoints.push('/api/model-stamps?ts=' + Date.now());
     }
     endpoints.push(MODEL_STAMP_MANIFEST_URL + '?ts=' + Date.now());

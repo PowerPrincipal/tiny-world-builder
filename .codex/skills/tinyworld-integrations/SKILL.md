@@ -9,6 +9,12 @@ The app has browser-local integration points, not a backend API:
 
 - Outbound webhooks live in `tiny-world-builder.html` under
   `// -------- API / webhooks / SSE bridge --------`.
+- Optional browser-local probes must be opt-in so the static app stays console-clean:
+  Cluso loads only with `?cluso=1`, `window.__TWB_ENABLE_CLUSO__ = true`, or
+  `localStorage['tinyworld:features:cluso']='1'`; model-stamp API endpoints load
+  only with `?modelApi=1`, `?modelStampApi=1`,
+  `window.__TWB_MODEL_STAMP_API_ENABLED__ = true`, or
+  `localStorage['tinyworld:features:model-stamp-api']='1'`.
 - `fireWebhook(event, payload)` batches editor mutations and POSTs
   `{ source: 'tiny-world-builder', events }` to the configured Developer-panel
   webhook URL.
