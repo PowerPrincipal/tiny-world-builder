@@ -32,6 +32,7 @@ Clipboard and templates:
 - Pasting or duplicating a multi-cell clipboard should call `replaceWorldCoords()` with placed cells so the pasted region stays selected for immediate follow-up edits.
 - Duplicating selected cells should use a one-shot payload and must not overwrite the user's explicit copy/cut clipboard.
 - Moving selected cells between board tiles should reuse the clipboard payload shape internally but must not overwrite the user's explicit copy/cut clipboard.
+- Select-tool dragging from inside an active selection should move the selected cells cell-by-cell through the same internal move path, preserving selection and leaving the user's explicit copy/cut clipboard untouched.
 - Paste actions should target the hovered cell first, then fall back to the selected region origin. Clear stale hover when the pointer leaves the canvas so this fallback remains reachable. The latest-template shortcut should paste a one-shot template payload, not overwrite the user's explicit copy/cut clipboard.
 - Saved asset templates should also surface in the Stamps panel under `Templates`; selecting one should place from its one-shot template payload and preserve the user's explicit copy/cut clipboard.
 - Template cards in Stamps should provide a delete control that removes the `localStorage` entry, refreshes Stamps counts/cards, and clears stale selected-template tool state.
@@ -60,6 +61,8 @@ Stamps panel:
 
 - Stamps navigation is client-side. `stampBuilderAllTools()` builds model, voxel, and built-in stamp tools; filtering combines active category and search text.
 - Include terrain/landscape tools in Stamps alongside objects so the panel can replace toolbar hunting for grass/path/dirt/water/stone/lava/sand/snow placement.
+- Include every normal placeable tool in Stamps, including small plant tools like `tuft`; do not leave toolbar-only assets out of the searchable stamp library.
+- Keep Tiny World's voxel-build stamp library aligned with the standalone voxel builder concepts where practical, especially tree/garden/utility stamps that users expect under Stamps.
 - Category counts should reflect the current search. Search is token-based: every whitespace-separated term must match the tool search text. Status text should reflect the number of shown stamps and the active category/search.
 - Stamps search should support fast keyboard selection: Enter activates the first selectable visible stamp, ArrowDown focuses the first selectable card, and Escape clears a non-empty search before closing the panel.
 - Stamps card thumbnail rendering should stay responsive: draw cheap fallback thumbnails immediately, cancel stale thumbnail queues on re-render, and build expensive 3D card thumbs in small requestAnimationFrame batches.

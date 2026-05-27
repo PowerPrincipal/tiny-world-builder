@@ -11549,6 +11549,32 @@
       fill(out, -2, 2, 0, 0, -2, 2, C.dirt);
       return out;
     }
+    function oakGrove() {
+      const out = [];
+      fill(out, -5, 5, 0, 0, -4, 4, C.greenD);
+      const trees = [[-3, 0, -1, 5], [1, 0, 1, 6], [4, 0, -2, 4]];
+      trees.forEach(([cx, , cz, h], index) => {
+        fill(out, cx, cx, 1, h, cz, cz, C.woodD);
+        fill(out, cx - 1, cx + 1, h - 1, h + 1, cz - 1, cz + 1, index === 1 ? C.green : C.greenD);
+        fill(out, cx - 2, cx + 2, h + 1, h + 2, cz - 2, cz + 2, C.green);
+        fill(out, cx - 1, cx + 1, h + 3, h + 3, cz - 1, cz + 1, C.greenD);
+      });
+      return out;
+    }
+    function pineCluster() {
+      const out = [];
+      fill(out, -4, 4, 0, 0, -4, 4, C.dirt);
+      const trees = [[-2, -1, 7], [2, 1, 6], [0, 3, 5]];
+      trees.forEach(([cx, cz, h]) => {
+        fill(out, cx, cx, 1, h, cz, cz, C.woodD);
+        for (let y = 3; y <= h + 2; y += 2) {
+          const spread = Math.max(1, h + 3 - y);
+          fill(out, cx - spread, cx + spread, y, y, cz - spread, cz + spread, C.greenD);
+          fill(out, cx - Math.max(0, spread - 1), cx + Math.max(0, spread - 1), y + 1, y + 1, cz - Math.max(0, spread - 1), cz + Math.max(0, spread - 1), C.green);
+        }
+      });
+      return out;
+    }
     function garden() {
       const out = [];
       fill(out, -4, 4, 0, 0, -4, 4, C.greenD);
@@ -11581,14 +11607,69 @@
       }
       return out;
     }
+    function lantern() {
+      const out = [];
+      fill(out, -2, 2, 0, 0, -2, 2, C.stoneD);
+      fill(out, 0, 0, 1, 5, 0, 0, C.stone);
+      fill(out, -1, 1, 3, 3, -1, 1, C.stoneD);
+      fill(out, -1, 1, 4, 5, -1, 1, C.gold);
+      fill(out, -2, 2, 6, 6, -2, 2, C.roofEdge);
+      fill(out, -1, 1, 7, 7, -1, 1, C.roof);
+      return out;
+    }
+    function voxelFence() {
+      const out = [];
+      for (const x of [-5, -2, 1, 4]) {
+        fill(out, x, x, 0, 4, 0, 0, C.woodD);
+        out.push(vox(x, 5, 0, C.wood));
+      }
+      fill(out, -5, 5, 2, 2, 0, 0, C.wood);
+      fill(out, -5, 5, 4, 4, 0, 0, C.wood);
+      return out;
+    }
+    function cropPatch() {
+      const out = [];
+      fill(out, -5, 5, 0, 0, -4, 4, C.dirt);
+      for (const x of [-4, -2, 0, 2, 4]) {
+        fill(out, x, x, 1, 2, -3, 3, C.greenD);
+        for (const z of [-3, -1, 1, 3]) out.push(vox(x, 3, z, C.gold));
+      }
+      return out;
+    }
+    function stairs() {
+      const out = [];
+      for (let i = 0; i < 5; i++) {
+        fill(out, -3, 3, i, i, -4 + i, -4 + i, C.stone);
+        fill(out, -3, 3, 0, i, -3 + i, -3 + i, C.stoneD);
+      }
+      return out;
+    }
+    function well() {
+      const out = [];
+      fill(out, -2, 2, 0, 0, -2, 2, C.stoneD);
+      for (const x of [-2, 2]) fill(out, x, x, 1, 3, -2, 2, C.stone);
+      for (const z of [-2, 2]) fill(out, -2, 2, 1, 3, z, z, C.stone);
+      fill(out, -1, 1, 1, 1, -1, 1, C.water);
+      for (const x of [-2, 2]) fill(out, x, x, 4, 7, 0, 0, C.woodD);
+      fill(out, -3, 3, 7, 7, 0, 0, C.wood);
+      roof(out, 8, 3, 2);
+      return out;
+    }
     return [
       { id: 'pagoda-large', name: 'Voxel Pagoda', voxels: pagoda(), footprint: 2.8 },
       { id: 'temple-gate', name: 'Temple Gate', voxels: gate(), footprint: 2.4 },
       { id: 'watchtower', name: 'Watchtower', voxels: watchtower(), footprint: 1.9 },
       { id: 'machiya-house', name: 'Machiya House', voxels: machiya(), footprint: 2.0 },
       { id: 'cherry-tree-build', name: 'Cherry Build', voxels: cherry(), footprint: 1.45 },
+      { id: 'oak-grove-build', name: 'Oak Grove', voxels: oakGrove(), footprint: 2.2 },
+      { id: 'pine-cluster-build', name: 'Pine Cluster', voxels: pineCluster(), footprint: 2.1 },
       { id: 'bamboo-garden', name: 'Bamboo Garden', voxels: garden(), footprint: 1.7 },
       { id: 'rock-outcrop-build', name: 'Rock Outcrop', voxels: rockOutcrop(), footprint: 1.35 },
+      { id: 'lantern-build', name: 'Stone Lantern', voxels: lantern(), footprint: 1.0 },
+      { id: 'fence-build', name: 'Voxel Fence', voxels: voxelFence(), footprint: 1.7 },
+      { id: 'crop-patch-build', name: 'Crop Patch', voxels: cropPatch(), footprint: 1.9 },
+      { id: 'stairs-build', name: 'Stone Stairs', voxels: stairs(), footprint: 1.5 },
+      { id: 'well-build', name: 'Village Well', voxels: well(), footprint: 1.5 },
     ];
   }
 
@@ -20421,7 +20502,7 @@
       'grass', 'path', 'dirt', 'water', 'stone', 'lava', 'sand', 'snow',
       'house', 'tree', 'rock', 'bridge', 'fence',
       'crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower',
-      'flower', 'bush', 'cow', 'sheep',
+      'tuft', 'flower', 'bush', 'cow', 'sheep',
     ];
     for (const id of ids) {
       const tool = TOOLS.find(t => t.id === id);
@@ -21452,8 +21533,9 @@
   let pointerDown = null;     // {x, y}
   let lastPointer = null;
   let didDrag = false;
-  let dragMode = null;        // 'orbit' | 'pan' | 'pinch' | 'select-area' | 'draw'
+  let dragMode = null;        // 'orbit' | 'pan' | 'pinch' | 'select-area' | 'draw' | 'move-selection'
   let selectionDragAnchor = null;
+  let selectionMoveDragLastCoord = null;
   const drawVisitedCells = new Set();
   const drawChangedWorldCoords = new Map();
   let drawLastWorldCoord = null;
@@ -21527,6 +21609,12 @@
     const bx = hit.boardX || 0;
     const bz = hit.boardZ || 0;
     return { x: hit.x + bx * GRID, z: hit.z + bz * GRID };
+  }
+
+  function isSelectedWorldHit(hit) {
+    const coord = drawWorldCoordForHit(hit);
+    const sel = window.__tinyworldSelection;
+    return !!(coord && sel && sel.containsWorldCoord && sel.containsWorldCoord(coord.x, coord.z));
   }
 
   function drawFenceSideForStep(from, to, sourceHit) {
@@ -21623,13 +21711,16 @@
       return;
     }
 
+    const pressHit = pickTile(e.clientX, e.clientY);
     const wantsDraw = e.button === 0 && !spaceDown && !e.shiftKey && !e.metaKey && isDrawablePlacementTool(selectedTool);
-    dragMode = wantsDraw ? 'draw' : ((e.button === 2 || spaceDown) ? 'pan' : 'orbit');
+    const wantsSelectionMove = e.button === 0 && !spaceDown && !e.shiftKey && !e.metaKey && selectedTool && selectedTool.select && isSelectedWorldHit(pressHit);
+    dragMode = wantsDraw ? 'draw' : wantsSelectionMove ? 'move-selection' : ((e.button === 2 || spaceDown) ? 'pan' : 'orbit');
+    selectionMoveDragLastCoord = wantsSelectionMove ? drawWorldCoordForHit(pressHit) : null;
     // Rectangle drag (Shift+drag):
     //   - With Select tool → normal area selection
     //   - With any other tool → live preview rectangle; on release we fill the area with the current tool
     if (dragMode === 'orbit' && (e.shiftKey || e.metaKey)) {
-      const hit = pickTile(e.clientX, e.clientY);
+      const hit = pressHit;
       if (hit) {
         dragMode = 'select-area';
         selectionDragAnchor = { hit };
@@ -21645,7 +21736,7 @@
     // Touch devices don't have hover before contact, so prime currentHover
     // at the press location so a quick tap can place a tile.
     if (dragMode === 'draw') {
-      const hit = pickTile(e.clientX, e.clientY);
+      const hit = pressHit;
       didDrag = !!applyDrawToolToHit(hit);
     } else if (e.pointerType !== 'mouse') {
       updateHoverAt(e.clientX, e.clientY);
@@ -21702,6 +21793,16 @@
           const hit = pickTile(e.clientX, e.clientY);
           if (hit && selectionDragAnchor) {
             setRectangleSelection(selectionDragAnchor.hit, hit, 'replace');
+          }
+        } else if (dragMode === 'move-selection') {
+          const hit = pickTile(e.clientX, e.clientY);
+          const coord = drawWorldCoordForHit(hit);
+          if (coord && selectionMoveDragLastCoord) {
+            const moveDx = coord.x - selectionMoveDragLastCoord.x;
+            const moveDz = coord.z - selectionMoveDragLastCoord.z;
+            if ((moveDx || moveDz) && shiftSelectedCellIntent(moveDx, moveDz)) {
+              selectionMoveDragLastCoord = coord;
+            }
           }
         } else {
           markCameraMoving();
@@ -21785,6 +21886,7 @@
       lastPointer = null;
       dragMode = null;
       selectionDragAnchor = null;
+      selectionMoveDragLastCoord = null;
       drawVisitedCells.clear();
       drawChangedWorldCoords.clear();
       drawLastWorldCoord = null;
@@ -21811,6 +21913,7 @@
       dragMode = null;
       pinchPrevDist = 0;
       pinchPrevMid = null;
+      selectionMoveDragLastCoord = null;
       drawVisitedCells.clear();
       drawChangedWorldCoords.clear();
       drawLastWorldCoord = null;
