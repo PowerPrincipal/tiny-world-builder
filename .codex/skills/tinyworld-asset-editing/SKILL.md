@@ -14,6 +14,7 @@ Use the existing board intent contract:
 Placement rules:
 
 - Bulk placement over a selection should call the normal `applyTool()` path once per selected world coord with `{ skipSelectionBulk: true }`. This preserves tool variants, terrain overrides, ghost transforms, fence logic, model stamp settings, and existing `setCell` side effects.
+- The selection properties `Actions` row can expose an `Apply tool` command; it should reuse the same bulk-placement helper rather than duplicating placement logic.
 - Freehand drawing uses `dragMode === 'draw'`, `drawVisitedCells`, `drawLastWorldCoord`, and `applyDrawToolToHit()`. Drawing should not repeatedly stack terrain, bridges, or same-kind objects while the pointer crosses the same cell.
 - Fence, wall, and boundary are still `kind: 'fence'`; use `fenceSide` plus `floors`. Wall starts at level 4, boundary at level 5. Drawing a higher-level fence over an existing same-side fence should upgrade to that base level, not silently no-op. This also applies when the fence is stored as an `extras` entry beside another occupant.
 - Interpolated freehand fence/wall/boundary cells should derive auto `fenceSide` from each draw step direction, not from the final pointer edge copied onto every skipped cell. Fixed side variants (`north`, `center-x`, etc.) should still win.

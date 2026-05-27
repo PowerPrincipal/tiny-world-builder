@@ -21092,6 +21092,33 @@
     return t;
   }
 
+  function applySelectedToolToSelection() {
+    const sel = window.__tinyworldSelection;
+    if (!sel || !sel.cells || !sel.cells.size) return false;
+    if (!selectedTool || selectedTool.select || selectedTool.auto) return false;
+    const selectedCoords = sel.materialize
+      ? sel.materialize()
+      : (sel.worldCoords ? sel.worldCoords() : []);
+    if (!selectedCoords.length) return false;
+    const ghostTransform = {
+      rotation: ghostRotation,
+      offsetX: ghostOffsetX,
+      offsetZ: ghostOffsetZ,
+    };
+    selectedCoords.forEach(({ x: sx, z: sz }) => {
+      ghostRotation = ghostTransform.rotation;
+      ghostOffsetX = ghostTransform.offsetX;
+      ghostOffsetZ = ghostTransform.offsetZ;
+      applyTool(sx, sz, { skipSelectionBulk: true });
+    });
+    ghostRotation = ghostTransform.rotation;
+    ghostOffsetX = ghostTransform.offsetX;
+    ghostOffsetZ = ghostTransform.offsetZ;
+    resetGhostTransform();
+    notifySelectionChanged();
+    return true;
+  }
+
   function applyTool(x, z, opts = {}) {
     if (selectedTool.auto) {
       if (!getAIProviderState().key) return; // Can't auto-place without API key
@@ -21111,27 +21138,9 @@
     // --- Bulk apply to active selection (Shift+select + tool) ---
     const sel = window.__tinyworldSelection;
     if (!opts.skipSelectionBulk && sel && sel.cells.size > 0) {
-      const selectedCoords = sel.materialize
-        ? sel.materialize()
-        : (sel.worldCoords ? sel.worldCoords() : []);
+      const selectedCoords = sel.worldCoords ? sel.worldCoords() : [];
       if (selectedCoords.some(c => c.x === x && c.z === z)) {
-        const ghostTransform = {
-          rotation: ghostRotation,
-          offsetX: ghostOffsetX,
-          offsetZ: ghostOffsetZ,
-        };
-        selectedCoords.forEach(({ x: sx, z: sz }) => {
-          ghostRotation = ghostTransform.rotation;
-          ghostOffsetX = ghostTransform.offsetX;
-          ghostOffsetZ = ghostTransform.offsetZ;
-          applyTool(sx, sz, { skipSelectionBulk: true });
-        });
-        ghostRotation = ghostTransform.rotation;
-        ghostOffsetX = ghostTransform.offsetX;
-        ghostOffsetZ = ghostTransform.offsetZ;
-        resetGhostTransform();
-        // Keep selection active for rapid multi-tool use on the area
-        notifySelectionChanged();
+        applySelectedToolToSelection();
         return;
       }
     }
@@ -30569,6 +30578,7 @@
         if (value === 'copy') copyActiveCellIntent();
         else if (value === 'cut') cutActiveCellIntent();
         else if (value === 'delete') deleteActiveCellIntent();
+        else if (value === 'apply-tool') applySelectedToolToSelection();
         else if (value === 'paste') pasteClipboardAtActiveTarget();
         else if (value === 'duplicate') duplicateActiveCellIntent();
         else if (value === 'save-template') saveActiveSelectionTemplate();
@@ -30796,6 +30806,7 @@
         { label: 'Copy', value: 'copy' },
         { label: 'Cut', value: 'cut' },
         { label: 'Delete', value: 'delete' },
+        { label: 'Apply tool', value: 'apply-tool' },
         { label: 'Paste', value: 'paste' },
         { label: 'Duplicate', value: 'duplicate' },
         { label: 'Save template', value: 'save-template' },
