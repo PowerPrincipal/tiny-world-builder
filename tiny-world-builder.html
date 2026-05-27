@@ -21771,6 +21771,19 @@
     return true;
   }
 
+  function deleteActiveCellIntent() {
+    const selectedTargets = selectedClipboardTargets(true);
+    if (selectedTargets.length) {
+      selectedTargets.forEach(({ x, z }) => clearCellForCut(x, z));
+      if (window.__tinyworldSelection) window.__tinyworldSelection.clear();
+      return true;
+    }
+    const target = hoverWorldTarget(true);
+    if (!target || !target.cell) return false;
+    clearCellForCut(target.x, target.z);
+    return true;
+  }
+
   function pasteClipboardPayloadAtTarget(payload, target, opts = {}) {
     const cells = normalizeClipboardCells(payload && payload.cells);
     if (!cells.length) return false;
@@ -21951,13 +21964,18 @@
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (generationViewLocked) {
-      if (e.code === 'Space' || k === 'c' || k === 'p' || k === 'i' || k === 'r' || k === 'f' || e.key.indexOf('Arrow') === 0) {
+      if (e.code === 'Space' || e.key === 'Backspace' || e.key === 'Delete' || k === 'c' || k === 'p' || k === 'i' || k === 'r' || k === 'f' || e.key.indexOf('Arrow') === 0) {
         e.preventDefault();
       }
       return;
     }
     if (e.code === 'Space') {
       spaceDown = true;
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      deleteActiveCellIntent();
       e.preventDefault();
       return;
     }
