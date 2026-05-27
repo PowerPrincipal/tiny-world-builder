@@ -18327,7 +18327,7 @@
     });
   }
 
-  function addCellExtra(x, z, extra) {
+  function addCellExtra(x, z, extra, opts = {}) {
     if (!world[x] || !world[x][z]) return;
     const cell = world[x][z];
     if (!cell.extras) cell.extras = [];
@@ -18337,7 +18337,12 @@
       const existingIdx = cell.extras.findIndex(e => e.kind === 'fence' && normalizeFenceSide(e.fenceSide) === side);
       if (existingIdx >= 0) {
         const requestedFloors = Math.max(1, Math.min(MAX_FLOORS, extra.floors || 1));
-        cell.extras[existingIdx].floors = Math.min(Math.max((cell.extras[existingIdx].floors || 1) + 1, requestedFloors), MAX_FLOORS);
+        const currentFloors = cell.extras[existingIdx].floors || 1;
+        const nextFloors = opts.drawing
+          ? Math.max(currentFloors, requestedFloors)
+          : Math.min(Math.max(currentFloors + 1, requestedFloors), MAX_FLOORS);
+        if (nextFloors === currentFloors) return;
+        cell.extras[existingIdx].floors = nextFloors;
         // Animate just the one that changed — existing siblings stay put.
         renderCellExtras(x, z, { animateFrom: existingIdx });
         refreshVehiclesForWorldObstacleChange(x, z);
@@ -20745,12 +20750,12 @@
       // Different-side fence on a fence cell → add the new side as an
       // extra so multiple fence sides co-exist on the same tile.
       if (cell.kind === 'fence') {
-        addCellExtra(x, z, { kind: 'fence', fenceSide: side, floors: baseLevel });
+        addCellExtra(x, z, { kind: 'fence', fenceSide: side, floors: baseLevel }, { drawing: opts.drawing });
         return;
       }
       // Different main occupant → fence co-exists alongside it.
       if (cell.kind && cell.kind !== 'fence') {
-        addCellExtra(x, z, { kind: 'fence', fenceSide: side, floors: baseLevel });
+        addCellExtra(x, z, { kind: 'fence', fenceSide: side, floors: baseLevel }, { drawing: opts.drawing });
         return;
       }
       // Empty cell → fence becomes the main kind.
