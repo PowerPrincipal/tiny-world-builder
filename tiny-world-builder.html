@@ -21891,6 +21891,13 @@
     return !!(payload && setAssetClipboard(payload));
   }
 
+  function activeTemplateClipboardPayload() {
+    const selectedTargets = selectedClipboardTargets(false);
+    if (selectedTargets.length) return makeClipboardPayload(selectedTargets);
+    const target = hoverWorldTarget(false);
+    return target && target.cell ? makeClipboardPayload([target]) : null;
+  }
+
   function clearCellForCut(x, z) {
     const cell = getWorldCell(x, z);
     if (!cell) return;
@@ -22006,14 +22013,15 @@
     if (!selectedTargets.length) {
       const target = hoverWorldTarget(false);
       if (!target || !target.cell) return false;
-      if (!setAssetClipboard(makeClipboardPayload([target]))) return false;
-      return pasteClipboardAtTarget({ x: target.x + 1, z: target.z, userEdited: isOutsideHomeGrid(target.x + 1, target.z) });
+      const payload = makeClipboardPayload([target]);
+      if (!payload) return false;
+      return pasteClipboardPayloadAtTarget(payload, { x: target.x + 1, z: target.z, userEdited: isOutsideHomeGrid(target.x + 1, target.z) });
     }
     const payload = makeClipboardPayload(selectedTargets);
-    if (!payload || !setAssetClipboard(payload)) return false;
+    if (!payload) return false;
     const maxX = Math.max(...selectedTargets.map(t => t.x));
     const minZ = Math.min(...selectedTargets.map(t => t.z));
-    return pasteClipboardAtTarget({ x: maxX + 1, z: minZ, userEdited: selectedTargets.some(t => isOutsideHomeGrid(t.x, t.z)) });
+    return pasteClipboardPayloadAtTarget(payload, { x: maxX + 1, z: minZ, userEdited: selectedTargets.some(t => isOutsideHomeGrid(t.x, t.z)) });
   }
 
   function shiftSelectedCellIntent(dx, dz) {
@@ -22090,13 +22098,14 @@
   }
 
   function saveActiveSelectionTemplate() {
-    if (!copyActiveCellIntent() || !assetClipboard) return false;
+    const payload = activeTemplateClipboardPayload();
+    if (!payload) return false;
     const templates = loadAssetTemplates();
     templates.unshift({
       id: 'template-' + Date.now().toString(36),
-      name: assetTemplateNameForClipboard(assetClipboard),
+      name: assetTemplateNameForClipboard(payload),
       createdAt: Date.now(),
-      clipboard: assetClipboard,
+      clipboard: payload,
     });
     saveAssetTemplates(templates);
     updateStampBuilderSummary();

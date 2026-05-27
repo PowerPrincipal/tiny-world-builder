@@ -25,7 +25,9 @@ Clipboard and templates:
 - The asset clipboard shape is `{ version, origin, size, cells: [{ dx, dz, cell }] }`.
 - Build clipboard cells with `cloneCellIntent()` so terrain, terrain height, kind, floors, building type, fence side, extras, rotation, `offsetX/Y/Z`, appearance, and `waterFlow` survive copy/paste and saved templates.
 - Template saves live under `tinyworld:asset-templates.v1` in `localStorage`. Keep these world-intent templates separate from model stamps and voxel build stamps.
+- Saving a template should build a one-shot clipboard payload from the active selection/hover target and must not overwrite the user's explicit copy/cut clipboard.
 - Pasting or duplicating a multi-cell clipboard should call `replaceWorldCoords()` with placed cells so the pasted region stays selected for immediate follow-up edits.
+- Duplicating selected cells should use a one-shot payload and must not overwrite the user's explicit copy/cut clipboard.
 - Moving selected cells between board tiles should reuse the clipboard payload shape internally but must not overwrite the user's explicit copy/cut clipboard.
 - Paste actions should target the hovered cell first, then fall back to the selected region origin. Clear stale hover when the pointer leaves the canvas so this fallback remains reachable. The latest-template shortcut should paste the loaded template, not just stage it in memory.
 - Saved asset templates should also surface in the Stamps panel under `Templates`; selecting one loads its clipboard and clicking the board places it through the normal paste path.
