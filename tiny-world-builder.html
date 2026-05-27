@@ -30362,6 +30362,7 @@
       if (rowKey === 'selectionAction') {
         if (value === 'copy') copyActiveCellIntent();
         else if (value === 'cut') cutActiveCellIntent();
+        else if (value === 'delete') deleteActiveCellIntent();
         else if (value === 'paste') pasteClipboardAtActiveTarget();
         else if (value === 'duplicate') duplicateActiveCellIntent();
         else if (value === 'save-template') saveActiveSelectionTemplate();
@@ -30572,6 +30573,7 @@
       addRow('Edit', { key: 'selectionAction', label: 'Actions', options: [
         { label: 'Copy', value: 'copy' },
         { label: 'Cut', value: 'cut' },
+        { label: 'Delete', value: 'delete' },
         { label: 'Paste', value: 'paste' },
         { label: 'Duplicate', value: 'duplicate' },
         { label: 'Save template', value: 'save-template' },

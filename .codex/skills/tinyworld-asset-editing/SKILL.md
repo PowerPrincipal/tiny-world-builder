@@ -30,6 +30,7 @@ Clipboard and templates:
 - Template cards in Stamps should provide a delete control that removes the `localStorage` entry, refreshes Stamps counts/cards, and clears stale selected-template tool state.
 - Saved template names should summarize their copied cell contents so template cards stay readable and searchable without a separate naming dialog.
 - `Delete`/`Backspace` should clear the active selection or hovered cell without writing to the asset clipboard; keep this separate from cut/copy semantics.
+- The selection properties `Actions` row should expose the same non-clipboard Delete path so mouse users can clear selected assets without using Cut.
 - Keyboard tile moves should keep selection behavior consistent with the property panel: `Shift+Arrow` shifts selected cells through the internal move path without replacing the user's explicit clipboard, while arrows without an active selection keep camera/ghost behavior.
 
 Selection properties:
