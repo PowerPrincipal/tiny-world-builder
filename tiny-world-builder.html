@@ -21684,14 +21684,12 @@
     return true;
   }
 
-  function pasteClipboardAtTarget(target, opts = {}) {
-    if (!assetClipboard && copiedHoverCell) {
-      setAssetClipboard(makeClipboardPayload([{ x: 0, z: 0, cell: copiedHoverCell }]));
-    }
-    if (!assetClipboard || !assetClipboard.cells || !assetClipboard.cells.length) return false;
+  function pasteClipboardPayloadAtTarget(payload, target, opts = {}) {
+    const cells = normalizeClipboardCells(payload && payload.cells);
+    if (!cells.length) return false;
     if (!target) return false;
     const placed = [];
-    assetClipboard.cells.forEach(item => {
+    cells.forEach(item => {
       const x = target.x + item.dx;
       const z = target.z + item.dz;
       const next = cloneCellIntent(item.cell);
@@ -21708,6 +21706,14 @@
       window.__tinyworldSelection.replaceWorldCoords(placed);
     }
     return placed.length > 0;
+  }
+
+  function pasteClipboardAtTarget(target, opts = {}) {
+    if (!assetClipboard && copiedHoverCell) {
+      setAssetClipboard(makeClipboardPayload([{ x: 0, z: 0, cell: copiedHoverCell }]));
+    }
+    if (!assetClipboard || !assetClipboard.cells || !assetClipboard.cells.length) return false;
+    return pasteClipboardPayloadAtTarget(assetClipboard, target, opts);
   }
 
   function pasteHoveredCellIntent() {
@@ -21742,6 +21748,20 @@
     const maxX = Math.max(...selectedTargets.map(t => t.x));
     const minZ = Math.min(...selectedTargets.map(t => t.z));
     return pasteClipboardAtTarget({ x: maxX + 1, z: minZ, userEdited: selectedTargets.some(t => isOutsideHomeGrid(t.x, t.z)) });
+  }
+
+  function shiftSelectedCellIntent(dx, dz) {
+    const selectedTargets = selectedClipboardTargets(true);
+    if (!selectedTargets.length) return false;
+    const payload = makeClipboardPayload(selectedTargets);
+    if (!payload || !payload.cells || !payload.cells.length) return false;
+    selectedTargets.forEach(({ x, z }) => clearCellForCut(x, z));
+    const target = {
+      x: (payload.origin && Number.isFinite(payload.origin.x) ? payload.origin.x : Math.min(...selectedTargets.map(t => t.x))) + dx,
+      z: (payload.origin && Number.isFinite(payload.origin.z) ? payload.origin.z : Math.min(...selectedTargets.map(t => t.z))) + dz,
+      userEdited: selectedTargets.some(t => isOutsideHomeGrid(t.x, t.z) || isOutsideHomeGrid(t.x + dx, t.z + dz)),
+    };
+    return pasteClipboardPayloadAtTarget(payload, target, { animate: true, impactDust: true });
   }
 
   function loadAssetTemplates() {
@@ -30234,6 +30254,14 @@
         if (sel && sel.rotate) sel.rotate(value === 'left' ? -Math.PI / 2 : Math.PI / 2);
         return;
       }
+      if (rowKey === 'selectionMove') {
+        if (value === 'west') shiftSelectedCellIntent(-1, 0);
+        else if (value === 'east') shiftSelectedCellIntent(1, 0);
+        else if (value === 'north') shiftSelectedCellIntent(0, -1);
+        else if (value === 'south') shiftSelectedCellIntent(0, 1);
+        renderSelection();
+        return;
+      }
       if (rowKey === 'objectScale') {
         scaleSelectedBoardObject(value === 'down' ? 0.85 : 1.18);
         return;
@@ -30431,6 +30459,12 @@
         { label: 'Left', value: 'left' },
         { label: 'Right', value: 'right' },
       ] });
+      addRow('Transform', { key: 'selectionMove', label: 'Shift', options: [
+        { label: 'West', value: 'west' },
+        { label: 'East', value: 'east' },
+        { label: 'North', value: 'north' },
+        { label: 'South', value: 'south' },
+      ] });
       if (selectedTargets.length) {
         addRows('Transform', [
           { key: 'objectScale', label: 'Scale', options: [
@@ -30449,7 +30483,7 @@
             { label: 'Down', value: 'down' },
             { label: 'Up', value: 'up' },
           ] },
-          { key: 'objectMove', label: 'Move', options: [
+          { key: 'objectMove', label: 'Nudge', options: [
             { label: 'X-', value: 'x-' },
             { label: 'X+', value: 'x+' },
             { label: 'Y-', value: 'y-' },
