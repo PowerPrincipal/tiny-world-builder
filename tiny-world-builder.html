@@ -20786,6 +20786,7 @@
     const variant = selectedTool.activeVariant;
     const requested = variant && variant.fenceSide;
     if (requested && requested !== 'auto') return normalizeFenceSide(requested);
+    if (cell && cell.drawFenceSide) return normalizeFenceSide(cell.drawFenceSide);
     if (!cell || !Number.isFinite(cell.localX) || !Number.isFinite(cell.localZ)) return 'n';
     const d = [
       { side: 'w', value: Math.abs(cell.localX + 0.5) },
@@ -21177,7 +21178,20 @@
     return { x: hit.x + bx * GRID, z: hit.z + bz * GRID };
   }
 
-  function drawHitFromWorldCoord(x, z, sourceHit) {
+  function drawFenceSideForStep(from, to, sourceHit) {
+    if (!from || !to) return null;
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    if (!dx && !dz) return null;
+    const localX = sourceHit && Number.isFinite(sourceHit.localX) ? sourceHit.localX : 0;
+    const localZ = sourceHit && Number.isFinite(sourceHit.localZ) ? sourceHit.localZ : 0;
+    if (Math.abs(dx) > Math.abs(dz)) return localZ < 0 ? 'n' : (localZ > 0 ? 's' : 'n');
+    if (Math.abs(dz) > Math.abs(dx)) return localX < 0 ? 'w' : (localX > 0 ? 'e' : 'w');
+    if (Math.abs(localX) > Math.abs(localZ)) return localX < 0 ? 'w' : 'e';
+    return localZ < 0 ? 'n' : 's';
+  }
+
+  function drawHitFromWorldCoord(x, z, sourceHit, drawFenceSide = null) {
     const boardX = floorDiv(x, GRID);
     const boardZ = floorDiv(z, GRID);
     const lx = positiveMod(x, GRID);
@@ -21192,6 +21206,7 @@
       worldZ: p.z,
       localX: sourceHit && Number.isFinite(sourceHit.localX) ? sourceHit.localX : 0,
       localZ: sourceHit && Number.isFinite(sourceHit.localZ) ? sourceHit.localZ : 0,
+      drawFenceSide,
     };
   }
 
@@ -21213,10 +21228,14 @@
       const dx = coord.x - drawLastWorldCoord.x;
       const dz = coord.z - drawLastWorldCoord.z;
       const steps = Math.max(Math.abs(dx), Math.abs(dz));
+      let prevCoord = drawLastWorldCoord;
       for (let i = 1; i <= steps; i++) {
         const x = Math.round(drawLastWorldCoord.x + dx * (i / steps));
         const z = Math.round(drawLastWorldCoord.z + dz * (i / steps));
-        changed = applyDrawToolToSingleHit(drawHitFromWorldCoord(x, z, hit)) || changed;
+        const stepCoord = { x, z };
+        const drawFenceSide = drawFenceSideForStep(prevCoord, stepCoord, hit);
+        changed = applyDrawToolToSingleHit(drawHitFromWorldCoord(x, z, hit, drawFenceSide)) || changed;
+        prevCoord = stepCoord;
       }
     } else {
       changed = applyDrawToolToSingleHit(hit);
