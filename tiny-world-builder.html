@@ -21686,12 +21686,50 @@
     try { localStorage.setItem(ASSET_TEMPLATES_LS, JSON.stringify((list || []).slice(0, 20))); } catch (_) {}
   }
 
+  function assetTemplateCellLabel(cell) {
+    if (!cell) return 'cell';
+    if (cell.kind === 'house') {
+      const shape = cell.buildingType || 'house';
+      return shape === 'turret' ? 'castle' : shape;
+    }
+    if (cell.kind === 'model-stamp') {
+      const asset = getModelStamp(cell.appearance && cell.appearance.modelStampId);
+      return asset ? asset.label : 'model';
+    }
+    if (cell.kind === 'voxel-build') {
+      const stamp = getVoxelBuildStamp(cell.appearance && cell.appearance.voxelBuildId);
+      return stamp ? stamp.name : 'voxel build';
+    }
+    if (cell.kind) return cell.kind;
+    return cell.terrain || 'terrain';
+  }
+
+  function assetTemplateNameForClipboard(clipboard) {
+    const cells = normalizeClipboardCells(clipboard && clipboard.cells);
+    if (!cells.length) return 'Template';
+    const counts = new Map();
+    cells.forEach(item => {
+      const label = assetTemplateCellLabel(item.cell);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    const labels = Array.from(counts.entries())
+      .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+      .slice(0, 3)
+      .map(([label, count]) => {
+        const title = label.charAt(0).toUpperCase() + label.slice(1);
+        return count > 1 ? count + ' ' + title : title;
+      });
+    const base = labels.join(' + ');
+    const countPrefix = cells.length > 1 ? cells.length + '-cell ' : '';
+    return countPrefix + base;
+  }
+
   function saveActiveSelectionTemplate() {
     if (!copyActiveCellIntent() || !assetClipboard) return false;
     const templates = loadAssetTemplates();
     templates.unshift({
       id: 'template-' + Date.now().toString(36),
-      name: 'Template ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      name: assetTemplateNameForClipboard(assetClipboard),
       createdAt: Date.now(),
       clipboard: assetClipboard,
     });

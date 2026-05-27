@@ -25,6 +25,7 @@ Clipboard and templates:
 - Pasting or duplicating a multi-cell clipboard should call `replaceWorldCoords()` with placed cells so the pasted region stays selected for immediate follow-up edits.
 - Paste actions should target the hovered cell first, then fall back to the selected region origin. Clear stale hover when the pointer leaves the canvas so this fallback remains reachable. The latest-template shortcut should paste the loaded template, not just stage it in memory.
 - Saved asset templates should also surface in the Stamps panel under `Templates`; selecting one loads its clipboard and clicking the board places it through the normal paste path.
+- Saved template names should summarize their copied cell contents so template cards stay readable and searchable without a separate naming dialog.
 
 Selection properties:
 
