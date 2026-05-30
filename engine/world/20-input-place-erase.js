@@ -149,6 +149,7 @@
   }
 
   function applyTool(x, z, opts = {}) {
+    if (window.__flightActive) return;
     if (selectedTool.mooring) return;
     if (selectedTool.island) {
       createEditableIsland(nextEditableIslandPosition(currentHover));
@@ -900,7 +901,21 @@
         && dragMode !== 'pinch' && dragMode !== 'engine-select' && dragMode !== 'transform-gizmo') {
       const hit = pointerDownHit;
       const mods = pointerDownMods;
-      if (mods.meta && mods.shift) {
+      // A placed plane is interactive: a plain (unmodified) click on it opens
+      // the Enter / Fly menu regardless of the active tool — you still remove it
+      // with the eraser. This must come before the place/select branches so a
+      // click on a plane never stacks/replaces it.
+      const _planeWX = hit ? hit.x + (hit.boardX || 0) * GRID : 0;
+      const _planeWZ = hit ? hit.z + (hit.boardZ || 0) * GRID : 0;
+      const _clickedPlane = hit && !mods.shift && !mods.meta
+        && selectedTool && !selectedTool.erase
+        && world[_planeWX] && world[_planeWX][_planeWZ]
+        && typeof isFlyableStampCell === 'function'
+        && isFlyableStampCell(world[_planeWX][_planeWZ]);
+      if (_clickedPlane && typeof showFlightMenu === 'function') {
+        showFlightMenu(_planeWX, _planeWZ, e.clientX, e.clientY);
+        if (selectedTool.select) { setRectangleSelection(hit, hit, 'replace'); lastSelectionAnchor = hit; }
+      } else if (mods.meta && mods.shift) {
         // Cmd/Ctrl+Shift+click → toggle one cell on/off (discontiguous).
         if (hit) { toggleCellSelection(hit); lastSelectionAnchor = hit; }
       } else if (mods.shift) {

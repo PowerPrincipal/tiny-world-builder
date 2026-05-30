@@ -51,10 +51,6 @@
         <span id="minimap-fps" data-tooltip="Frames per second">60 fps</span>
         <button type="button" class="minimap-toggle" id="minimap-toggle" aria-label="Toggle map" title="Hide/show map (N)">–</button>
       </div>
-      <label class="minimap-autoexpand is-disabled" for="minimap-autoexpand" data-tooltip="Coming Soon" aria-disabled="true">
-        <span>Autoexpand</span>
-        <input id="minimap-autoexpand" type="checkbox" disabled aria-disabled="true" />
-      </label>
     </div>
   </div>
 
@@ -833,6 +829,10 @@
                 <option value="16">16 × 16</option>
               </select>
             </label>
+            <label class="gen-check" data-settings-keywords="toolbar groups blocks palette floating panel tools dock">
+              <input type="checkbox" id="toolbar-show-groups" checked />
+              <span>Show groups <em class="gen-hint">off swaps the grouped toolbar for a floating palette of every block</em></span>
+            </label>
             <div class="settings-section-title sponsors-title">Thanks to our partners and sponsors</div>
             <div class="sponsors-logos">
               <a href="https://x.com/Autoincentiv3" target="_blank" rel="noopener noreferrer" class="sponsor-logo" aria-label="Autoincentive on X">
@@ -1297,6 +1297,14 @@
   <div class="toolbar" id="toolbar"></div>
   <div class="flyout" id="flyout" hidden></div>
 
+  <!-- Floating block palette — shown when "Show groups" is off. A resizable,
+       draggable panel holding every placeable block; the grid reflows to a
+       square grid as it is resized. -->
+  <div class="tool-palette" id="tool-palette" hidden>
+    <div class="tool-palette-head" id="tool-palette-head" aria-label="Drag to move blocks panel"></div>
+    <div class="tool-palette-grid" id="tool-palette-grid"></div>
+  </div>
+
 
   <!-- Command palette ⌘K -->
   <div class="palette-overlay" id="palette-overlay" hidden>
@@ -1386,6 +1394,7 @@
   <script src="engine/world/32-layers-panel.js"></script>
   <script src="engine/world/33-radial-menu.js"></script>
   <script src="engine/world/34-flight-sim.js"></script>
+  <script src="engine/world/35-tool-palette.js"></script>
   <script src="engine/world/99-late-boot.js"></script>
 </body>
 </html>

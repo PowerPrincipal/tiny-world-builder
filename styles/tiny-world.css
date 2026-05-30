@@ -431,6 +431,7 @@
   body.xr-active .xr-status { color: rgba(255, 255, 255, 0.86); }
   body.xr-active .brand,
   body.xr-active .world-pill,
+  body.xr-active .tool-palette,
   body.xr-active .brand-banner,
   body.xr-active .controls,
   body.xr-active .toolbar,
@@ -1401,7 +1402,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--ink);
+    /* White body so the icon reads as "dark coloured outline, inner white". */
+    color: #fff;
+    --glyph-outline: #2f3b57;
     pointer-events: none;
   }
   .tool .tool-glyph svg {
@@ -1409,8 +1412,23 @@
     height: 26px;
     display: block;
     fill: currentColor;
-    stroke: none;
+    overflow: visible;
   }
+  /* Dark outline in a darkened version of the icon's category colour, drawn
+     under the white fill (paint-order: stroke) at a constant pixel width
+     (non-scaling-stroke) so it looks identical across every glyph viewBox. */
+  .tool .tool-glyph svg * {
+    fill: currentColor;
+    stroke: var(--glyph-outline);
+    stroke-width: 2.1;
+    vector-effect: non-scaling-stroke;
+    paint-order: stroke;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .tool[data-pos-type="terrain"]  .tool-glyph { --glyph-outline: #3a571f; }
+  .tool[data-pos-type="primary"]  .tool-glyph { --glyph-outline: #304878; }
+  .tool[data-pos-type="tertiary"] .tool-glyph { --glyph-outline: #8a5416; }
   .flyout-tool .tool-glyph { width: 42px; height: 42px; }
   .flyout-tool .tool-glyph svg { width: 34px; height: 34px; }
   .tool .tool-glyph.tool-glyph-empty {
@@ -1435,12 +1453,28 @@
 
   /* Selected-tool indicator: the active group button shows the selected tool's
      own glyph (filled) plus a ring tinted by its positional type. */
+  .group-icon.group-icon-glyph {
+    color: #fff;
+    --glyph-outline: #2f3b57;
+  }
   .group-icon.group-icon-glyph svg {
     width: 32px;
     height: 32px;
     fill: currentColor;
-    stroke: none;
+    overflow: visible;
   }
+  .group-icon.group-icon-glyph svg * {
+    fill: currentColor;
+    stroke: var(--glyph-outline);
+    stroke-width: 2.1;
+    vector-effect: non-scaling-stroke;
+    paint-order: stroke;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .tool-group-btn[data-pos-type="terrain"]  .group-icon-glyph { --glyph-outline: #3a571f; }
+  .tool-group-btn[data-pos-type="primary"]  .group-icon-glyph { --glyph-outline: #304878; }
+  .tool-group-btn[data-pos-type="tertiary"] .group-icon-glyph { --glyph-outline: #8a5416; }
   .toolbar .tool-group-btn[data-pos-type="terrain"].active  { box-shadow: 0 0 0 2px rgba(122, 170, 72, 0.66) inset, 0 1px 2px rgba(20,30,50,0.06); }
   .toolbar .tool-group-btn[data-pos-type="primary"].active  { box-shadow: 0 0 0 2px rgba(58, 114, 200, 0.6) inset, 0 1px 2px rgba(20,30,50,0.06); }
   .toolbar .tool-group-btn[data-pos-type="tertiary"].active { box-shadow: 0 0 0 2px rgba(214, 142, 54, 0.66) inset, 0 1px 2px rgba(20,30,50,0.06); }
@@ -1528,7 +1562,8 @@
     color: var(--ink);
   }
   .toolbar .tool-group-btn .group-icon svg,
-  .toolbar .tool .tool-icon svg {
+  .toolbar .tool .tool-icon svg,
+  .tool-palette .tool .tool-icon svg {
     width: 32px;
     height: 32px;
     display: block;
@@ -1538,6 +1573,7 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  .tool-palette .tool .tool-icon { color: var(--ink); }
   .toolbar .tool-group-btn[data-group="terrain"]::before {
     -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'><path d='M3 19.5 9.2 7.7l4.1 7.1 2.3-3.2 5.4 7.9Z'/><path d='m9.2 7.7 2.2 3.7'/></svg>");
     mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'><path d='M3 19.5 9.2 7.7l4.1 7.1 2.3-3.2 5.4 7.9Z'/><path d='m9.2 7.7 2.2 3.7'/></svg>");
@@ -1751,6 +1787,117 @@
   .flyout.open > *:nth-child(6) { transition-delay: 0.15s; }
   .flyout.open > *:nth-child(7) { transition-delay: 0.17s; }
   .flyout.open > *:nth-child(n+8) { transition-delay: 0.19s; }
+  /* Group popout: a compact 2-row block of icons instead of one long row.
+     Column count is set inline (ceil(n/2)) in renderToolGroupFlyout. */
+  .flyout.tool-menu {
+    display: grid;
+    grid-auto-flow: row;
+    gap: 4px;
+    align-content: start;
+    justify-content: center;
+  }
+
+  /* Floating block palette — shown when "Show groups" is off. */
+  body.hide-groups .toolbar { display: none; }
+  .tool-palette {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 13;
+    width: 320px;
+    height: 208px;
+    min-width: 104px;
+    min-height: 120px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    padding: 4px 6px 8px;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.85) inset,
+      0 -1px 0 rgba(120, 130, 150, 0.10) inset,
+      0 1px 2px rgba(20, 30, 50, 0.05),
+      0 12px 36px -12px rgba(40, 50, 80, 0.22);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    overflow: hidden;
+    resize: both;
+  }
+  .tool-palette[hidden] { display: none; }
+  .tool-palette-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 4px 4px;
+    cursor: grab;
+    user-select: none;
+  }
+  /* Grab cue in place of the old title. */
+  .tool-palette-head::after {
+    content: '';
+    width: 28px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(120, 130, 150, 0.35);
+  }
+  .tool-palette.dragging .tool-palette-head { cursor: grabbing; }
+  .tool-palette-grid {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 64px);
+    grid-auto-rows: 62px;
+    gap: 4px;
+    justify-content: center;
+    align-content: start;
+    scrollbar-width: thin;
+  }
+  /* The palette reuses .flyout-tool blocks, but they live outside .flyout, so
+     restate the sizing the .flyout-scoped rule would otherwise give them. */
+  .tool-palette .tool.flyout-tool {
+    width: 62px;
+    height: 60px;
+    font-size: 10.5px;
+    padding: 1px 3px 5px;
+    justify-content: flex-start;
+    gap: 1px;
+    border-color: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) inset;
+  }
+
+  /* Outline the block square itself to match the glyph: a dark border in the
+     icon's darkened category colour + an inner white line. */
+  .tool.flyout-tool[data-pos-type="terrain"],
+  .tool[data-pos-type="terrain"] {
+    border: 1.5px solid #3a571f;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.92),
+      inset 0 -3px 0 rgba(58, 87, 31, 0.22),
+      0 2px 3px -1px rgba(20, 30, 50, 0.22);
+  }
+  .tool.flyout-tool[data-pos-type="primary"],
+  .tool[data-pos-type="primary"] {
+    border: 1.5px solid #304878;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.92),
+      inset 0 -3px 0 rgba(48, 72, 120, 0.22),
+      0 2px 3px -1px rgba(20, 30, 50, 0.22);
+  }
+  .tool.flyout-tool[data-pos-type="tertiary"],
+  .tool[data-pos-type="tertiary"] {
+    border: 1.5px solid #8a5416;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.92),
+      inset 0 -3px 0 rgba(138, 84, 22, 0.22),
+      0 2px 3px -1px rgba(20, 30, 50, 0.22);
+  }
   /* The tool-group bottom dock also gets a subtle press feel matching
      OWB's dock-btn.  Existing icons keep their thumbnails; only the
      active-state indicator gets the OWB accent underline. */
@@ -1791,11 +1938,10 @@
     line-height: 1;
     margin: 0;
   }
-  /* Flyout: hide the kbd by default and swap label ↔ kbd on hover so the
-     button stays one line tall. */
-  .flyout .tool.flyout-tool kbd { display: none; }
-  .flyout .tool.flyout-tool:hover > span:not(.chev) { display: none; }
-  .flyout .tool.flyout-tool:hover kbd { display: inline-block; }
+  /* Block buttons (popout + palette): drop the keyboard shortcut entirely
+     and keep a bold label, no hover swap. */
+  .tool.flyout-tool kbd { display: none; }
+  .tool.flyout-tool > span:not(.chev) { font-weight: 800; }
   .flyout[hidden] { display: none; }
   .flyout-item {
     min-width: 56px;
@@ -2988,6 +3134,7 @@
   body.showcase .brand,
   body.showcase .controls,
   body.showcase .world-pill,
+  body.showcase .tool-palette,
   body.showcase .brand-banner,
   body.showcase .toolbar,
   body.showcase .audio-panel,

@@ -53,6 +53,14 @@ Interaction rules:
 - Preview board meshes must not set `userData.gx/gz` on their tile/object
   roots in a way that lets them be edited.
 - Right-drag pans. Space+drag pans. Left-drag orbits.
+- Panning is **unrestricted**: `clampTargetToHomeBoard()` is no longer called
+  from the pan paths (`panCameraByPixels`/`panCameraByCells` in
+  `02-cameras-lighting.js`) or the minimap click-to-go (`30-ui-boot-wiring.js`),
+  so the camera target can move anywhere regardless of Autoexpand. The clamp
+  helper is retained only for the explicit Autoexpand-OFF reset (which recenters
+  to the home board). Note: with Autoexpand off, panning beyond the home board
+  shows empty water/sky because `maybeEnsureGhostBoardsAroundTarget` early-returns
+  when `renderAutoExpand` is false — turn Autoexpand on to reveal preview boards.
 
 The home board has a thin dark ground-line border (see
 `buildHomeBorder()` in the *home board border* section) so the user can

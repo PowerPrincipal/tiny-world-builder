@@ -5,10 +5,23 @@ Guidance for AI coding agents working in this repo. Read this before touching
 
 ## Project shape
 
-- Main app: `tiny-world-builder.html`. Inline CSS in `<style>`, inline JS in a
-  single `<script>` block at the bottom. Three.js **r128** and GLTFLoader are
-  self-hosted under `vendor/three/` and copied to `dist/` by `publish.sh`.
-  Vercel (`vercel.json`) and Netlify (`netlify.toml`) both use that same static
+- Main app: `tiny-world-builder.html` — a ~1.4k-line HTML shell (boot config,
+  DOM, and the ordered `<script src>` tags at the bottom). It is **no longer a
+  single file**: styles live in `styles/tiny-world.css` (~5.2k lines) and the
+  logic is split into ordered modules under `engine/world/00..34 + 99-*.js`
+  (~37k lines across 36 files), plus the LandscapeEngine (`LandscapeEngine.js`
+  ~1.6k lines + `engine/landscape/*.js`). Total JS is ~40k lines.
+- The `engine/world/*.js` modules are **plain classic `<script>`s that all share
+  one global scope** (the 2-space indent is cosmetic, left over from the old
+  god-file). Two consequences: (1) load **order** matters; (2) every top-level
+  `const`/`let`/`function` name must be **unique across all modules** — a
+  duplicate identifier throws `SyntaxError: Identifier 'X' has already been
+  declared` and silently kills the *entire* module at instantiation (its globals
+  never appear) while other modules keep loading. Prefix module-local scratch
+  globals (e.g. flight uses `_fl…`).
+- Three.js **r128** and GLTFLoader are self-hosted under `vendor/three/`.
+  `publish.sh` copies the whole `engine/` tree, `styles/`, and `vendor/` into
+  `dist/`. Vercel (`vercel.json`) and Netlify (`netlify.toml`) use that static
   build output.
 - No bundler and no npm runtime dependencies. Use `npm test` for static checks,
   `npm run build` for dist generation, then reload the browser.
@@ -37,6 +50,8 @@ Guidance for AI coding agents working in this repo. Read this before touching
   - `.codex/skills/tinyworld-runtime-state` — persisted localStorage, defaults pipeline (`tinyworld-defaults.json` + `/api/save-defaults`), audio, camera, panel positions, inline-script gotcha.
   - `.codex/skills/tinyworld-island-and-planes` — home island layout, sponsor banner drape, plane/crop-duster flight curves, "front" side conventions.
   - `.codex/skills/tinyworld-tool-icons-and-modes` — mode indicator, boot-to-Select, Esc-to-Select.
+  - `.codex/skills/tinyworld-block-button-style` — locked-in "block" button aesthetic: raised square, dark category-colored outline + inner white line, white-bodied outlined glyph. Use for any new icon button/tile.
+  - `.codex/skills/tinyworld-flight-sim` — flyable plane. The plane is the existing **`stunt-plane` model-stamp** (`models/stunt_plane.glb`) placed via the **Stamps** system (NOT a bespoke tool/kind). A plain click on the placed stamp opens an Enter/Fly menu; flight uses a rear chase-cam + the ported ships physics (sim-space → scene similarity transform); Escape exits.
 
 ## House style
 
@@ -46,7 +61,7 @@ Guidance for AI coding agents working in this repo. Read this before touching
 - Section comments are `// -------- name --------` and they matter — keep
   related code grouped under them. If you add a new system, give it its own
   section header.
-- Boring obvious code over clever. The app is now feature-rich (~29k LoC), so
+- Boring obvious code over clever. The app is now feature-rich (~37k LoC of modular JS), so
   prefer small, well-sectioned changes over clever abstractions.
 
 ## Mental model

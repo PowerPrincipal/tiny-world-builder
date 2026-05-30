@@ -1214,8 +1214,15 @@
       const visible = renderCullCellVisible(x, z);
       if (!visible) renderCullStats.cells++;
       setRenderCullVisible(entry.tile, visible);
-      setRenderCullOpacity(entry.object, topOpacity);
-      setRenderCullVisible(entry.object, visible && topVisible);
+      // The plane currently being flown leaves its home cell's footprint; the
+      // chase cam follows it off-board, so its cell would cull. Keep it shown.
+      if (window.__flightActive && entry.object && entry.object === window.__flightJet) {
+        setRenderCullOpacity(entry.object, 1);
+        setRenderCullVisible(entry.object, true);
+      } else {
+        setRenderCullOpacity(entry.object, topOpacity);
+        setRenderCullVisible(entry.object, visible && topVisible);
+      }
       if (entry.extras) {
         for (const extra of entry.extras) {
           setRenderCullOpacity(extra, topOpacity);

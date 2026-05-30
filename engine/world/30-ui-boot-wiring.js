@@ -1053,7 +1053,6 @@
       target.x = worldPoint.x;
       target.z = worldPoint.z;
       expandVisibleSizeOnFirstMove();
-      clampTargetToHomeBoard();
       updateCamera();
       if (renderAutoExpand) ensureGhostBoardsAroundTarget();
       requestMinimapRepaint();

@@ -1180,7 +1180,7 @@
 
   function toolbarIconSvg(id) {
     const icons = {
-      select: '<svg viewBox="0 0 24 24"><path d="M4 3.5 18.8 11l-6.2 1.6-3.1 6.2Z"/></svg>',
+      select: '<svg viewBox="0 0 24 24"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg>',
       erase: '<svg viewBox="0 0 24 24"><path d="M4 6.5h16"/><path d="M9 6.5V4.7c0-.9.7-1.6 1.6-1.6h2.8c.9 0 1.6.7 1.6 1.6v1.8"/><path d="m18.5 6.5-.8 13.1c-.1.8-.8 1.4-1.6 1.4H7.9c-.8 0-1.5-.6-1.6-1.4L5.5 6.5"/><path d="M10 11v5.5"/><path d="M14 11v5.5"/></svg>',
       terrain: '<svg viewBox="0 0 24 24"><path d="M3 19.5 9.2 7.7l4.1 7.1 2.3-3.2 5.4 7.9Z"/><path d="m9.2 7.7 2.2 3.7"/></svg>',
       plants: '<svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11C8.2 10.7 6 8.4 5.4 4.5 9.2 4.8 11.4 7.1 12 11Z"/><path d="M12 13c3.7-.3 5.9-2.6 6.5-6.5-3.8.3-6 2.6-6.5 6.5Z"/><path d="M7 21h10"/></svg>',
@@ -1400,6 +1400,7 @@
     const audioPanel = document.getElementById('audio-panel');
     if (audioPanel) bar.appendChild(audioPanel);
     updateToolActiveStates();
+    if (typeof rebuildToolPaletteIfActive === 'function') rebuildToolPaletteIfActive();
     twPerfMark('toolbar:end');
   }
 
@@ -1536,11 +1537,16 @@
       }
       el.appendChild(buildToolButton(tool, { flyout: true }));
     });
+    // Lay the popout out as a compact 2-row block: columns = ceil(n / 2) so
+    // the icons fill row-major across two rows instead of one long strip.
+    const n = el.children.length;
+    el.style.gridTemplateColumns = 'repeat(' + Math.max(1, Math.ceil(n / 2)) + ', auto)';
     updateToolActiveStates();
   }
 
   function renderFlyout(el, tool) {
     el.innerHTML = '';
+    el.style.gridTemplateColumns = '';
     tool.variants.forEach(v => {
       const item = document.createElement('button');
       item.className = 'flyout-item' + (v === tool.activeVariant ? ' active' : '');

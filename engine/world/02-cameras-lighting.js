@@ -125,7 +125,6 @@
     target.addScaledVector(panRight, -dx * scale);
     target.addScaledVector(panForward, dy * scale);
     expandVisibleSizeOnFirstMove();
-    clampTargetToHomeBoard();
     updateCamera();
     maybeEnsureGhostBoardsAroundTarget();
     updateLandscapeClipBounds();
@@ -136,7 +135,6 @@
     target.x += dx;
     target.z += dz;
     expandVisibleSizeOnFirstMove();
-    clampTargetToHomeBoard();
     updateCamera();
     maybeEnsureGhostBoardsAroundTarget(true);
     updateLandscapeClipBounds();

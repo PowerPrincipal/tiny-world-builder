@@ -1,427 +1,124 @@
-[assistant turn failed before producing content]
+# CodeSurf Workspace Memory — tinyworld
 
-### Session: Article generator cron run
-- Source: OpenClaw
-- Provider: openclaw (main)
-- Updated: 2026-05-30T07:41:19.879Z
-
-USER: You are the VibeClaw Article Generator...
-
-A: [assistant turn failed before producing content]
-
-USER: You are the VibeClaw Article Generator...
-
-A: [assistant turn failed before producing content]
-
-### Session: Wallpaper generator cron run
-- Source: OpenClaw
-- Provider: openclaw (main)
-- Updated: 2026-05-30T07:39:26.393Z
-
-USER: You are the VibeClaw Wallpaper Generator...
-
-A: [assistant turn failed before producing content]
-
-USER: You are the VibeClaw Wallpaper Generator...
-
-A: [assistant turn failed before producing content]
-
-### Session: Tom Doerr tweet tracker cron run
-- Source: OpenClaw
-- Provider: openclaw (main)
-- Updated: 2026-05-30T07:39:04.978Z
-
-USER: You are the Tom Doerr tweet tracker...
-
-A: I checked the nitter RSS feed at https://nitter.net/tom_doerr/rss. The feed shows no new posts since the last check. State file updated with the current timestamp and the most-recent tweet ID.
-
-No new content to report this cycle.
-
-### Session: Skills Scout cron run
-- Source: OpenClaw
-- Provider: openclaw (main)
-- Updated: 2026-05-30T07:37:57.873Z
-
-USER: You are the VibeClaw Skills Scout...
-
-A: [assistant turn failed before producing content]
-
-USER: You are the VibeClaw Skills Scout...
-
-A: [assistant turn failed before producing content]
-
-### Session: Lead C3f78d0c Abf3 45d5 898e 27cd1d95c0d1 chat
-- Source: OpenClaw
-- Provider: openclaw (lead-c3f78d0c-abf3-45d5-898e-27cd1d95c0d1)
-- Updated: 2026-05-30T07:30:12.114Z
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs confirmed from TOOLS.md.
-
-**No concrete outcome** - no board task work.
-
-**HEARTBEAT_OK**
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs confirmed from TOOLS.md.
-
-**No concrete outcome** - no board task work.
-
-**HEARTBEAT_OK**
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs confirmed from TOOLS.md.
-
-**No concrete outcome** - no board task work.
-
-**HEARTBEAT_OK**
+Generated: 2026-05-30
 
 ---
 
-## Current file list
-
-.codesurf/
-  DREAMING.md
-.claude/
-  CLAUDE.md
-  skills/
-    codesurf-dreaming/
-      SKILL.md
-  workflows/
-    split-god-file.js
-.codex/
-  skills/
-    tinyworld-asset-editing/
-      SKILL.md
-    tinyworld-auto-batching/
-      SKILL.md
-    tinyworld-crowd-layer/
-      SKILL.md
-    tinyworld-integrations/
-      SKILL.md
-    tinyworld-island-and-planes/
-      SKILL.md
-    tinyworld-lowpoly-stylized-3d/
-      SKILL.md
-    tinyworld-lowpoly-world-prompt/
-      SKILL.md
-    tinyworld-opacity-torch/
-      SKILL.md
-    tinyworld-render-performance/
-      SKILL.md
-    tinyworld-runtime-state/
-      SKILL.md
-    tinyworld-settings/
-      SKILL.md
-    tinyworld-single-file/
-      SKILL.md
-    tinyworld-tile-variation/
-      SKILL.md
-    tinyworld-visual-qa/
-      SKILL.md
-    tinyworld-webxr/
-      SKILL.md
-engine/
-  landscape/
-    LandscapeEngine.js
-  world/
-    00-prelude.js
-    01-constants.js
-    02-camera.js
-    03-materials.js
-    04-renderer.js
-    05-lighting.js
-    06-audio.js
-    07-world-state.js
-    08-tile-factory.js
-    09-object-factory.js
-    10-set-cell.js
-    11-adjacency.js
-    12-terrain-tools.js
-    13-select-tools.js
-    14-undo-redo.js
-    15-persistence.js
-    16-save-load.js
-    17-ui-panels.js
-    18-settings.js
-    19-webxr.js
-    20-tools-palette.js
-    21-voxel-stamps.js
-    22-crowd-layer.js
-    23-integrations.js
-    24-lowpoly-import.js
-    25-animation.js
-    26-clouds.js
-    27-home-island.js
-    28-tour-mode.js
-    29-events.js
-    30-animate.js
-    31-cloud-sea.js
-    99-late-boot.js
-    assets/
-      *.js (placeholder imports only)
-styles/
-  tiny-world.css
-tiny-world-builder.html
-world.schema.json
-AGENTS.md
-...
-
-### .codesurf/DREAMING.md (previous run)
-(same as the "Existing Generated Dream Memory" section embedded above)
-
-## Recent Sessions
-
-The sessions below summarize the most recent activity in this workspace.
-
-### Session: Start with this in order: 1. State your exact goal in one sentence. 2. Tell me t
-- Source: Codex
-- Provider: codex (gpt-5.3-codex-spark)
-- Updated: 2026-05-30T11:36:58.000Z
-- Last message preview: Start with this in order: 1. State your exact goal in one sentence. 2. Tell me the repo/path and whether you want code c
+## Overview
+
+Tiny World Builder is a single-file (vanilla ES6, no bundler) 3D world editor built on Three.js r128. The app shipped as `tiny-world-builder.html` but has been progressively refactored: the main logic now lives in ~34 numbered engine modules under `engine/world/`, assembled at build time. Total codebase is approximately 38k lines. The project is deployed via Vercel and Netlify from a `dist/` directory produced by `publish.sh`.
+
+---
+
+## Durable Facts
+
+**Architecture**
+- Primary file: `tiny-world-builder.html` (~1.4k lines, mostly HTML shell and wiring after the refactor)
+- Engine modules: `engine/world/00-prelude.js` through `engine/world/99-late-boot.js` (34 modules, numbered by load order)
+- Skills: 18 `.codex/skills/tinyworld-*` SKILL.md files covering every major subsystem; `tinyworld-tool-icons-and-modes` is the newest (added 2026-05-30)
+- Extra skills: `tinyworld-ghost-world-gen` and `threejs-primitive-reconstructor` exist in `.codex/skills/` but are not yet listed in AGENTS.md routing table — open thread
+- Three.js pinned to r128; bumping is risky (shadow/material color-space changes)
+
+**Data layer contract (never break these)**
+- `world[x][z]` — intent: `{ terrain, terrainFloors, kind, floors }`
+- `cellMeshes['x,z']` — render: `{ tile: Group, object: Group|null }`
+- All mutations must go through `setCell(x, z, opts)` — direct writes to `world[x][z]` desync intent from rendering
+- Materials in `M.*` are shared; never mutate in place, clone first
+- `userData.landing` guards drop-in animations; never remove these checks
+
+**Build / test**
+- `npm test` — static checks
+- `npm run build` — generates `dist/`
+- `npm run icons` — re-bakes PNG tool icons (must run after adding new tool kinds)
+- `publish.sh` — copies `styles/`, `icons/`, and `data/` into `dist/`
+
+**Persistence**
+- Runtime state in localStorage; `twSafeSetItem` wraps all writes (surfacing quota errors)
+- World save/load via `29-persistence-api.js`; custom voxel stamps embedded in world save payload
+- Defaults pipeline: `tinyworld-defaults.json` + `/api/save-defaults`
+- URL param `?world=<same-origin-url>` loads a remote world at boot
+
+**House style**
+- Semicolons used throughout (follow existing file)
+- 2-space indent, trailing commas, single quotes
+- Section headers: `// -------- name --------`
+- No npm packages, no bundler — single-file constraint is intentional
+
+---
+
+## Active Subsystems and Recent Additions
+
+**Editable Islands (latest major feature — landed 2026-05-30)**
+- Islands now render terrain per-cell, matching home island parity (`ensureEditableIslandCellTiles`)
+- 8-slot placement workflow: hologram snapping, nearest-slot selection, hover/placement wired through `20-input-place-erase.js`
+- Radial menu (`33-radial-menu.js`) recognizes island selections and restricts to move/rotate; rebuilds ring on selection type change
+- Mooring cable routing now avoids engine hazards (`MOORING_HAZARD_CLEARANCE`, `avoidMooringHazards`)
+
+**Crowd / vehicle pathfinding (2026-05-30)**
+- BFS grid pathfinder added to `11-vehicle-crowd.js` with segment/check/simplify utilities
+- Path-biased wander routes: crowds favor road cells, avoid obstacles
+- Spawn logic prefers path cells; walkable terrain set expanded
+
+**Engine model system**
+- Shared lift-engine system (`buildHomeIslandEngines`) — home and island engines unified
+- Engine types: propeller (tinted), rocket (heavy variant), and standard
+- Selected engines now reveal the agent panel (`28-generate-panel-agent.js`)
+
+**Storage / asset utilities (2026-05-30)**
+- `twToast`, `twSafeSetItem`, `twDownloadJSON`, `twPickJSONFile` added to `00-prelude.js`
+- Asset library export/import: `exportAssetLibrary`, `importAssetLibrary`
+- Custom voxel-build stamps: `referencedVoxelBuildStamps`, `registerEmbeddedVoxelBuildStamps`
+
+**Layers panel** — `32-layers-panel.js` (clouds kept off build plane)
+
+**Radial menu** — `33-radial-menu.js`, context-sensitive ring rebuilt on selection type change
+
+**Ghost preview** — tile plates no longer cast or receive shadows
+
+**Publish** — `publish.sh` now copies `data/` to `dist/data` for same-origin world JSON
+
+---
+
+## Skill Routing Reference
+
+| Subsystem | Skill |
+|---|---|
+| Repo workflow / single-file constraints | `tinyworld-single-file` |
+| Auto palette inference / cache | `tinyworld-auto-batching` |
+| Ghost boards, panning, opacity torch | `tinyworld-opacity-torch` |
+| Repeat-click levels, terrain variation | `tinyworld-tile-variation` |
+| Selection, freehand draw, clipboard, Stamps nav | `tinyworld-asset-editing` |
+| Browser checks, visual QA | `tinyworld-visual-qa` |
+| Renderer, shadows, clouds, GPU budget | `tinyworld-render-performance` |
+| Settings modal, tabs, accessibility | `tinyworld-settings` |
+| WebXR AR/VR | `tinyworld-webxr` |
+| 2.5D crowd sprites | `tinyworld-crowd-layer` |
+| Low-poly world prompting | `tinyworld-lowpoly-world-prompt` |
+| Low-poly asset design / import | `tinyworld-lowpoly-stylized-3d` |
+| API, webhook, SSE, MCP, plugin | `tinyworld-integrations` |
+| localStorage, defaults, audio, camera | `tinyworld-runtime-state` |
+| Home island, sponsor banner, planes | `tinyworld-island-and-planes` |
+| Tool icons (PNG bake), ghost billboard, mode indicator | `tinyworld-tool-icons-and-modes` |
+
+Skills not yet in AGENTS.md routing table (may need wiring):
+- `tinyworld-ghost-world-gen`
+- `threejs-primitive-reconstructor`
+
+---
 
-USER: Tell me more
+## Open Threads
 
-A: Sure—here are a few more examples by style.
+- Two skills (`tinyworld-ghost-world-gen`, `threejs-primitive-reconstructor`) exist on disk but are absent from the AGENTS.md skill routing table
+- `fork-improvements-report.md` added 2026-05-30 — documents fork findings and recommended lifts; review pending
+- OpenClaw cron runs (VibeClaw Article Generator, Wallpaper Generator, Skills Scout) are failing repeatedly — platform-level instability in OpenClaw cron execution
+- OpenClaw `mc-gateway` session has repeated assistant turn failures; lead-agent heartbeat (Ava, board `c3f78d0c`) remains healthy
+- Tom Doerr tweet tracker blocked by X.com login wall; Nitter fallback also unavailable
+- `split-god-file.js` workflow in `.claude/workflows/` — purpose/status not confirmed in recent sessions
 
-**Python (automation)**
-1. Parse a CSV and compute totals:
-2. Use `requests` with timeout/retry backoff.
-3. Wrap long scripts with `if __name__ == "__main__":`.
+---
 
-**Shell**
-1. Use `rg` instead of `grep` for fast code search.
-2. Use `find . -maxdepth 2 -name "*.py"` for scoped file listing.
-3. Combine commands with `set -euo pipefail` in scripts.
+## Memory Notes
 
-**Git workflow**
-1. `git status` to see changed files before committing.
-2. `git restore -s HEAD -- path`…
-
-USER: Summarize this
-
-A: You asked for more examples, and I gave quick examples in three areas:
-
-- **Python**: list comprehensions, `pathlib`, `dataclasses`, CSV parsing totals, `requests` with timeout/retries, and using `if __name__ == "__main__":`.
-- **Shell**: `rg` over `grep`, scoped file search with `find`, and safer scripts with `set -euo pipefail`.
-- **Git/workflow**: check status before changes, revert one file safely, and keep commits small/single-purpose.
-
-I also offered to tailor examples to a specific stack…
-
-USER: What should I do first?
-
-A: Start with this in order:
-
-1. State your exact goal in one sentence.
-2. Tell me the repo/path and whether you want code changes or just advice.
-3. Provide current branch/status if relevant (`git status`, failing command, or error message).
-
-I can then give you the first safe action immediately.
-
-### Session: Received.
-- Source: Codex
-- Provider: codex (gpt-5.5)
-- Updated: 2026-05-30T11:36:03.000Z
-- Last message preview: Received.
-
-USER: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/hermes-agent/agent-core-rs
-
-<INSTRUCTIONS>
-## Non-Negotiable Rules
-
-1. Check model validity before making assumptions about 2026-era model releases or identifiers.
-2. Never use emoji unless the user explicitly asks for them.
-
-## Model Handling
-
-- Verify model names and availability from the local codebase or official sources before claiming a model is invalid, unknown, or unsupported.
-- If the user says a model exists in their environm…
-
-USER: [system]
-# Hermes Soul
-# Hermes Agent Persona
-
-<!--
-This file defines the agent's personality and tone.
-The agent will embody whatever you write here.
-Edit this to customize how Hermes communicates with you.
-
-Examples:
-  - "You are a warm, playful assistant who uses kaomoji occasionally."
-  - "You are a concise technical expert. No fluff, just facts."
-  - "You speak like a friendly coworker who happens to know everything."
-
-This file is loaded fresh each message -- no restart needed.
-Delete the…
-
-A: Hello.
-
-USER: [system]
-# Hermes Soul
-# Hermes Agent Persona
-
-<!--
-This file defines the agent's personality and tone.
-The agent will embody whatever you write here.
-Edit this to customize how Hermes communicates with you.
-
-Examples:
-  - "You are a warm, playful assistant who uses kaomoji occasionally."
-  - "You are a concise technical expert. No fluff, with facts.
-
-This file is loaded fresh each message -- no restart needed.
-Delete the…
-
-A: Received.
-
-### Session: hello
-- Source: Codex
-- Provider: codex (gpt-5.5)
-- Updated: 2026-05-30T11:33:48.000Z
-- Last message preview: hello
-
-USER: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/hermes-agent/agent-core-rs
-
-<INSTRUCTIONS>
-## Non-Negotiable Rules
-
-1. Check model validity before making assumptions about 2026-era model releases or identifiers.
-2. Never use emoji unless the user explicitly asks for them.
-
-## Model Handling
-
-- Verify model names and availability from the local codebase or official sources before claiming a model is invalid, unknown, or unsupported.
-- If the user says a model exists in their environm…
-
-USER: [system]
-# Hermes Soul
-# Hermes Agent Persona
-
-<!--
-This file defines the agent's personality and tone.
-The agent will embody whatever you write here.
-Edit this to customize how Hermes communicates with you.
-
-Examples:
-  - "You are a warm, playful assistant who uses kaomoji occasionally."
-  - "You are a concise technical expert. No fluff, just facts."
-  - "You speak like a friendly coworker who happens to know everything."
-
-This file is loaded fresh each message -- no restart needed.
-Delete the…
-
-A: hello
-
-### Session: reply with exactly the word: pong
-- Source: Codex
-- Provider: codex (gpt-5.5)
-- Updated: 2026-05-30T11:33:10.000Z
-- Last message preview: reply with exactly the word: pong
-
-USER: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/grok-cli
-
-<INSTRUCTIONS>
-## Non-Negotiable Rules
-
-1. Check model validity before making assumptions about 2026-era model releases or identifiers.
-2. Never use emoji unless the user explicitly asks for them.
-
-## Model Handling
-
-- Verify model names and availability from the local codebase or official sources before claiming a model is invalid, unknown, or unsupported.
-- If the user says a model exists in their environment, treat that as…
-
-USER: reply with exactly the word: pong
-
-### Session: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/grok-cli <INSTRUCTIO
-- Source: Codex
-- Provider: codex (gpt-5.5)
-- Updated: 2026-05-30T11:32:10.000Z
-- Last message preview: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/grok-cli <INSTRUCTIONS> ## Non-Negotiable Rules 1. Check mod
-
-USER: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/grok-cli
-
-<INSTRUCTIONS>
-## Non-Nineteen Rules
-
-1. Check model validity before making assumptions about 2026-era model releases or identifiers.
-2. Never use emoji unless the user explicitly asks for them.
-
-## Model Handling
-
-- Verify model names and availability from the local codebase or official sources before claiming a model is invalid, unknown, or unsupported.
-- If the user says a model exists in their environment, treat that as…
-
-### Session: ok
-- Source: Codex
-- Provider: codex (gpt-5.5)
-- Updated: 2026-05-30T11:31:42.000Z
-- Last message preview: ok
-
-USER: # AGENTS.md instructions for /Users/jkneen/Documents/GitHub/hermes-agent/agent-core-rs
-
-<INSTRUCTIONS>
-## Non-Negotiable Rules
-
-1. Check model validity before making assumptions about 2026-era model releases or identifiers.
-2. Never use emoji unless the user explicitly asks for them.
-
-## N…
-
-USER: test
-
-A: ok
-
-### Session: Lead C3f78d0c Abf3 45d5 898e 27cd1d95c0d1 chat
-- Source: OpenClaw
-- Provider: openclaw (lead-c3f78d0c-abf3-45d5-898e-27cd1d95c0d1)
-- Updated: 2026-05-30T11:26:21.114Z
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs from TOOLS.md (BOARD_ID: c3f78d0c-abf3-45d5-898e-27cd1d95c0d1).
-
-**No concrete outcome** - no board task work.
-
-**HEARTBEAT_OK**
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs confirmed from TOOLS.md.
-
-**No concrete outcome** - no board task work.
-
-**HEARTBEAT_OK**
-
-USER: [OpenClaw heartbeat poll]
-
-A: **Pre-flight**: ✓ Gateway OK. Required inputs confirmed from TOOLS.md:
-- `BASE_URL`: localhost:19789 ✓
-- `AUTH_TOKEN`: configured ✓
-- `BOARD_ID`: c3f78d0c-abf3-45d5-898e-27cd1d95c0d1 ✓
-- `AGENT_NAME`: Ava ✓
-- `AGENT_ID`: 9f5f3df9-2ed7-4efe-9d97-2114fe460a35 ✓
-
-Per HEARTBEAT.md "If nothing needs attention, reply HEARTBEAT_OK": no board task work this cycle.
-
-**HEARTBEAT_OK**
-
-### Session: Mc Gateway 894a3d5b 7faa 4c0a A40f 69fbdee7b78d chat
-- Source: OpenClaw
-- Provider: openclaw (mc-gateway-894a3d5b-7faa-4c0a-a40f-69fbdee7b78d)
-- Updated: 2026-05-30T11:24:04.149Z
-
-A: [assistant turn failed before producing content]
-
-A: [assistant turn failed before producing content]
-
-A: [assistant turn failed before producing content]
-
-A: [assistant turn failed before producing content]
-
-USER: [OpenClaw heartbeat poll]
-
-A: Heartbeat check-in failed: connection refused. Will retry on next heartbeat.
+- No emoji anywhere — user strictly prohibits emoji in UI, code, and output
+- Do not rebuild existing components; reuse as-is
+- Verify UI/interaction behavior via 3D math (positions, bbox, ray math) — not browser screenshots or synthetic clicks

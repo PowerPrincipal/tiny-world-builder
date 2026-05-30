@@ -148,6 +148,7 @@
     updateXRFrame(xrFrame);
     repaintProfileEnd('tick.runtime', tickStart);
 
+    if (window.tickFlight) window.tickFlight(dt);
     renderScene();
   }
 
