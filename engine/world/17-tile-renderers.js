@@ -434,6 +434,7 @@
         renderCellExtras(x, z, { animateFrom: existingIdx });
         refreshVehiclesForWorldObstacleChange(x, z);
         saveState();
+        notifyWorldChanged(x, z);
         return;
       }
     }
@@ -444,6 +445,7 @@
     renderCellExtras(x, z, { animateFrom: newIdx });
     refreshVehiclesForWorldObstacleChange(x, z);
     saveState();
+    notifyWorldChanged(x, z);
   }
 
   function popCellExtra(x, z) {
@@ -453,6 +455,7 @@
     renderCellExtras(x, z); // no animation — surviving extras stay put
     refreshVehiclesForWorldObstacleChange(x, z);
     saveState();
+    notifyWorldChanged(x, z);
     return true;
   }
 
@@ -725,4 +728,3 @@
     });
     repaintProfileEnd('dispose.traverse', profileStart);
   }
-

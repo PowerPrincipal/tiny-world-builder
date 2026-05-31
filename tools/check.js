@@ -7,6 +7,7 @@ const htmlPath = path.join(root, 'tiny-world-builder.html');
 const schemaPath = path.join(root, 'world.schema.json');
 const vercelPath = path.join(root, 'vercel.json');
 const netlifyPath = path.join(root, 'netlify.toml');
+const partykitPath = path.join(root, 'partykit.json');
 const htmlRaw = fs.readFileSync(htmlPath, 'utf8');
 const defaultsPath = path.join(root, 'tinyworld-defaults.json');
 
@@ -520,11 +521,23 @@ if (!/Authorization'?\]\s*=/.test(html) && !/opts\.headers\.Authorization\s*=/.t
 if (!/data-action="share"/.test(htmlRaw) || !/\/api\/share/.test(html)) {
   fail('world menu must expose share URL creation through /api/share');
 }
+if (!/data-action="collaborate"/.test(htmlRaw) || !/worldMenuCollaborateUrl/.test(html) || !/searchParams\.set\('party'/.test(html)) {
+  fail('world menu must expose collaborate URL creation through share id + PartyKit room id');
+}
 if (!/params\.get\('share'\)/.test(html) || !/\/api\/share\?id=/.test(html)) {
   fail('shared worlds must load from ?share= ids through the same-origin API');
 }
+if (!/ws: wss:/.test(netlifyText)) {
+  fail('Netlify CSP must permit PartyKit websocket connections');
+}
 if (!/function twCloudSyncLocalWorldsToCloud/.test(html) || !/function twCloudSyncAssetsBothWays/.test(html) || !/\/api\/assets/.test(html)) {
   fail('local worlds and asset libraries must sync to the authenticated DB APIs');
+}
+if (!/engine\/world\/38-multiplayer-partykit\.js/.test(htmlRaw) || !/function wirePartyKitMultiplayer/.test(html)) {
+  fail('PartyKit multiplayer browser module must be loaded');
+}
+if (!/tinyworld:world-changed/.test(html) || !/type: 'cell\.set'/.test(html) || !/new WebSocket/.test(html)) {
+  fail('PartyKit multiplayer must broadcast cell edits over websocket');
 }
 if (!/function twImportJSONPayload/.test(html) || !/function twImportWorldEntriesFromJSON/.test(html) || !/twImportLooksLikeAssetLibrary/.test(html)) {
   fail('JSON import must accept world files, named-world lists, and asset-library bundles');
@@ -571,6 +584,21 @@ for (const table of ['profiles', 'builds', 'world_shares']) {
 const assetMigration = fs.readFileSync(path.join(root, 'netlify/database/migrations/20260531124500_tinyworld_asset_libraries.sql'), 'utf8');
 if (!/CREATE TABLE IF NOT EXISTS asset_libraries/.test(assetMigration)) {
   fail('asset library migration missing table');
+}
+if (!fs.existsSync(partykitPath)) fail('partykit.json missing');
+const partykitConfig = fs.readFileSync(partykitPath, 'utf8');
+if (!/"main"\s*:\s*"party\/index\.js"/.test(partykitConfig) || !/"port"\s*:\s*1999/.test(partykitConfig)) {
+  fail('partykit.json must point at party/index.js on port 1999');
+}
+const partyServerPath = path.join(root, 'party/index.js');
+if (!fs.existsSync(partyServerPath)) fail('PartyKit room server missing');
+const partyServer = fs.readFileSync(partyServerPath, 'utf8');
+if (!/onConnect\(conn\)/.test(partyServer) || !/this\.room\.broadcast/.test(partyServer) || !/cell\.set/.test(partyServer) || !/presence/.test(partyServer)) {
+  fail('PartyKit room server must broadcast presence and cell.set messages');
+}
+const pkgText = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
+if (!/"party:dev"\s*:\s*"partykit dev party\/index\.js --port 1999"/.test(pkgText)) {
+  fail('package.json missing party:dev script');
 }
 
 console.log('ok');

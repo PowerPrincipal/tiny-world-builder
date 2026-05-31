@@ -40,6 +40,10 @@ Cloud saves are separate from defaults/localStorage:
 - Queued account syncs must not be dropped while a previous `/api/builds`
   request is in flight. Keep a pending retry flag around `twCloudWorldSyncing`
   so imports and saves made during bootstrap still reach the database.
+- Live multiplayer rooms are ephemeral runtime state. Keep PartyKit presence
+  (cursor, selected cells, active tool) out of saved world JSON and send durable
+  edits as full `cell.set` snapshots, then apply them through `setCell()` so
+  rendering and later account saves stay on the normal persistence path.
 
 ## Defaults pipeline (dev → all users)
 

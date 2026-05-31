@@ -27,6 +27,12 @@ backend:
   localStorage worlds can stay bound to one cloud row instead of creating
   duplicates. Public share links create immutable-ish rows in `world_shares` and
   load through same-origin `?share=<id>` / `/api/share?id=<id>`.
+- Multiplayer/shared building uses PartyKit separately from Netlify Functions.
+  `partykit.json` points at `party/index.js`, local development runs with
+  `npm run party:dev` on port `1999`, and browser rooms connect only when a URL
+  includes `?party=`, `?room=`, or `?collab=`. Collaborate links should reuse a
+  `/api/share` id as both the world snapshot id and the PartyKit room id:
+  `/tiny-world-builder?share=<id>&party=<id>`.
 - Local custom assets are account data too: `/api/assets` stores one
   `asset_libraries` row per profile containing custom voxel-build stamps and
   saved asset templates. Browser hooks in `saveCustomVoxelBuildStamps()` and

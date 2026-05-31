@@ -2218,8 +2218,10 @@
     if (!trigger || !menu || !labelEl || !nameInput || !listEl) return;
     const manageBtn = menu.querySelector('[data-action="manage"]');
     const shareBtn = menu.querySelector('[data-action="share"]');
+    const collaborateBtn = menu.querySelector('[data-action="collaborate"]');
     if (!window.TinyWorldAuth && manageBtn) manageBtn.hidden = true;
     if (!window.TinyWorldAuth && shareBtn) shareBtn.hidden = true;
+    if (!window.TinyWorldAuth && collaborateBtn) collaborateBtn.hidden = true;
 
     function menuWorlds() {
       return twCloudMergedWorlds(readWorldsMeta(), twCloudWorldCache);
@@ -2348,6 +2350,14 @@
       return '';
     }
 
+    function worldMenuCollaborateUrl(result) {
+      const url = worldMenuAbsoluteShareUrl(result);
+      if (!url || !result || !result.id) return url;
+      const u = new URL(url);
+      u.searchParams.set('party', result.id);
+      return u.href;
+    }
+
     async function copyWorldMenuShareUrl(url) {
       if (!url) return false;
       try {
@@ -2359,7 +2369,7 @@
       }
     }
 
-    async function shareCurrentWorld() {
+    async function shareCurrentWorld(options = {}) {
       if (!window.TinyWorldAuth || !window.__loggedIn) {
         close();
         if (typeof window.__openLoginModal === 'function') window.__openLoginModal('Sign in to save and share worlds');
@@ -2375,9 +2385,9 @@
           twToast((result && result.error) || 'Share failed.', 'err');
           return;
         }
-        const url = worldMenuAbsoluteShareUrl(result);
+        const url = options.collaborate ? worldMenuCollaborateUrl(result) : worldMenuAbsoluteShareUrl(result);
         await copyWorldMenuShareUrl(url);
-        twToast('Share URL copied.', 'ok');
+        twToast(options.collaborate ? 'Collaborate URL copied.' : 'Share URL copied.', 'ok');
         close();
       } catch (err) {
         twToast((err && err.message) || 'Share failed.', 'err');
@@ -2497,6 +2507,8 @@
           saveAsNew(name);
         } else if (action === 'share') {
           shareCurrentWorld();
+        } else if (action === 'collaborate') {
+          shareCurrentWorld({ collaborate: true });
         } else if (action === 'manage') {
           const acc = document.getElementById('account-btn');
           if (acc) acc.click();
@@ -2654,6 +2666,10 @@
       } });
       items.push({ group: 'World', label: 'Export world as JSON', run: topBtnAction('export') });
       items.push({ group: 'World', label: 'Import world from JSON', run: topBtnAction('import') });
+      items.push({ group: 'World', label: 'Copy collaborate URL', hint: 'shared PartyKit room link', run: () => {
+        const btn = document.querySelector('#world-menu [data-action="collaborate"]');
+        if (btn) btn.click();
+      } });
       items.push({ group: 'World', label: 'Generate from prompt…', hint: 'AI generation panel', kbd: '⌘G', run: () => {
         if (typeof openGenerateModal === 'function') openGenerateModal();
         else topBtnAction('generate')();

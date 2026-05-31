@@ -13,6 +13,7 @@ dist/
 
 # Local Netlify folder
 .netlify
+.partykit/
 .claude/worktrees/agent-a17895f4/
 .claude/worktrees/agent-a35bb1ef/
 .claude/worktrees/agent-a6b44378/
