@@ -299,16 +299,26 @@
   };
 
   const islandShellMaterialCache = new Map();
+  function syncIslandShellMaterial(baseMat, shellMat) {
+    shellMat.map = baseMat.map || shellMat.map || null;
+    shellMat.onBeforeCompile = baseMat.onBeforeCompile;
+    shellMat.userData = Object.assign({}, baseMat.userData || {}, shellMat.userData || {}, {
+      islandShellMaterial: true,
+    });
+    shellMat.needsUpdate = true;
+  }
+
   function islandShellMaterial(baseMat) {
     if (!baseMat || baseMat.side === THREE.DoubleSide) return baseMat;
     const key = baseMat.uuid;
     let hit = islandShellMaterialCache.get(key);
-    if (hit) return hit;
+    if (hit) {
+      syncIslandShellMaterial(baseMat, hit);
+      return hit;
+    }
     const mat = baseMat.clone();
     mat.side = THREE.DoubleSide;
-    mat.userData = mat.userData || {};
-    mat.userData.islandShellMaterial = true;
+    syncIslandShellMaterial(baseMat, mat);
     islandShellMaterialCache.set(key, mat);
     return mat;
   }
-

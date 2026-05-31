@@ -320,13 +320,24 @@
     return tex;
   }
 
-  function applyWorldUVs(material, texture, textureScale = 1.0) {
+  function applyWorldUVs(material, texture, textureScale = 1.0, opts = {}) {
     if (!material) return;
     material.map = texture;
     material.userData = material.userData || {};
     material.userData.worldTextureScale = textureScale;
+    material.userData.worldVoxelSeams = !!opts.voxelSeams;
     material.needsUpdate = true;
     material.onBeforeCompile = (shader) => {
+      if (opts.voxelSeams) {
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <common>',
+          `
+          #include <common>
+          varying vec3 vWorldVoxelPos;
+          varying vec3 vWorldVoxelNormal;
+          `
+        );
+      }
       shader.vertexShader = shader.vertexShader.replace(
         '#include <project_vertex>',
         `
@@ -350,8 +361,57 @@
         } else {
           vUv = worldPos.xy * ${textureScale.toFixed(4)};
         }
+        ${opts.voxelSeams ? `
+        vWorldVoxelPos = worldPos.xyz;
+        vWorldVoxelNormal = worldNormal;
+        ` : ''}
         `
       );
+      if (opts.voxelSeams) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <common>',
+          `
+          #include <common>
+          varying vec3 vWorldVoxelPos;
+          varying vec3 vWorldVoxelNormal;
+
+          float twVoxelSeamLine(float coord, float scale, float width) {
+            float f = fract(coord * scale);
+            float d = min(f, 1.0 - f);
+            return 1.0 - smoothstep(width, width * 2.8, d);
+          }
+
+          float twVoxelBlockHash(vec2 cell) {
+            return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+          }
+          `
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <map_fragment>',
+          `
+          #include <map_fragment>
+          vec3 seamNormal = normalize(vWorldVoxelNormal);
+          float sideFace = 1.0 - smoothstep(0.42, 0.72, abs(seamNormal.y));
+          float sideCoord = abs(seamNormal.x) > abs(seamNormal.z) ? vWorldVoxelPos.z : vWorldVoxelPos.x;
+          float sideY = vWorldVoxelPos.y + 0.08;
+          float sideGridX = 9.60;
+          float sideGridY = 7.80;
+          vec2 sideCell = floor(vec2(sideCoord * sideGridX, sideY * sideGridY));
+          float yBand = twVoxelSeamLine(sideY, sideGridY, 0.015);
+          float vBlock = twVoxelSeamLine(sideCoord, sideGridX, 0.015);
+          float vBlockFine = twVoxelSeamLine(sideCoord + sideY * 0.08, sideGridX * 2.0, 0.005);
+          float blockShade = twVoxelBlockHash(sideCell) - 0.5;
+          float underFace = smoothstep(0.62, 0.86, -seamNormal.y);
+          float underX = twVoxelSeamLine(vWorldVoxelPos.x, 5.00, 0.012);
+          float underZ = twVoxelSeamLine(vWorldVoxelPos.z, 5.00, 0.012);
+          float underCellShade = twVoxelBlockHash(floor(vWorldVoxelPos.xz * 5.00)) - 0.5;
+          float sideSeam = sideFace * clamp(yBand * 0.64 + vBlock * 0.64 + vBlockFine * 0.10, 0.0, 1.0);
+          float seam = clamp(sideSeam + underFace * max(underX, underZ) * 0.42, 0.0, 1.0);
+          diffuseColor.rgb *= 1.0 + sideFace * blockShade * 0.055 + underFace * underCellShade * 0.045;
+          diffuseColor.rgb *= mix(1.0, 0.56, seam);
+          `
+        );
+      }
     };
   }
 
@@ -612,7 +672,7 @@
   applyWorldUVs(M.grass, initialGrassTex, 1.0);
   applyWorldUVs(M.grassEdge, initialGrassTex, 1.0);
   applyWorldUVs(M.grassHi, initialGrassTex, 1.0);
-  applyWorldUVs(M.boardSide, texRockFace, 2.4);
+  applyWorldUVs(M.boardSide, texRockFace, 2.4, { voxelSeams: true });
 
   applyWorldUVs(M.path, texNoise, 1.0);
   applyWorldUVs(M.pathTrim, texNoise, 1.0);
@@ -630,8 +690,8 @@
   applyWorldUVs(M.wallTrim, texCottageStone, 10.0);
   applyWorldUVs(M.roofBlue, texShingles, 28.0);
   applyWorldUVs(M.roofBlueD, texShingles, 28.0);
-  applyWorldUVs(M.islandUnder, texRockFace, 2.8);
-  applyWorldUVs(M.islandUnderD, texRockFace, 2.8);
+  applyWorldUVs(M.islandUnder, texRockFace, 2.8, { voxelSeams: true });
+  applyWorldUVs(M.islandUnderD, texRockFace, 2.8, { voxelSeams: true });
 
   applyWorldUVs(M.castleStone, texBrick, 11.0);
   applyWorldUVs(M.castleStoneD, texBrick, 11.0);
@@ -1381,4 +1441,3 @@
     if (dir === 'e') m.position.set( 0.465, y, 0);
     return m;
   }
-

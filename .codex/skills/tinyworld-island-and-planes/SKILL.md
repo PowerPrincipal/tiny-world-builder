@@ -57,6 +57,15 @@ Cost note: at max bevel (0.06) the merged homeBorder geometry grows ~13× (the
 many tiny greebles each round), so keep bevel modest. The **distant ghost-island
 dressing** (tiny far preview islands) intentionally stays `noBevel` for perf.
 
+Island shell materials (`M.boardSide`, `M.islandUnder`, `M.islandUnderD`) opt
+into the world-UV shader's `voxelSeams` pass in `04-textures.js`. That pass
+darkens a fine horizontal/vertical side grid and lightly modulates each
+block/underside cell in the fragment shader. It uses world position/normal
+varyings, so the large merged side slabs read as small voxel seams without
+adding geometry or draw calls. `islandShellMaterial()` in `03-geometry-materials.js`
+copies the base material's `onBeforeCompile` hook so the side-backing clone keeps
+the same fine grid.
+
 ## Editable-island LOD + whole-island select/delete
 
 - Two gates decide an editable island's LOD: a **distance** gate

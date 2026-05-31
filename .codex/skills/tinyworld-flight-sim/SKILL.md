@@ -47,9 +47,9 @@ stamp at `enterFlight`. Ground is a flat sim plane at spawn height.
 - Place the **Stunt Plane** from Stamps (it is a model-stamp).
 - Plain-click the placed plane → `showFlightMenu` → "Enter / Fly" →
   `enterFlight(x,z)`: swaps the global `camera` to a `flightCam` (FOV 60), captures
-  keys, and uses the placed stamp group as the flown mesh (`flightJet`); wraps
-  named propeller nodes in a hub pivot and adds the Dusty-style translucent
-  strobe disc whose opacity flickers with throttle.
+  keys, and uses the placed stamp group as the flown mesh (`flightJet`); spins
+  the named propeller mesh in place and adds the Dusty-style translucent strobe
+  disc whose opacity flickers with throttle.
 - Controls: W = nose down, S or X = nose up (pitch), A/D roll, Q/E yaw, Shift/Ctrl OR
   ArrowUp/ArrowDown = throttle, ArrowLeft/ArrowRight = rudder, B brake.
 - `Escape` → `exitFlight()`: restores the previous camera, calls `updateCamera()`,
@@ -62,6 +62,18 @@ stamp at `enterFlight`. Ground is a flat sim plane at spawn height.
   top-level `const`/`let`/`function` name silently kills the whole module.
 - The tool picker is a **search palette** (`#palette-search` → `#palette-results`),
   not a fixed toolbar; the stunt plane is found under Stamps, not a tool button.
+- The stunt plane propeller mesh (`SM_Veh_Plane_Stunt_01_Prop`) already has its
+  local origin at the hub. Match the crop-duster path by rotating that mesh in
+  place around local Z; do not wrap it in a new AABB-centred pivot, or it orbits
+  off-centre instead of spinning like the ambient dusting plane.
+- The flight propeller must read like the ambient Dusty/crop-duster prop while
+  borrowing the duplicate-island engine tint: high apparent RPM, a dark
+  translucent disc, and mostly faded physical blades at cruise throttle. A solid
+  blade screenshot means the visual balance is wrong even if the mesh is
+  technically rotating.
+- The blur shape should be a round camera-facing disc, not a projected oval from
+  a tilted local mesh. Use the circular sprite treatment for flight-camera
+  readability.
 - Flight is arcade-scale for a tiny world: `enterFlight` launches the plane
   already cruising just above the board (initial forward speed + throttle 0.6)
   so there is no runway taxi phase. Collision and landing are checked in scene space against the

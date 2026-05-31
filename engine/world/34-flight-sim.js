@@ -79,7 +79,7 @@
   let flightPrevCamera = null;
   let flightCell = null;            // { x, z } of the parked plane
   let flightJet = null;             // the cell object group being flown
-  let flightProps = [];             // propeller pivots to spin
+  let flightProps = [];             // named propeller meshes to spin
   let flightSimGroundY = 0;         // sim-space reference height for ground effect
   let flightLanded = false;
   let flightImpactCooldown = 0;
@@ -370,60 +370,90 @@
 
   // -------- Dusty-style propeller spin / strobe disc --------
   const _flpropBox = new THREE.Box3();
-  const _flpropCenterWorld = new THREE.Vector3();
   const _flpropSizeWorld = new THREE.Vector3();
+  const _flpropSizeLocal = new THREE.Vector3();
+  let _flpropDiscTexture = null;
 
   function flightClonePropMaterial(mat) {
     return mat && typeof mat.clone === 'function' ? mat.clone() : mat;
   }
 
+  function flightPropDiscTexture() {
+    if (_flpropDiscTexture) return _flpropDiscTexture;
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width * 0.5;
+    const cy = canvas.height * 0.5;
+    const r = canvas.width * 0.46;
+    const glow = ctx.createRadialGradient(cx, cy, r * 0.10, cx, cy, r);
+    glow.addColorStop(0.00, 'rgba(20,22,24,0.18)');
+    glow.addColorStop(0.56, 'rgba(19,21,23,0.48)');
+    glow.addColorStop(0.80, 'rgba(74,53,38,0.32)');
+    glow.addColorStop(1.00, 'rgba(19,21,23,0.00)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(19,21,23,0.46)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.76, 0, Math.PI * 2);
+    ctx.stroke();
+    _flpropDiscTexture = new THREE.CanvasTexture(canvas);
+    _flpropDiscTexture.needsUpdate = true;
+    return _flpropDiscTexture;
+  }
+
   function flightAddPropDisc(pivot, sweepR) {
     if (!pivot || !(sweepR > 0.08)) return;
     if (pivot.userData.__disc) return;
-    const discGeo = new THREE.CircleGeometry(sweepR * 1.04, 40);
-    const discMat = new THREE.MeshBasicMaterial({
+    const discMat = new THREE.SpriteMaterial({
+      map: flightPropDiscTexture(),
       color: 0xffffff,
       transparent: true,
       opacity: 0,
-      side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const disc = new THREE.Mesh(discGeo, discMat);
+    const disc = new THREE.Sprite(discMat);
     disc.name = 'tw_flight_prop_strobe_disc';
     disc.position.z = -0.02;
+    disc.scale.set(sweepR * 3.08, sweepR * 3.08, 1);
     disc.renderOrder = 2;
+    disc.raycast = () => {};
     pivot.add(disc);
     pivot.userData.__disc = disc;
     pivot.userData.__sweepR = sweepR;
   }
 
-  function flightWrapNamedProp(node) {
-    if (!node || !node.parent || node.userData.__twFlightPropWrapped) return null;
-    node.updateMatrixWorld(true);
-    const parent = node.parent;
-    parent.updateMatrixWorld(true);
-    _flpropBox.setFromObject(node);
-    if (_flpropBox.isEmpty()) return null;
-    _flpropBox.getCenter(_flpropCenterWorld);
-    _flpropBox.getSize(_flpropSizeWorld);
-    const centerLocal = parent.worldToLocal(_flpropCenterWorld.clone());
-    const pivot = new THREE.Group();
-    pivot.name = 'tw_flight_prop_' + (node.name || 'prop');
-    pivot.position.copy(centerLocal);
-    parent.add(pivot);
-    parent.updateMatrixWorld(true);
-    pivot.attach(node);
+  function flightPrepareNamedProp(node) {
+    if (!node || !node.isMesh || node.userData.__twFlightPropPrepared) return null;
+    let sweepR = 0;
+    const geo = node.geometry;
+    if (geo && !geo.boundingBox && typeof geo.computeBoundingBox === 'function') geo.computeBoundingBox();
+    if (geo && geo.boundingBox && !geo.boundingBox.isEmpty()) {
+      geo.boundingBox.getSize(_flpropSizeLocal);
+      sweepR = Math.max(_flpropSizeLocal.x, _flpropSizeLocal.y) * 0.5;
+    }
+    if (!(sweepR > 0.08)) {
+      node.updateMatrixWorld(true);
+      _flpropBox.setFromObject(node);
+      if (_flpropBox.isEmpty()) return null;
+      _flpropBox.getSize(_flpropSizeWorld);
+      sweepR = Math.max(_flpropSizeWorld.x, _flpropSizeWorld.y) * 0.5;
+    }
     node.traverse(child => {
       if (!child || !child.isMesh || !child.material) return;
       child.material = Array.isArray(child.material)
         ? child.material.map(flightClonePropMaterial)
         : flightClonePropMaterial(child.material);
     });
-    pivot.userData.__propAxis = 'z';
-    pivot.userData.__isNamedProp = true;
-    flightAddPropDisc(pivot, Math.max(_flpropSizeWorld.x, _flpropSizeWorld.y) * 0.5);
-    node.userData.__twFlightPropWrapped = true;
-    return pivot;
+    node.userData.__propAxis = 'z';
+    node.userData.__isNamedProp = true;
+    flightAddPropDisc(node, sweepR);
+    node.userData.__twFlightPropPrepared = true;
+    return node;
   }
 
   function flightPreparePropellers(root) {
@@ -433,19 +463,11 @@
     const raw = [];
     root.traverse(o => {
       if (!o || o === root) return;
-      if ((o.isMesh || o.isObject3D) && propNames.test(o.name || '')) raw.push(o);
+      if (o.isMesh && propNames.test(o.name || '')) raw.push(o);
     });
-    const rawSet = new Set(raw);
-    raw.filter(o => {
-      let p = o.parent;
-      while (p && p !== root) {
-        if (rawSet.has(p)) return false;
-        p = p.parent;
-      }
-      return true;
-    }).forEach(o => {
-      const pivot = flightWrapNamedProp(o);
-      if (pivot) out.push(pivot);
+    raw.forEach(o => {
+      const prop = flightPrepareNamedProp(o);
+      if (prop) out.push(prop);
     });
     return out;
   }
@@ -454,14 +476,13 @@
     if (!flightProps || !flightProps.length) return;
     const propThrottle = Math.max(0, Math.min(1.15, flightPlane.throttle));
     const engineRunning = flightPlane.throttle > 0.02;
-    const omega = engineRunning ? 60 + propThrottle * 240 : 0;
+    const omega = engineRunning ? 220 + propThrottle * 70 : 0;
     const dRot = omega * dt;
     const tNow = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) * 0.001;
-    const rpmN = flightClamp01((propThrottle - 0.35) / 0.65);
-    const flicker = (Math.sin(tNow * 48) * 0.5 + Math.sin(tNow * 73 + 1.3) * 0.5) * 0.15
-      + (Math.random() - 0.5) * 0.08;
-    const discOpacity = Math.max(0, Math.min(0.55, rpmN * 0.45 + flicker * rpmN));
-    const bladeOpacity = 1 - rpmN * 0.25;
+    const rpmN = flightClamp01((propThrottle - 0.08) / 0.42);
+    const dustyFlicker = 0.20 + Math.max(0, Math.sin(tNow * 60)) * 0.16;
+    const discOpacity = engineRunning ? Math.min(0.62, dustyFlicker * (0.92 + rpmN * 0.38)) : 0;
+    const bladeOpacity = engineRunning ? Math.max(0.02, 1 - rpmN * 0.98) : 1;
     flightProps.forEach(prop => {
       if (!prop) return;
       const axis = prop.userData.__propAxis || 'z';
