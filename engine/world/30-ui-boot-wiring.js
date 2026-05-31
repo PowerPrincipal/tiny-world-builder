@@ -623,6 +623,7 @@
     twPerfMark('boot:crowd-ready');
     onResize();
     twPerfMark('boot:resized');
+    setRenderSceneReady(true);
     renderer.setAnimationLoop(animate);
     twPerfMark('boot:animation-loop');
     startToolThumbBuildQueue();

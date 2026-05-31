@@ -327,7 +327,7 @@
   function normalizeVoxelCustomParts(parts) {
     if (!Array.isArray(parts)) return [];
     const out = [];
-    for (let i = 0; i < parts.length && out.length < 220; i++) {
+    for (let i = 0; i < parts.length && out.length < 180; i++) {
       const part = parts[i] || {};
       const rawKind = String(part.kind || '').toLowerCase();
       const kind = ['box', 'cylinder', 'cone', 'sphere', 'ellipsoid', 'cable'].includes(rawKind) ? rawKind : 'box';

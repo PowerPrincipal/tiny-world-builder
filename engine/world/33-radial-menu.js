@@ -40,6 +40,7 @@
     ];
     const RADIUS = 116;
     const TOP_ANGLE = 270;
+    const radialProjectPoint = new THREE.Vector3();
 
     // Islands are transformed as a whole (move x/y/z + rotate-y via the gizmo),
     // so the cell-object actions (Color/Style/Size/Duplicate/More) don't apply.
@@ -199,7 +200,7 @@
       // this the menu would project against last frame's camera and swim while
       // orbiting. Refresh here so the projection matches the frame being drawn.
       cam.updateMatrixWorld();
-      const p = gizmo.position.clone();
+      const p = radialProjectPoint.copy(gizmo.position);
       p.y += 0.4;
       p.project(cam);
       if (p.z > 1) { if (!root.hidden) { root.hidden = true; currentLevel = 'root'; } return; }

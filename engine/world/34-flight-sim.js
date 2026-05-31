@@ -105,15 +105,67 @@
   const _flcolCellPos = new THREE.Vector3();
   const _flcolBox = new THREE.Box3();
   const _flcolUp = new THREE.Vector3();
+  const _flSurfaceCandidates = [];
+  const _flSurfaceCandidateEntries = new Set();
+  const _flSurfaceIslandLocal = new THREE.Vector3();
+
+  function flightRenderedCellEntry(x, z) {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    if (x >= 0 && x < GRID && z >= 0 && z < GRID) {
+      return cellMeshesGrid[x] ? cellMeshesGrid[x][z] || null : null;
+    }
+    return cellMeshes[x + ',' + z] || null;
+  }
+
+  function flightQueueSurfaceCandidate(x, z) {
+    const entry = flightRenderedCellEntry(x, z);
+    if (!entry || !entry.tile || _flSurfaceCandidateEntries.has(entry)) return;
+    _flSurfaceCandidateEntries.add(entry);
+    _flSurfaceCandidates.push(entry);
+  }
+
+  function flightQueueSurfaceCandidateWindow(cx, cz) {
+    const reach = Math.max(1, Math.ceil(FLIGHT_SCENE_COLLISION_RADIUS));
+    for (let dz = -reach; dz <= reach; dz++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        flightQueueSurfaceCandidate(cx + dx, cz + dz);
+      }
+    }
+  }
+
+  function flightCollectSurfaceCandidates(scenePos) {
+    _flSurfaceCandidates.length = 0;
+    _flSurfaceCandidateEntries.clear();
+
+    flightQueueSurfaceCandidateWindow(
+      Math.floor(scenePos.x + GRID / 2),
+      Math.floor(scenePos.z + GRID / 2)
+    );
+
+    if (typeof editableIslands !== 'undefined' && Array.isArray(editableIslands) && typeof xrWorldRoot !== 'undefined') {
+      for (const island of editableIslands) {
+        if (!island || !island.contentGroup) continue;
+        _flSurfaceIslandLocal.copy(scenePos);
+        xrWorldRoot.localToWorld(_flSurfaceIslandLocal);
+        island.contentGroup.worldToLocal(_flSurfaceIslandLocal);
+        flightQueueSurfaceCandidateWindow(
+          island.boardX * GRID + Math.floor(_flSurfaceIslandLocal.x + GRID / 2),
+          island.boardZ * GRID + Math.floor(_flSurfaceIslandLocal.z + GRID / 2)
+        );
+      }
+    }
+
+    return _flSurfaceCandidates;
+  }
 
   function flightSurfaceAtScene(scenePos) {
     if (typeof cellMeshes === 'undefined' || typeof getWorldCell !== 'function') return null;
     let hit = null;
-    for (const key in cellMeshes) {
-      const parts = key.split(',');
-      const x = parseInt(parts[0], 10);
-      const z = parseInt(parts[1], 10);
-      if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+    const candidates = flightCollectSurfaceCandidates(scenePos);
+    for (let i = 0; i < candidates.length; i++) {
+      const entry = candidates[i];
+      const x = entry.x;
+      const z = entry.z;
       const cell = getWorldCell(x, z);
       if (!cell) continue;
       const p = (typeof cellDisplayPointForCell === 'function') ? cellDisplayPointForCell(x, z) : tilePos(x, z);
@@ -123,7 +175,6 @@
       if (Math.abs(dx) > FLIGHT_SCENE_COLLISION_RADIUS || Math.abs(dz) > FLIGHT_SCENE_COLLISION_RADIUS) continue;
       const terrainY = (_flcolCellPos.y || 0) + TOP_H + terrainVisualRiseForCell(cell);
       if (!hit || terrainY > hit.surfaceY) hit = { surfaceY: terrainY, terrainY, objectY: -Infinity, objectKind: null, x, z };
-      const entry = cellMeshes[key];
       const obj = entry && entry.object;
       if (!obj || obj === flightJet || !obj.visible) continue;
       obj.updateMatrixWorld(true);

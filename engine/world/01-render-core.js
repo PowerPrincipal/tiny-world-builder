@@ -1038,6 +1038,17 @@
   let underOcclusionWipeDirection = 1;
   let underOcclusionWipeLastPhase = null;
   let underOcclusionWipeLastTime = 0;
+  let renderSceneReady = false;
+
+  function setRenderSceneReady(ready) {
+    renderSceneReady = !!ready;
+  }
+
+  function renderSceneIfReady() {
+    if (!renderSceneReady) return false;
+    renderScene();
+    return true;
+  }
 
   function resetRenderCullStats() {
     renderCullStats.roots = 0;

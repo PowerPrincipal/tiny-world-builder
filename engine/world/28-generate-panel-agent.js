@@ -1262,6 +1262,9 @@
 
     function updateSelectionPreview(target) {
       if (!previewCanvas) return;
+      if (target && previewBox && (previewBox.hidden || previewBox.classList.contains('selection-staging'))) {
+        target = null;
+      }
       if (!target || !target.cell) {
         // clear preview
         if (previewMesh) {

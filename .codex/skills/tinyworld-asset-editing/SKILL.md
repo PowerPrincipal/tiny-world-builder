@@ -114,3 +114,6 @@ panel restores that node to the agent panel (`selPropsHome`). Keep the tree dens
 The old agent-panel Preview/Properties selection dialog has been retired: module
 28 renders the shared properties node as a hidden staging element, while radial
 More/Style/Move and multi-cell selection should open `window.openLayersPropertiesPanel()`.
+Because that staging element is hidden, `updateSelectionPreview(target)` must
+clear the preview and avoid starting the preview WebGL `requestAnimationFrame`
+loop unless the preview UI is genuinely visible again.

@@ -572,7 +572,7 @@
 
   function createMaterialImageTexture(src) {
     const tex = new THREE.TextureLoader().load(src, () => {
-      if (typeof renderScene === 'function') renderScene();
+      if (typeof renderSceneIfReady === 'function') renderSceneIfReady();
     });
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearMipmapLinearFilter || THREE.LinearFilter;

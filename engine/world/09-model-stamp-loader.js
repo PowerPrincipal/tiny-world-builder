@@ -310,7 +310,7 @@
       const tex = new THREE.TextureLoader().load(url, () => {
         tex.needsUpdate = true;
         if (opts.modelStampId || (asset && asset.id)) scheduleModelStampRefresh(opts.modelStampId || asset.id);
-        if (typeof renderScene === 'function') renderScene();
+        if (typeof renderSceneIfReady === 'function') renderSceneIfReady();
       }, undefined, err => {
         if (opts.warn !== false) console.warn('[model-stamp] texture failed', url, err);
       });
@@ -1183,15 +1183,14 @@
   }
 
   function addCustomPartEllipsoid(parent, part, w, h, d, x, y, z, mat) {
-    const widthSegments = Math.max(6, Math.min(24, Math.round(part.segments || 12)));
-    const heightSegments = Math.max(4, Math.min(16, Math.round(part.verticalSegments || 8)));
-    const phiStart = Number.isFinite(part.phiStart) ? part.phiStart : 0;
-    const phiLength = Number.isFinite(part.phiLength) ? part.phiLength : Math.PI * 2;
-    const thetaStart = Number.isFinite(part.thetaStart) ? part.thetaStart : 0;
-    const thetaLength = Number.isFinite(part.thetaLength) ? part.thetaLength : Math.PI;
-    let geo = new THREE.SphereGeometry(0.5, widthSegments, heightSegments, phiStart, phiLength, thetaStart, thetaLength);
-    if (typeof geo.toNonIndexed === 'function') geo = geo.toNonIndexed();
-    if (geo.computeVertexNormals) geo.computeVertexNormals();
+    const geo = getCustomPartEllipsoidGeometry(
+      part.segments,
+      part.verticalSegments,
+      part.phiStart,
+      part.phiLength,
+      part.thetaStart,
+      part.thetaLength
+    );
     const mesh = new THREE.Mesh(geo, mat);
     mesh.scale.set(w, h, d);
     mesh.position.set(x, y, z);

@@ -78,10 +78,14 @@ stamp at `enterFlight`. Ground is a flat sim plane at spawn height.
   already cruising just above the board (initial forward speed + throttle 0.6)
   so there is no runway taxi phase. Collision and landing are checked in scene space against the
   TinyWorld board surface plus object bounds, then converted back to sim-space Y.
-  Shallow, upright touchdowns become `ROLLING` / `LANDED`; hard terrain strikes
-  or object hits stop the plane and show a collision/hard-landing status. Tuning
-  lives in `FCFG`, `FLIGHT_SIM_TO_SCENE` (0.09), and the `FLIGHT_SCENE_*`
-  collision constants.
+  The collision hot path must stay candidate-based: collect the small 3x3-ish
+  cell window around the plane in home/world coordinates plus the matching local
+  window for each editable island, then test only those rendered `cellMeshes`
+  entries. Do not return to splitting and scanning every `cellMeshes` key per
+  frame. Shallow, upright touchdowns become `ROLLING` / `LANDED`; hard terrain
+  strikes or object hits stop the plane and show a collision/hard-landing status.
+  Tuning lives in `FCFG`, `FLIGHT_SIM_TO_SCENE` (0.09), and the
+  `FLIGHT_SCENE_*` collision constants.
 
 ## Verify (real app, real pointer pipeline — not synthetic shortcuts)
 `npm run dev`, then via agent-browser `eval`:

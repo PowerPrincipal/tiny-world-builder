@@ -52,6 +52,28 @@
     return g;
   }
 
+  function getCustomPartEllipsoidGeometry(segments = 12, verticalSegments = 8, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) {
+    const ws = Math.max(6, Math.min(24, Math.round(segments || 12)));
+    const hs = Math.max(4, Math.min(16, Math.round(verticalSegments || 8)));
+    const ps = Math.round((Number.isFinite(phiStart) ? phiStart : 0) * 10000) / 10000;
+    const pl = Math.round((Number.isFinite(phiLength) ? phiLength : Math.PI * 2) * 10000) / 10000;
+    const ts = Math.round((Number.isFinite(thetaStart) ? thetaStart : 0) * 10000) / 10000;
+    const tl = Math.round((Number.isFinite(thetaLength) ? thetaLength : Math.PI) * 10000) / 10000;
+    const key = 'custom-ellipsoid|' + ws + '|' + hs + '|' + ps + '|' + pl + '|' + ts + '|' + tl;
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    let geo = new THREE.SphereGeometry(0.5, ws, hs, ps, pl, ts, tl);
+    if (typeof geo.toNonIndexed === 'function') {
+      const nonIndexed = geo.toNonIndexed();
+      geo.dispose();
+      geo = nonIndexed;
+    }
+    if (geo.computeVertexNormals) geo.computeVertexNormals();
+    geo.userData.cached = true;
+    geomCache.set(key, geo);
+    return geo;
+  }
+
   function getVoxelBoxGeometry(w, h, d, bevel = 0) {
     const qw = Math.round(w * 100) / 100;
     const qh = Math.round(h * 100) / 100;

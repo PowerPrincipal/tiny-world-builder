@@ -201,6 +201,14 @@ if (!/function getWaterfallCurtainMaterial/.test(html) || !/function getWaterfal
 if (!/function optimizeVoxelObjectGroup/.test(html) || !/new THREE\.InstancedMesh\(bucket\.geometry, bucket\.material, bucket\.items\.length\)/.test(html)) {
   fail('voxel object factories must have a shared InstancedMesh batching helper');
 }
+const addCustomPartEllipsoidBody = sourceFunctionBody(html, 'addCustomPartEllipsoid');
+if (!/function getCustomPartEllipsoidGeometry/.test(html) || /new THREE\.SphereGeometry/.test(addCustomPartEllipsoidBody)) {
+  fail('customParts sphere/ellipsoid primitives must use cached shared geometry');
+}
+const normalizeVoxelCustomPartsBody = sourceFunctionBody(html, 'normalizeVoxelCustomParts');
+if (!/out\.length < 180/.test(normalizeVoxelCustomPartsBody)) {
+  fail('customParts normalizer must honor the 180-part schema cap');
+}
 if (!/optimizeVoxelObjectGroup\(g, \{ reason: 'voxel-build-stamp' \}\)/.test(html) || !/optimizeVoxelObjectGroup\(g, \{ reason: 'voxel-crop' \}\)/.test(html)) {
   fail('voxel stamps and crops must route repeated boxes through the batching helper');
 }
@@ -210,6 +218,15 @@ if (!/window\.__tinyworldRepaintProfile/.test(html) || !/repaintProfileEnd\('ren
 const renderSceneBody = sourceFunctionBody(html, 'renderScene');
 if (!/function updateSceneVisibilityForCamera/.test(html) || !/updateSceneVisibilityForCamera\(\);/.test(renderSceneBody) || !/function renderCullTopContentOpacity/.test(html) || !/'culled  '/.test(html)) {
   fail('render stats must include camera culling for off-frustum and underside-occluded roots');
+}
+const createMaterialImageTextureBody = sourceFunctionBody(html, 'createMaterialImageTexture');
+const loadModelStampTextureBody = sourceFunctionBody(html, 'loadModelStampTexture');
+const makeIslandBannerTextureBody = sourceFunctionBody(html, 'makeIslandBannerTexture');
+if (!/function renderSceneIfReady/.test(html) || !/setRenderSceneReady\(true\);\s*renderer\.setAnimationLoop\(animate\)/.test(html)) {
+  fail('resource-load render callbacks must be gated until the scene is fully booted');
+}
+if (/renderScene\(\)/.test(createMaterialImageTextureBody) || /renderScene\(\)/.test(loadModelStampTextureBody) || /renderScene\(\)/.test(makeIslandBannerTextureBody) || !/renderSceneIfReady\(\)/.test(createMaterialImageTextureBody + loadModelStampTextureBody + makeIslandBannerTextureBody)) {
+  fail('async texture callbacks must use renderSceneIfReady instead of repainting during partial boot');
 }
 const renderCullBody = sourceFunctionBody(html, 'updateSceneVisibilityForCamera');
 if (!/setRenderCullVisible\(entry\.tile, visible\);/.test(renderCullBody) || !/setRenderCullOpacity\(entry\.object, topOpacity\);/.test(renderCullBody) || /renderCullCellVisible\(x, z, topVisible\)/.test(html)) {
@@ -229,6 +246,13 @@ if (!/function findFenceRenderSpan/.test(html) || !/function makeVoxelFenceSpan/
 }
 if (!/function getEditableIslandPropellerDiscMaterial/.test(html) || !/propellerDiscShader/.test(html) || !/propellerBlurDisc/.test(html)) {
   fail('editable island lift propellers must switch to a shared shader blur disc at high RPM');
+}
+if (!/const FLIGHT_MODEL_FWD_FIX/.test(html) || !/function isFlyableStampCell/.test(html) || !/window\.tickFlight = tickFlight/.test(html)) {
+  fail('flyable plane must stay wired as a Stamps model-stamp runtime, not a separate tool');
+}
+const flightSurfaceAtSceneBody = sourceFunctionBody(html, 'flightSurfaceAtScene');
+if (/for \(const key in cellMeshes\)/.test(flightSurfaceAtSceneBody) || !/flightCollectSurfaceCandidates\(scenePos\)/.test(flightSurfaceAtSceneBody)) {
+  fail('flight collision must use candidate cells instead of scanning all cellMeshes per frame');
 }
 if (!/const EDITABLE_ISLAND_PROP_LOCAL_Z = -2\.84/.test(html) || !/const EDITABLE_ISLAND_PROP_SPINDLE_LINK_Z = -2\.66/.test(html) || !/prop\.position\.set\(0,\s*0,\s*EDITABLE_ISLAND_PROP_LOCAL_Z - \(level - 1\) \* 0\.18\)/.test(html) || !/sourceCube\(body,\s*0,\s*0,\s*EDITABLE_ISLAND_PROP_SPINDLE_LINK_Z/.test(html) || !/prop\.userData\.spinRamp/.test(html)) {
   fail('editable island lift propellers must stay centered on the lift shaft and ramp into the blur disc');
@@ -337,6 +361,10 @@ if (!/function customTextureMaterial[\s\S]*base\.userData\.worldTextureScale[\s\
 }
 if (!/function makeSelectionPreviewObject/.test(html) || /makeVoxelBuild\(target\.cell\)/.test(html) || /makeGenericObject\(kind\)/.test(html)) {
   fail('selection preview must render real object factories instead of falling back to the blue cube');
+}
+const updateSelectionPreviewBody = sourceFunctionBody(html, 'updateSelectionPreview');
+if (!/previewBox\.hidden \|\| previewBox\.classList\.contains\('selection-staging'\)/.test(updateSelectionPreviewBody)) {
+  fail('hidden selection staging must not start the preview WebGL render loop');
 }
 if (/const useShaderAA = renderShaderAntialias > 0\.001 && !xrPresenting && !usePixelation/.test(html) || !/antialiasColor\(vUv, texel, col, edgeHint\)/.test(html)) {
   fail('shader antialiasing must work in pixel mode and be limited by edge detection');

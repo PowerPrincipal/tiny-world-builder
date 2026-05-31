@@ -50,6 +50,15 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
   local `THREE.InstancedMesh` buckets. Keep the legacy factory code intact; the
   optimization is a render-layer replacement for repeated live meshes, not a
   removal of the authored object.
+- `customParts` sphere/ellipsoid primitives use the shared
+  `getCustomPartEllipsoidGeometry(...)` cache and per-mesh scale. Do not create a
+  fresh `SphereGeometry` for every generated rounded part; repeated domes,
+  balloons, canopies, and tanks should share cached VBOs and be skipped by
+  `safeDisposeGeometry`.
+- Async texture/resource callbacks must repaint through `renderSceneIfReady()`,
+  not direct `renderScene()` calls. These callbacks can fire while classic
+  scripts are still loading; `bootApp()` flips `setRenderSceneReady(true)` only
+  after scene setup is complete and before the animation loop starts.
 - Home and duplicate floating-island bases count as voxel object assemblies too:
   run `optimizeVoxelObjectGroup(...)` after underside/engine/edge dressing is
   authored so repeated clamps, boxes, and small slabs batch before LOD copies
