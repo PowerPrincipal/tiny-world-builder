@@ -2129,6 +2129,21 @@
       });
     }
 
+    // Quick language flags in the appbar. Same reload-on-switch path as the
+    // settings select; mark the current locale active.
+    const langFlags = document.getElementById('lang-flags');
+    if (langFlags && window.TWI18N) {
+      langFlags.querySelectorAll('.lang-flag').forEach((btn) => {
+        if (btn.getAttribute('data-lang') === window.TWI18N.locale) {
+          btn.classList.add('is-active');
+          btn.setAttribute('aria-current', 'true');
+        }
+        btn.addEventListener('click', () => {
+          window.TWI18N.setLocale(btn.getAttribute('data-lang'));
+        });
+      });
+    }
+
     if (timeBtn && timePopup) {
       const range = document.getElementById('time-range');
       const readout = document.getElementById('time-readout');

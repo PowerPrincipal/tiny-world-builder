@@ -159,7 +159,17 @@
     var norm = normalize(code) || DEFAULT;
     try { window.localStorage.setItem(LS_KEY, norm); } catch (_) {}
     if (norm === locale) return;
-    // Reload-on-switch: re-resolve everything from a clean boot.
+    // A ?lang= param outranks the stored choice in resolveLocale(), so a switch
+    // while one is present would be undone on reload (the param re-forces the old
+    // locale). Drop it — the persisted choice is now the source of truth — then
+    // reload to re-resolve every surface from a clean boot.
+    try {
+      var url = new URL(window.location.href);
+      if (url.searchParams.has('lang')) {
+        url.searchParams.delete('lang');
+        window.history.replaceState(null, '', url.toString());
+      }
+    } catch (_) {}
     try { window.location.reload(); } catch (_) { locale = norm; apply(document); }
   }
 
