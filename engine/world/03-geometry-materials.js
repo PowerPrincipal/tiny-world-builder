@@ -200,6 +200,25 @@
   // -------- materials --------
   // Lambert (not Standard): non-PBR diffuse only, much more direct color response.
   // Stylized low-poly looks better with flat shading than physical energy conservation.
+  // Soft radial glow texture: white core fading to transparent. Additive light
+  // haze sprites (lamps, window halos) map to this so they read as soft round
+  // blooms instead of the hard SQUARE of an untextured sprite quad.
+  const softGlowTexture = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.6)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return tex;
+  })();
+
   const M = {
     grass:     new THREE.MeshLambertMaterial({ color: 0xb0d949, side: THREE.FrontSide }),
     grassEdge: new THREE.MeshLambertMaterial({ color: 0x95c138, side: THREE.FrontSide }),
@@ -336,6 +355,7 @@
       ].join('\n'),
     }),
     lampHazeSprite: new THREE.SpriteMaterial({
+      map: softGlowTexture,
       color: 0xffc875,
       transparent: true,
       opacity: 0.34,
@@ -344,6 +364,7 @@
       blending: THREE.AdditiveBlending,
     }),
     windowHalo: new THREE.SpriteMaterial({
+      map: softGlowTexture,
       color: 0xffd989,
       transparent: true,
       opacity: 0.24,
