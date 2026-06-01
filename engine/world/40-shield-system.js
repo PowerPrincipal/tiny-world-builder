@@ -641,8 +641,19 @@
         const cannonOut = shieldSmoothstep((wp - 0.45) / 0.55);
         for (const panel of this._weaponPorts) {
           const port = panel.userData.weaponPort;
+          // Panels deploy with a non-uniform scale: uniform in x/y (~1.2) but
+          // compressed to ~0.3 in z (thin slabs). The cannon + hatch are children,
+          // so without correction they get squished flat into the panel and never
+          // visibly protrude. Counter the z compression (x==y, so the effective
+          // scale stays uniform -> no shear with the hinge rotation). The slide
+          // position also divides by sz so the cannon travels a real world span.
+          const sx = panel.scale.x || 1;
+          const sz = panel.scale.z || 1;
+          const zc = sz !== 0 ? sx / sz : 1;
+          port.cannon.scale.z = zc;
+          port.hatchPivot.scale.z = zc;
           port.hatchPivot.rotation.x = SHIELD_HATCH_OPEN_ANGLE * hatchOpen;
-          port.cannon.position.z = shieldLerp(port.cannonRetractZ, port.cannonDeployZ, cannonOut);
+          port.cannon.position.z = shieldLerp(port.cannonRetractZ, port.cannonDeployZ, cannonOut) / sz;
           port.cannon.visible = wp > 0.4;
         }
       }
