@@ -379,7 +379,7 @@
 
   function makeIslandBannerTexture() {
     const tex = new THREE.TextureLoader().load(AUTOINCENTIVE_BANNER_DATA_URL, () => {
-      if (typeof renderSceneIfReady === 'function') renderSceneIfReady();
+      repaintAfterTextureLoad();
     });
     tex.encoding = THREE.sRGBEncoding;
     tex.anisotropy = (renderer.capabilities.getMaxAnisotropy

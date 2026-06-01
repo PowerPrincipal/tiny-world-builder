@@ -315,7 +315,7 @@
       const tex = new THREE.TextureLoader().load(url, () => {
         tex.needsUpdate = true;
         if (opts.modelStampId || (asset && asset.id)) scheduleModelStampRefresh(opts.modelStampId || asset.id);
-        if (typeof renderSceneIfReady === 'function') renderSceneIfReady();
+        repaintAfterTextureLoad();
       }, undefined, err => {
         if (opts.warn !== false) console.warn('[model-stamp] texture failed', url, err);
       });

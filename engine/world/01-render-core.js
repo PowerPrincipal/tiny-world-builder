@@ -1068,6 +1068,12 @@
     return true;
   }
 
+  // Shared async-load repaint callback: deduped across the texture loaders
+  // in 04/09/24 (01 loads first, so the name is available to them).
+  function repaintAfterTextureLoad() {
+    if (typeof renderSceneIfReady === 'function') renderSceneIfReady();
+  }
+
   function resetRenderCullStats() {
     renderCullStats.roots = 0;
     renderCullStats.cells = 0;

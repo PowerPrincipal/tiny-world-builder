@@ -266,8 +266,8 @@ const makeIslandBannerTextureBody = sourceFunctionBody(html, 'makeIslandBannerTe
 if (!/function renderSceneIfReady/.test(html) || !/setRenderSceneReady\(true\);\s*renderer\.setAnimationLoop\(animate\)/.test(html)) {
   fail('resource-load render callbacks must be gated until the scene is fully booted');
 }
-if (/renderScene\(\)/.test(createMaterialImageTextureBody) || /renderScene\(\)/.test(loadModelStampTextureBody) || /renderScene\(\)/.test(makeIslandBannerTextureBody) || !/renderSceneIfReady\(\)/.test(createMaterialImageTextureBody + loadModelStampTextureBody + makeIslandBannerTextureBody)) {
-  fail('async texture callbacks must use renderSceneIfReady instead of repainting during partial boot');
+if (/renderScene\(\)/.test(createMaterialImageTextureBody) || /renderScene\(\)/.test(loadModelStampTextureBody) || /renderScene\(\)/.test(makeIslandBannerTextureBody) || !/repaintAfterTextureLoad\(\)/.test(createMaterialImageTextureBody + loadModelStampTextureBody + makeIslandBannerTextureBody)) {
+  fail('async texture callbacks must use the shared repaintAfterTextureLoad helper instead of repainting during partial boot');
 }
 const renderCullBody = sourceFunctionBody(html, 'updateSceneVisibilityForCamera');
 if (!/setRenderCullVisible\(entry\.tile, visible\);/.test(renderCullBody) || !/setRenderCullOpacity\(entry\.object, topOpacity\);/.test(renderCullBody) || /renderCullCellVisible\(x, z, topVisible\)/.test(html)) {
