@@ -2187,6 +2187,16 @@
     stroke-linejoin: round;
   }
   .tool-palette .tool .tool-icon { color: var(--ink); }
+  /* Erase reads as a white-bodied glyph (like Select on its white tile) instead
+     of grey line-art: filled white with a dark outline. Scoped to erase so
+     Select / Connect / group icons keep their line-art style. */
+  .toolbar .tool[data-id="erase"] .tool-icon svg,
+  .tool-palette .tool[data-id="erase"] .tool-icon svg {
+    fill: #fff;
+    stroke: #2f3b57;
+    stroke-width: 1.6;
+    paint-order: stroke;
+  }
   .toolbar .tool-group-btn[data-group="terrain"]::before {
     -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'><path d='M3 19.5 9.2 7.7l4.1 7.1 2.3-3.2 5.4 7.9Z'/><path d='m9.2 7.7 2.2 3.7'/></svg>");
     mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'><path d='M3 19.5 9.2 7.7l4.1 7.1 2.3-3.2 5.4 7.9Z'/><path d='m9.2 7.7 2.2 3.7'/></svg>");
