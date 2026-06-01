@@ -87,6 +87,7 @@
   const flightSceneOrigin = new THREE.Vector3();
   const flightYawQuat = new THREE.Quaternion();
   const flightKeys = {};
+  window.__flightKeys = flightKeys; // read by 41-flight-combat for gun fire
 
   // sim-space -> scene-space similarity transform
   const _flf0 = new THREE.Vector3();
@@ -575,8 +576,36 @@
     // single-player / un-upgraded multiplayer simply no-ops.
     const mp = window.__tinyworldMultiplayer;
     if (mp && typeof mp.broadcastFlight === 'function') mp.broadcastFlight(true);
+    if (window.__flightCombat && typeof window.__flightCombat.tick === 'function') {
+      window.__flightCombat.tick(dt);
+    }
   }
   window.tickFlight = tickFlight;
+
+  // Scene-space travel-forward of the plane (unit vector), with the visual
+  // FLIGHT_MODEL_FWD_FIX 180-degree spin backed out. This is the direction the
+  // nose actually travels, which combat fires along. Exposed for 41-flight-combat.js.
+  const _flSceneFwd = new THREE.Vector3();
+  const _flSceneFwdQuat = new THREE.Quaternion();
+  window.__flightSceneForward = function (out) {
+    const v = out || _flSceneFwd;
+    _flSceneFwdQuat.copy(flightYawQuat).multiply(flightPlane.quat);
+    return v.set(0, 0, -1).applyQuaternion(_flSceneFwdQuat).normalize();
+  };
+
+  window.__flightRelaunch = function () {
+    if (!flightActive) return;
+    const launchSimY = (FLIGHT_SCENE_GEAR_CLEARANCE + FLIGHT_SCENE_LAUNCH_CLEARANCE) / FLIGHT_SIM_TO_SCENE;
+    flightPlane.pos.set(0, launchSimY, 0);
+    flightPlane.vel.set(0, 0, -34);
+    flightPlane.angVel.set(0, 0, 0);
+    flightPlane.quat.identity();
+    flightPlane.throttle = flightPlane.throttleTarget = 0.6;
+    flightPlane.onGround = false;
+    flightImpactCooldown = 0;
+    _flCamInit = false;
+    flightSetHudStatus('FLYING');
+  };
 
   // -------- enter / exit --------
   // The flyable plane is the existing crop-duster/stunt-plane MODEL-STAMP
@@ -641,6 +670,9 @@
     window.__flightActive = true;
     flightSetHudStatus('FLYING');
     showFlightHud(true);
+    if (window.__flightCombat && typeof window.__flightCombat.onEnter === 'function') {
+      window.__flightCombat.onEnter(jet);
+    }
     return true;
   }
 
@@ -655,6 +687,9 @@
     flightPrevCamera = null;
     document.body.classList.remove('flight-active');
     window.__flightActive = false;
+    if (window.__flightCombat && typeof window.__flightCombat.onExit === 'function') {
+      window.__flightCombat.onExit();
+    }
     showFlightHud(false);
     // restore the parked plane to its resting transform
     if (flightCell && typeof renderCellObject === 'function') {
@@ -714,6 +749,7 @@
     KeyW: 1, KeyS: 1, KeyX: 1, KeyA: 1, KeyD: 1, KeyQ: 1, KeyE: 1, KeyB: 1,
     ShiftLeft: 1, ShiftRight: 1, ControlLeft: 1, ControlRight: 1,
     ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1,
+    Space: 1,
   };
   window.addEventListener('keydown', e => {
     if (!flightActive) return;
@@ -732,6 +768,16 @@
       e.stopImmediatePropagation();
     }
   }, true);
+  // Mouse fire-intent: left button while flying. 41-flight-combat reads
+  // window.__flightFireHeld. Gated on flightActive so it only arms in flight.
+  window.__flightFireHeld = false;
+  window.addEventListener('pointerdown', e => {
+    if (flightActive && e.button === 0) { window.__flightFireHeld = true; }
+  }, true);
+  window.addEventListener('pointerup', e => {
+    if (e.button === 0) window.__flightFireHeld = false;
+  }, true);
+
   window.addEventListener('resize', () => {
     if (flightCam) { flightCam.aspect = window.innerWidth / window.innerHeight; flightCam.updateProjectionMatrix(); }
   });

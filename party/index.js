@@ -59,6 +59,9 @@ const RATE_LIMITS = {
   // Typing indicator fires on keystrokes — needs its own bucket or it becomes a
   // spam vector. Generous enough for fast typing, capped against abuse.
   'chat.typing': { refill: 8, burst: 16 },
+  // Combat hit reports: gun bursts ~9/s, two muzzles, plus missiles. Generous
+  // sustained cap, bounded burst, so a socket cannot flood a victim.
+  'combat.hit': { refill: 30, burst: 60 },
 };
 
 function takeToken(buckets, type, now) {
@@ -398,6 +401,19 @@ export default class TinyWorldParty {
       const known = this.presence.get(sender.id);
       const name = cleanText((known && known.name) || data.name || 'Builder', 48) || 'Builder';
       this.broadcastToAdmitted({ type: 'chat.typing', id: sender.id, name, typing: data.typing === true }, sender.id);
+      return;
+    }
+
+    if (data.type === 'combat.hit') {
+      // PvP damage report. Admitted-only. Routed ONLY to the targeted peer (not
+      // broadcast); the server stamps by = sender.id so a peer cannot spoof the
+      // shooter. The victim's own client owns its health/death.
+      if (!this.admitted.has(sender.id)) return;
+      const to = cleanText(data.to, 96);
+      if (!to || !this.admitted.has(to)) return;
+      const damage = Math.max(0, Math.min(10000, cleanNumber(data.damage, 0)));
+      const source = cleanText(data.source, 24) || 'gun';
+      this.sendTo(to, { type: 'combat.hit', to, by: sender.id, damage, source });
       return;
     }
 

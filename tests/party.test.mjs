@@ -260,6 +260,27 @@ test('host leaving promotes the next admitted member to host', () => {
   assert.ok(typesTo(room.getConnection('e')).includes('role'));
 });
 
+test('combat.hit routes only to the targeted peer, stamped with shooter id', () => {
+  const { connect, send } = setup();
+  const host = connect('host');           // first connection becomes host
+  // admit two peers as players
+  const a = connect('peerA');
+  const b = connect('peerB');
+  send(host, { type: 'admit', id: 'peerA', role: 'player' });
+  send(host, { type: 'admit', id: 'peerB', role: 'player' });
+  // peerA shoots peerB
+  a.received.length = 0; b.received.length = 0; host.received.length = 0;
+  send(a, { type: 'combat.hit', to: 'peerB', damage: 8, source: 'gun' });
+  // only B receives it, stamped by = peerA
+  const bMsg = b.received.find(m => m.type === 'combat.hit');
+  assert.ok(bMsg, 'peerB should receive the hit');
+  assert.equal(bMsg.by, 'peerA');
+  assert.equal(bMsg.to, 'peerB');
+  assert.equal(bMsg.damage, 8);
+  assert.equal(a.received.find(m => m.type === 'combat.hit'), undefined, 'shooter should not receive its own hit');
+  assert.equal(host.received.find(m => m.type === 'combat.hit'), undefined, 'host should not receive the hit');
+});
+
 test('a returning admitted member (same id) is re-admitted, not re-lobbied', () => {
   const { party, connect, send, room } = setup();
   const host = connect('h');

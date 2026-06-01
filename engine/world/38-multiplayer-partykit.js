@@ -1726,6 +1726,13 @@
       } else if (data.type === 'chat.typing') {
         // A peer's typing indicator (never our own — server excludes the sender).
         handleRemoteTyping(data);
+      } else if (data.type === 'combat.hit') {
+        // Targeted PvP damage. The server already routes only to us, but guard
+        // on our own id for defense-in-depth. The victim owns its own health.
+        if (data.to === (serverClientId || localClientId) &&
+            window.__flightCombat && typeof window.__flightCombat.onIncomingHit === 'function') {
+          window.__flightCombat.onIncomingHit(data);
+        }
       }
     }
 
@@ -1852,6 +1859,15 @@
       // tick while flying (self-throttled to ~15/s) and once with active:false
       // on exit so peers drop the ghost. Reads __flightJet itself.
       broadcastFlight,
+      // Live remote-player flight ghosts for combat targeting (41-flight-combat).
+      // Returns lightweight refs; consumers must not mutate the groups.
+      flightGhosts: () => {
+        const out = [];
+        flightGhosts.forEach((ghost, id) => {
+          if (ghost && ghost.group && ghost.group.visible) out.push({ id, group: ghost.group });
+        });
+        return out;
+      },
       send: sendMessage,
       // Chat hooks (open/close the panel, post a line) for any caller that wants
       // to drive chat programmatically. No-ops gracefully until admitted.
