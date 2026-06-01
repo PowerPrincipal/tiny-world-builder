@@ -174,6 +174,63 @@
 
   // ---- HUD overlay + reticle ----
   let overlayEl = null, reticleEl = null;
+
+  // ---- target HUD pool ----
+  const HUD_TARGET_LIMIT = 6;
+  const hudPool = [];
+  let lockId = ''; // set by the lock system in a later task
+  function ensureHudPool() {
+    if (hudPool.length || !overlayEl) return;
+    for (let i = 0; i < HUD_TARGET_LIMIT; i++) {
+      const bracket = document.createElement('div');
+      bracket.className = 'fc-target-bracket';
+      bracket.style.display = 'none';
+      const card = document.createElement('div');
+      card.className = 'fc-target-card';
+      card.style.display = 'none';
+      overlayEl.appendChild(bracket);
+      overlayEl.appendChild(card);
+      hudPool.push({ bracket, card });
+    }
+  }
+
+  const _tpos = new THREE.Vector3();
+  const _tproj = new THREE.Vector3();
+  const _camPos = new THREE.Vector3();
+  function updateTargetHud() {
+    if (!overlayEl) return;
+    camera.getWorldPosition(_camPos);
+    let used = 0;
+    for (const tgt of targets) {
+      if (used >= HUD_TARGET_LIMIT) break;
+      tgt.getWorldPos(_tpos);
+      _tproj.copy(_tpos).project(camera);
+      if (_tproj.z > 1) continue; // behind camera / beyond far plane
+      const sx = (_tproj.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-_tproj.y * 0.5 + 0.5) * window.innerHeight;
+      const dist = _camPos.distanceTo(_tpos);
+      const px = Math.max(18, Math.min(160, (tgt.radius * 2 / Math.max(0.001, dist)) * window.innerHeight * 0.9));
+      const slot = hudPool[used++];
+      slot.bracket.style.display = 'block';
+      slot.bracket.style.left = (sx - px / 2) + 'px';
+      slot.bracket.style.top = (sy - px / 2) + 'px';
+      slot.bracket.style.width = px + 'px';
+      slot.bracket.style.height = px + 'px';
+      slot.bracket.classList.toggle('locked', tgt.id === lockId);
+      slot.card.style.display = 'block';
+      slot.card.style.left = (sx + px / 2 + 4) + 'px';
+      slot.card.style.top = (sy - px / 2) + 'px';
+      const altU = Math.round(tgt._pos ? tgt._pos.y : 0);
+      slot.card.textContent =
+        tgt.label() + '\nDST ' + Math.round(dist) +
+        '\nSPD ' + Math.round(tgt.speedKts()) + 'kt' +
+        '\nALT ' + altU;
+    }
+    for (let i = used; i < hudPool.length; i++) {
+      hudPool[i].bracket.style.display = 'none';
+      hudPool[i].card.style.display = 'none';
+    }
+  }
   const reticleState = { x: 0, y: 0, vx: 0, vy: 0, init: false };
   const _aimWorld = new THREE.Vector3();
   const _aimProj = new THREE.Vector3();
@@ -219,6 +276,7 @@
     shotsFired = 0;
     ensureTracerPool();
     ensureOverlay();
+    ensureHudPool();
     reticleState.init = false;
     muzzlesReady = deriveMuzzles();
   }
@@ -226,6 +284,7 @@
   function onExit() {
     active = false;
     jet = null;
+    for (const slot of hudPool) { slot.bracket.style.display = 'none'; slot.card.style.display = 'none'; }
   }
 
   function tick(dt) {
@@ -241,6 +300,7 @@
     }
     updateTracers(dt);
     updateReticle(dt);
+    updateTargetHud();
   }
 
   function telemetry() {
