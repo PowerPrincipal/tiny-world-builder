@@ -48,7 +48,28 @@
     };
   }
 
-  function onHitPlayer(/* peerId, amount, source */) { /* implemented in a later task */ }
+  function onHitPlayer(peerId, amount, source) {
+    const mp = window.__tinyworldMultiplayer;
+    if (mp && typeof mp.send === 'function') {
+      mp.send({ type: 'combat.hit', to: peerId, damage: amount, source: source || 'gun' });
+    }
+  }
+
+  function onIncomingHit(msg) {
+    if (!active) return;
+    health -= Number(msg.damage) || 0;
+    if (jet) { jet.getWorldPosition(_fcSparkTmp); spawnHitSparks(_fcSparkTmp); }
+    if (health <= 0) { health = 0; doDeathAndRelaunch(); }
+  }
+  function spawnExplosionFX(pos) {
+    // bigger burst than a normal hit, reusing the spark pool
+    for (let k = 0; k < 3; k++) spawnHitSparks(pos);
+  }
+  function doDeathAndRelaunch() {
+    if (jet) { jet.getWorldPosition(_fcSparkTmp); spawnExplosionFX(_fcSparkTmp); }
+    health = MAX_HEALTH;
+    if (typeof window.__flightRelaunch === 'function') window.__flightRelaunch();
+  }
 
   function collectTargets(dt) {
     targets.length = 0;
@@ -461,5 +482,5 @@
     };
   }
 
-  window.__flightCombat = { onEnter, onExit, tick, telemetry };
+  window.__flightCombat = { onEnter, onExit, tick, telemetry, onIncomingHit };
 })();

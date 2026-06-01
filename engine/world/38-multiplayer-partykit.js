@@ -1726,6 +1726,13 @@
       } else if (data.type === 'chat.typing') {
         // A peer's typing indicator (never our own — server excludes the sender).
         handleRemoteTyping(data);
+      } else if (data.type === 'combat.hit') {
+        // Targeted PvP damage. The server already routes only to us, but guard
+        // on our own id for defense-in-depth. The victim owns its own health.
+        if (data.to === (serverClientId || localClientId) &&
+            window.__flightCombat && typeof window.__flightCombat.onIncomingHit === 'function') {
+          window.__flightCombat.onIncomingHit(data);
+        }
       }
     }
 

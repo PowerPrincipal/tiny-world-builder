@@ -593,6 +593,20 @@
     return v.set(0, 0, -1).applyQuaternion(_flSceneFwdQuat).normalize();
   };
 
+  window.__flightRelaunch = function () {
+    if (!flightActive) return;
+    const launchSimY = (FLIGHT_SCENE_GEAR_CLEARANCE + FLIGHT_SCENE_LAUNCH_CLEARANCE) / FLIGHT_SIM_TO_SCENE;
+    flightPlane.pos.set(0, launchSimY, 0);
+    flightPlane.vel.set(0, 0, -34);
+    flightPlane.angVel.set(0, 0, 0);
+    flightPlane.quat.identity();
+    flightPlane.throttle = flightPlane.throttleTarget = 0.6;
+    flightPlane.onGround = false;
+    flightImpactCooldown = 0;
+    _flCamInit = false;
+    flightSetHudStatus('FLYING');
+  };
+
   // -------- enter / exit --------
   // The flyable plane is the existing crop-duster/stunt-plane MODEL-STAMP
   // (models/stunt_plane.glb), placed via the Stamps system as a 'model-stamp'
