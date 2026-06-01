@@ -411,7 +411,7 @@ export default class TinyWorldParty {
       if (!this.admitted.has(sender.id)) return;
       const to = cleanText(data.to, 96);
       if (!to || !this.admitted.has(to)) return;
-      const damage = cleanNumber(data.damage, 0);
+      const damage = Math.max(0, Math.min(10000, cleanNumber(data.damage, 0)));
       const source = cleanText(data.source, 24) || 'gun';
       this.sendTo(to, { type: 'combat.hit', to, by: sender.id, damage, source });
       return;

@@ -57,7 +57,8 @@
 
   function onIncomingHit(msg) {
     if (!active) return;
-    health -= Number(msg.damage) || 0;
+    const dmg = Math.max(0, Number(msg.damage) || 0);
+    health = Math.max(0, Math.min(MAX_HEALTH, health - dmg));
     if (jet) { jet.getWorldPosition(_fcSparkTmp); spawnHitSparks(_fcSparkTmp); }
     if (health <= 0) { health = 0; doDeathAndRelaunch(); }
   }
@@ -68,6 +69,11 @@
   function doDeathAndRelaunch() {
     if (jet) { jet.getWorldPosition(_fcSparkTmp); spawnExplosionFX(_fcSparkTmp); }
     health = MAX_HEALTH;
+    missilesAmmo = MISSILE_COUNT;
+    missileCooldown = 0;
+    missileSide = -1;
+    _fcXPrev = false;
+    for (const m of missiles) deactivateMissile(m);
     if (typeof window.__flightRelaunch === 'function') window.__flightRelaunch();
   }
 
@@ -151,7 +157,7 @@
       _muzzleWorld.copy(local);
       jet.localToWorld(_muzzleWorld);
       spawnTracer(_muzzleWorld, dir);
-      attemptInstantHit(_muzzleWorld, dir); // no-op until a later task
+      attemptInstantHit(_muzzleWorld, dir);
     }
     shotsFired++;
   }
@@ -536,6 +542,7 @@
   let missileCooldown = 0;
   let missileSide = -1;
   let _fcXPrev = false;
+  let _fcFrame = 0;
   const MISSILE_SPEED = 70, MISSILE_LIFE = 5.5, MISSILE_TURN = 2.4, MISSILE_DAMAGE = 40;
   const _fcMForward = new THREE.Vector3();
   const _fcMToTarget = new THREE.Vector3();
@@ -558,7 +565,7 @@
       g.add(b, n); g.visible = false; g.raycast = () => {};
       missileGroup.add(g);
       missiles.push({ mesh: g, vel: new THREE.Vector3(), pos: new THREE.Vector3(),
-        targetId: '', life: 0, active: false });
+        targetId: '', life: 0, active: false, sceneryPhase: i % 4 });
     }
   }
   function findTargetById(id) { for (const t of targets) if (t.id === id) return t; return null; }
@@ -597,8 +604,9 @@
           deactivateMissile(m); continue;
         }
       }
-      // dumb-fire / missed-player missiles still knock down scenery
-      if (attemptSceneryHit(m.pos, _fcMTrailTmp.copy(m.vel).normalize(), 60, 1.2)) {
+      // scenery knockdown (throttled per-missile to avoid scanning all cells every frame)
+      if ((_fcFrame % 4) === (m.sceneryPhase || 0) &&
+          attemptSceneryHit(m.pos, _fcMTrailTmp.copy(m.vel).normalize(), 60, 1.2)) {
         spawnExplosionFX(m.pos);
         deactivateMissile(m); continue;
       }
@@ -635,10 +643,13 @@
     lockAmount = 0; lockCandidateId = ''; lockId = '';
     for (const slot of hudPool) { slot.bracket.style.display = 'none'; slot.card.style.display = 'none'; }
     for (const m of missiles) deactivateMissile(m);
+    for (const tr of tracers) { tr.active = false; if (tr.mesh) tr.mesh.visible = false; }
+    for (const sp of sparks) { sp.active = false; if (sp.sprite) sp.sprite.visible = false; }
   }
 
   function tick(dt) {
     if (!active || !(dt > 0)) return;
+    _fcFrame++;
     fireCooldown = Math.max(0, fireCooldown - dt);
     if (!muzzlesReady) muzzlesReady = deriveMuzzles();
     collectTargets(dt);
