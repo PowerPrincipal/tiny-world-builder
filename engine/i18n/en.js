@@ -78,7 +78,7 @@
     'worldmenu.empty': 'No saved worlds yet. Build one and choose “Save as new”.',
     'worldmenu.saveAs': 'Save as new',
     'worldmenu.share': 'Copy share URL',
-    'worldmenu.collaborate': 'Copy collaborate URL',
+    'worldmenu.collaborate': 'Start collaborate room',
     'worldmenu.cloud': 'Cloud worlds',
     'unsaved.banner': "Areas outside your home grid aren't saved",
 

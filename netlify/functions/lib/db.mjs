@@ -3,9 +3,35 @@ import { getConnectionString } from '@netlify/database';
 
 let _twSql = null;
 
+function envValue(name) {
+  try {
+    if (globalThis.Netlify && Netlify.env && typeof Netlify.env.get === 'function') {
+      const value = Netlify.env.get(name);
+      if (value) return value;
+    }
+  } catch (_) {}
+  return process.env[name] || '';
+}
+
+function connectionStringFromEnv() {
+  for (const name of ['NETLIFY_DB_URL', 'DATABASE_URL', 'POSTGRES_URL', 'NETLIFY_DATABASE_URL']) {
+    const value = envValue(name);
+    if (value) return value;
+  }
+  return getConnectionString();
+}
+
+export function isDatabaseUnavailable(err) {
+  return !!(err && (
+    err.name === 'MissingDatabaseConnectionError'
+    || /Netlify Database/i.test(String(err.message || ''))
+    || /NETLIFY_DB_URL/i.test(String(err.message || ''))
+  ));
+}
+
 export function getSql() {
   if (!_twSql) {
-    const connectionString = process.env.NETLIFY_DB_URL || getConnectionString();
+    const connectionString = connectionStringFromEnv();
     _twSql = postgres(connectionString, {
       max: 1,
       idle_timeout: 20,

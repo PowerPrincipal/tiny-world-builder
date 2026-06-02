@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { requireAuthUser } from './lib/auth.mjs';
-import { getSql } from './lib/db.mjs';
+import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { ensureProfile } from './lib/profiles.mjs';
 
@@ -49,10 +49,9 @@ export default async function shareFunction(request) {
   const origin = request.headers.get('origin');
   if (request.method === 'OPTIONS') return corsResponse(origin);
 
-  const sql = getSql();
-
   try {
     if (request.method === 'GET') {
+      const sql = getSql();
       const id = new URL(request.url).searchParams.get('id') || '';
       if (!validShareId(id)) return errorResponse('Invalid share id', 400, origin);
       const rows = await sql`
@@ -69,6 +68,7 @@ export default async function shareFunction(request) {
       if (!sameOriginWriteGuard(request)) return errorResponse('Forbidden', 403, origin);
       const auth = await requireAuthUser(request, origin);
       if (auth.response) return auth.response;
+      const sql = getSql();
       const profile = await ensureProfile(auth.user);
       const body = await readJson(request);
       if (!body || typeof body !== 'object') return errorResponse('Invalid JSON body', 400, origin);
@@ -122,6 +122,9 @@ export default async function shareFunction(request) {
 
     return errorResponse('Method not allowed', 405, origin);
   } catch (err) {
+    if (isDatabaseUnavailable(err)) {
+      return errorResponse('Netlify Database is not available in this local session.', 503, origin);
+    }
     console.error('[share]', err);
     return errorResponse('Share request failed', 500, origin);
   }

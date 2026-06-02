@@ -12,6 +12,12 @@ backend:
   `profile.mjs`, `builds.mjs`, `share.mjs`, and `assets.mjs` are routed to
   `/api/profile`, `/api/builds`, `/api/share`, and `/api/assets` via each
   function's exported `config.path`.
+- Wallet/social functions also live under `netlify/functions/`: `wallet.mjs`
+  verifies Phantom-signed Solana wallet challenges and reads `$TINYWORLD`
+  balances/activity from RPC, `wallet-payments.mjs` creates Solana Pay payment
+  intents, `players.mjs` tracks online presence/search/chat requests/parties,
+  and `livekit-token.mjs` issues LiveKit room tokens when `LIVEKIT_URL`,
+  `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` are configured.
 - User auth is Netlify Identity. The browser bridge is self-hosted through
   `vendor/tinyworld-auth.js` with an import map to vendored
   `@netlify/identity` / `gotrue-js`; do not reintroduce a remote identity
@@ -37,6 +43,16 @@ backend:
   `asset_libraries` row per profile containing custom voxel-build stamps and
   saved asset templates. Browser hooks in `saveCustomVoxelBuildStamps()` and
   `saveAssetTemplates()` queue a cloud sync after login.
+- Local Netlify Database failures are expected in some `netlify dev` sessions.
+  Translate 503 `Netlify Database is not available...` responses into a friendly
+  account/cloud status or `warn` toast, never a red production-style error toast,
+  raw database message, or visible `Local DB offline` wording.
+- Phantom wallet linking must stay challenge/response based: the browser asks
+  Phantom to sign the server-issued message and the function verifies the
+  Ed25519 signature against the Solana public key before linking. Do not accept
+  a posted wallet address as proof of ownership. `$TINYWORLD` mint/payment
+  values come from env (`TINYWORLD_TOKEN_MINT`, `TINYWORLD_PAYMENT_WALLET`,
+  optional `SOLANA_RPC_URL`) rather than client constants.
 - Database schema changes belong in `netlify/database/migrations/*.sql`. Deploy
   previews get their own database branch, so use a preview deploy for real
   Identity + DB verification; local `netlify dev` is useful for functions but is

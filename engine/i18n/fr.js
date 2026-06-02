@@ -60,7 +60,7 @@
     'worldmenu.empty': 'Aucun monde enregistré. Créez-en un et choisissez « Enregistrer comme nouveau ».',
     'worldmenu.saveAs': 'Enregistrer comme nouveau',
     'worldmenu.share': 'Copier le lien de partage',
-    'worldmenu.collaborate': 'Copier le lien de collaboration',
+    'worldmenu.collaborate': 'Démarrer la salle de collaboration',
     'worldmenu.cloud': 'Mondes dans le cloud',
     'unsaved.banner': 'Les zones hors de votre grille principale ne sont pas enregistrées',
 

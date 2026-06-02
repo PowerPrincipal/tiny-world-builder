@@ -1112,19 +1112,19 @@
 
   window.__generateLandscapeWorld = generateLandscapeWorld;
 
-  async function generateWorld(provider, model, key, userPrompt, gridSize) {
+  async function generateWorld(provider, model, key, userPrompt, gridSize, opts = {}) {
     const requestedGridSize = coerceGridSize(gridSize, GRID);
     const system = buildSystemPrompt(requestedGridSize);
     const def = AI_DEFAULTS[provider];
     if (!def) throw new Error('unknown provider: ' + provider);
     let raw;
     if (provider === 'anthropic') {
-      raw = await callAnthropic(def.endpoint, key, model || def.model, system, userPrompt);
+      raw = await callAnthropic(def.endpoint, key, model || def.model, system, userPrompt, null, opts);
     } else if (provider === 'gemini') {
-      raw = await callGemini(def.endpoint, key, model || def.model, system, userPrompt);
+      raw = await callGemini(def.endpoint, key, model || def.model, system, userPrompt, opts);
     } else {
       // OpenAI + xAI share the chat-completions shape.
-      raw = await callOpenAI(def.endpoint, key, model || def.model, system, userPrompt);
+      raw = await callOpenAI(def.endpoint, key, model || def.model, system, userPrompt, opts);
     }
     const parsed = extractJSON(raw);
     if (!parsed) {
@@ -1230,4 +1230,3 @@
     if (!suggestions.length) throw new Error('schema check: suggestions empty');
     return suggestions;
   }
-

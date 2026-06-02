@@ -66,9 +66,10 @@
   let twCloudPrefSyncTimer = null;
   let twCloudPrefSyncing = false;
   let twCloudApplyingPrefs = false;
+  let twCloudDatabaseUnavailable = false;
 
   function twCloudLoggedIn() {
-    return !!(window.TinyWorldAuth && window.__loggedIn);
+    return !!(window.__tinyworldAuthEnabled && window.TinyWorldAuth && window.__loggedIn);
   }
 
   function twCloudSlotId(buildId) {
@@ -134,11 +135,25 @@
       try { data = text ? JSON.parse(text) : null; } catch (_) {
         data = { error: text || r.statusText || ('HTTP ' + r.status) };
       }
-      if (!r.ok) return data || { error: r.statusText || ('HTTP ' + r.status) };
+      if (!r.ok) {
+        const out = data || { error: r.statusText || ('HTTP ' + r.status) };
+        out.status = r.status;
+        out.cloudUnavailable = r.status === 503 && /Netlify Database is not available/i.test(String(out.error || ''));
+        if (out.cloudUnavailable) {
+          out.rawError = out.error;
+          out.error = 'Cloud account features are unavailable in this Netlify session.';
+          twCloudDatabaseUnavailable = true;
+        }
+        return out;
+      }
       return data;
     } catch (err) {
       return { error: err.message || 'Network error' };
     }
+  }
+
+  function twCloudIsUnavailable(result) {
+    return !!(result && result.cloudUnavailable);
   }
 
   async function twCloudLoadWorlds(force) {
@@ -151,6 +166,8 @@
     const list = await twCloudApiCall('/api/builds', 'GET');
     if (Array.isArray(list)) {
       twCloudWorldCache = list;
+      twCloudWorldCacheAt = Date.now();
+    } else if (twCloudIsUnavailable(list)) {
       twCloudWorldCacheAt = Date.now();
     }
     return twCloudWorldCache;
@@ -322,7 +339,7 @@
           if (delta.renameId) slot.id = delta.renameId;
           if (identity) cloudDeltas.set(identity, delta);
           changed = true;
-        } else if (saved && saved.error) {
+        } else if (saved && saved.error && !twCloudIsUnavailable(saved)) {
           console.warn('[cloud-worlds] sync failed:', saved.error);
         }
       }
@@ -344,7 +361,7 @@
         if (newSlot && !fresh.some(s => s.id === newSlot.id)) fresh.push(newSlot);
         writeWorldsMeta(fresh);
       }
-      await twCloudLoadWorlds(true);
+      if (!twCloudDatabaseUnavailable) await twCloudLoadWorlds(true);
       if (typeof window.__tinyworldWorldMenuRefresh === 'function') window.__tinyworldWorldMenuRefresh();
       if (typeof window.__tinyworldAccountWorldsRefresh === 'function') window.__tinyworldAccountWorldsRefresh();
       return changed;
@@ -447,7 +464,7 @@
       const remote = await twCloudApiCall('/api/assets', 'GET');
       if (remote && !remote.error) twCloudMergeAssetsIntoLocal(remote);
       const saved = await twCloudPutAssetLibrary();
-      if (saved && saved.error) console.warn('[cloud-assets] sync failed:', saved.error);
+      if (saved && saved.error && !twCloudIsUnavailable(saved)) console.warn('[cloud-assets] sync failed:', saved.error);
     } finally {
       twCloudAssetSyncing = false;
     }
@@ -543,7 +560,7 @@
       const remote = await twCloudApiCall('/api/preferences', 'GET');
       const pulled = (remote && !remote.error) ? twCloudApplyPreferences(remote) : false;
       const saved = await twCloudPutPreferences();
-      if (saved && saved.error) console.warn('[cloud-prefs] sync failed:', saved.error);
+      if (saved && saved.error && !twCloudIsUnavailable(saved)) console.warn('[cloud-prefs] sync failed:', saved.error);
       return pulled;
     } finally {
       twCloudPrefSyncing = false;
@@ -598,9 +615,13 @@
     const closeBtn = document.getElementById('account-close');
     const tabProfile = document.getElementById('tab-profile');
     const tabSaves = document.getElementById('tab-saves');
+    const tabWallet = document.getElementById('tab-wallet');
+    const tabPlayers = document.getElementById('tab-players');
     const tabApi = document.getElementById('tab-api');
     const panelProfile = document.getElementById('panel-profile');
     const panelSaves = document.getElementById('panel-saves');
+    const panelWallet = document.getElementById('panel-wallet');
+    const panelPlayers = document.getElementById('panel-players');
     const panelApi = document.getElementById('panel-api');
     const profileUsername = document.getElementById('profile-username');
     const profileDisplayName = document.getElementById('profile-display-name');
@@ -623,17 +644,27 @@
     function showTab(tab) {
       tabProfile.classList.toggle('active', tab === 'profile');
       tabSaves.classList.toggle('active',   tab === 'saves');
+      if (tabWallet) tabWallet.classList.toggle('active', tab === 'wallet');
+      if (tabPlayers) tabPlayers.classList.toggle('active', tab === 'players');
       if (tabApi) tabApi.classList.toggle('active', tab === 'api');
       panelProfile.hidden = tab !== 'profile';
       panelSaves.hidden   = tab !== 'saves';
+      if (panelWallet) panelWallet.hidden = tab !== 'wallet';
+      if (panelPlayers) panelPlayers.hidden = tab !== 'players';
       if (panelApi) panelApi.hidden = tab !== 'api';
       if (tab === 'saves') loadBuilds();
+      if (tab === 'wallet' && typeof window.__renderWalletPanel === 'function') window.__renderWalletPanel();
+      if (tab === 'players' && typeof window.__renderPlayersPanel === 'function') window.__renderPlayersPanel();
       if (tab === 'api' && typeof window.__renderApiPanel === 'function') window.__renderApiPanel();
     }
     // Initialise the API panel handlers once per account-modal lifetime.
     if (typeof window.__initApiPanel === 'function') window.__initApiPanel();
+    if (typeof window.__initWalletPanel === 'function') window.__initWalletPanel();
+    if (typeof window.__initPlayersPanel === 'function') window.__initPlayersPanel();
     tabProfile.addEventListener('click', () => showTab('profile'));
     tabSaves.addEventListener('click', () => showTab('saves'));
+    if (tabWallet) tabWallet.addEventListener('click', () => showTab('wallet'));
+    if (tabPlayers) tabPlayers.addEventListener('click', () => showTab('players'));
     if (tabApi) tabApi.addEventListener('click', () => showTab('api'));
 
     function openModal() { openTinyModal(modal, closeBtn); }
@@ -887,6 +918,7 @@
       window.__tinyworldAuthReady.then(() => initAuth()).catch(() => initAuth());
       return;
     }
+    window.__tinyworldAuthEnabled = !!Auth;
     if (!Auth) {
       // No auth library — single-user local mode. Hide all auth UI
       // and treat the user as logged in so settings/AI aren't
@@ -963,16 +995,24 @@
     document.getElementById('auth-show-login').addEventListener('click', () => showForm('login'));
     document.getElementById('auth-back-login').addEventListener('click', () => showForm('login'));
 
-    // Google OAuth
-    document.getElementById('auth-google-login').addEventListener('click', () => Auth.oauthLogin('google'));
-    document.getElementById('auth-google-signup').addEventListener('click', () => Auth.oauthLogin('google'));
-
-    // Show Google buttons if the provider is enabled
+    // OAuth providers: show only providers enabled in Netlify Identity settings.
+    ['google', 'github'].forEach(provider => {
+      const login = document.getElementById('auth-' + provider + '-login');
+      const signup = document.getElementById('auth-' + provider + '-signup');
+      if (login) login.addEventListener('click', () => Auth.oauthLogin(provider));
+      if (signup) signup.addEventListener('click', () => Auth.oauthLogin(provider));
+    });
     Auth.getSettings().then(settings => {
-      if (settings && settings.providers && settings.providers.google) {
-        document.getElementById('auth-oauth-login').hidden = false;
-        document.getElementById('auth-oauth-signup').hidden = false;
-      }
+      const providers = settings && settings.providers ? settings.providers : {};
+      const enabled = ['google', 'github'].filter(provider => providers[provider]);
+      enabled.forEach(provider => {
+        const login = document.getElementById('auth-' + provider + '-login');
+        const signup = document.getElementById('auth-' + provider + '-signup');
+        if (login) login.hidden = false;
+        if (signup) signup.hidden = false;
+      });
+      document.getElementById('auth-oauth-login').hidden = enabled.length === 0;
+      document.getElementById('auth-oauth-signup').hidden = enabled.length === 0;
     }).catch(() => {});
 
     // Tracks the live login state so gated controls can react to it.
@@ -2507,7 +2547,7 @@
           writeWorldsMeta(next);
           if (cloudId) {
             twCloudDeleteWorld(cloudId).then(result => {
-              if (result && result.error) twToast(result.error, 'err');
+              if (result && result.error && !twCloudIsUnavailable(result)) twToast(result.error, 'err');
               paintList(); paintLabel();
               if (typeof window.__tinyworldAccountWorldsRefresh === 'function') window.__tinyworldAccountWorldsRefresh();
             }).catch(err => twToast((err && err.message) || 'Delete failed.', 'err'));
@@ -2533,7 +2573,7 @@
             const localId = twCloudCacheBuildLocally(full);
             if (localId) id = localId;
           } else if (full && full.error) {
-            twToast(full.error, 'err');
+            if (!twCloudIsUnavailable(full)) twToast(full.error, 'err');
             return;
           }
         }
@@ -2610,12 +2650,21 @@
       try {
         const result = await twCloudApiCall('/api/share', 'POST', { name, data: state });
         if (!result || result.error) {
-          twToast((result && result.error) || 'Share failed.', 'err');
+          twToast(
+            twCloudIsUnavailable(result) ? 'Cloud sharing is unavailable in this Netlify session.' : ((result && result.error) || 'Share failed.'),
+            twCloudIsUnavailable(result) ? 'warn' : 'err'
+          );
           return;
         }
         const url = options.collaborate ? worldMenuCollaborateUrl(result) : worldMenuAbsoluteShareUrl(result);
         await copyWorldMenuShareUrl(url);
-        twToast(options.collaborate ? 'Collaborate URL copied.' : 'Share URL copied.', 'ok');
+        if (options.collaborate) {
+          twToast('Collaborate room starting...', 'ok');
+          close();
+          setTimeout(() => { location.assign(url); }, 240);
+          return;
+        }
+        twToast('Share URL copied.', 'ok');
         close();
       } catch (err) {
         twToast((err && err.message) || 'Share failed.', 'err');
@@ -2894,7 +2943,7 @@
       } });
       items.push({ group: 'World', label: 'Export world as JSON', run: topBtnAction('export') });
       items.push({ group: 'World', label: 'Import world from JSON', run: topBtnAction('import') });
-      items.push({ group: 'World', label: 'Copy collaborate URL', hint: 'shared PartyKit room link', run: () => {
+      items.push({ group: 'World', label: 'Start collaborate room', hint: 'shared PartyKit room link', run: () => {
         const btn = document.querySelector('#world-menu [data-action="collaborate"]');
         if (btn) btn.click();
       } });

@@ -1,5 +1,5 @@
 import { requireAuthUser } from './lib/auth.mjs';
-import { getSql } from './lib/db.mjs';
+import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { ensureProfile } from './lib/profiles.mjs';
 
@@ -80,6 +80,9 @@ export default async function assetsFunction(request) {
 
     return errorResponse('Method not allowed', 405, origin);
   } catch (err) {
+    if (isDatabaseUnavailable(err)) {
+      return errorResponse('Netlify Database is not available in this local session.', 503, origin);
+    }
     console.error('[assets]', err);
     return errorResponse('Asset library request failed', 500, origin);
   }

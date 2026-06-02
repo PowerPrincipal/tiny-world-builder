@@ -1560,7 +1560,7 @@
     return selectedBuildingRenderFootprint(seed && seed.stamp);
   }
 
-  async function enhanceSelectedCustomPartsObject(target, userInstruction, seed) {
+  async function enhanceSelectedCustomPartsObject(target, userInstruction, seed, opts = {}) {
     if (!seed || !Array.isArray(seed.customParts) || !seed.customParts.length) return null;
     const ai = getAIProviderState();
     const provider = ai.provider || 'openai';
@@ -1613,7 +1613,7 @@
       sourceCustomParts: seed.customParts,
       sourceBounds,
       allowedBounds,
-      imageDataUrl: null,
+      imageDataUrl: opts.imageDataUrl || null,
     };
     postAiDebugLog({
       kind: 'selected-building-parts-before',
@@ -1668,10 +1668,10 @@
       ].join('\n');
       const user = JSON.stringify(payload);
       const raw = provider === 'anthropic'
-        ? await callAnthropic(def.endpoint, ai.key, model, system, user, { name: 'emit_custom_parts', schema })
+        ? await callAnthropic(def.endpoint, ai.key, model, system, user, { name: 'emit_custom_parts', schema }, { imageDataUrl: payload.imageDataUrl })
         : provider === 'gemini'
-          ? await callGemini(def.endpoint, ai.key, model, system, user)
-          : await callOpenAI(def.endpoint, ai.key, model, system, user);
+          ? await callGemini(def.endpoint, ai.key, model, system, user, { imageDataUrl: payload.imageDataUrl })
+          : await callOpenAI(def.endpoint, ai.key, model, system, user, { imageDataUrl: payload.imageDataUrl });
       result = extractJSON(raw);
       if (!result) throw new Error('AI returned non-JSON');
     }
@@ -1687,19 +1687,19 @@
     }, seed.label + ' enhanced');
   }
 
-  async function enhanceSelectedBuildingPartsObject(target, userInstruction) {
+  async function enhanceSelectedBuildingPartsObject(target, userInstruction, opts = {}) {
     const seed = builderStylePartsForSelectedObject(target);
     if (!seed) return null;
     seed.isBuildingSource = true;
-    return enhanceSelectedCustomPartsObject(target, userInstruction, seed);
+    return enhanceSelectedCustomPartsObject(target, userInstruction, seed, opts);
   }
 
-  async function enhanceSelectedBoardObject(userInstruction) {
+  async function enhanceSelectedBoardObject(userInstruction, opts = {}) {
     const target = selectedBoardObjectTarget();
     if (!target) throw new Error('Shift-select exactly one object first.');
     const beforeCell = cloneCellIntent(target.cell);
     if (target.cell && target.cell.kind === 'house') {
-      const stamp = await enhanceSelectedBuildingPartsObject(target, userInstruction);
+      const stamp = await enhanceSelectedBuildingPartsObject(target, userInstruction, opts);
       if (!stamp) throw new Error('No enhanced building returned');
       VOXEL_BUILD_STAMPS.push(stamp);
       saveCustomVoxelBuildStamps();
@@ -1740,7 +1740,7 @@
         stamp: seed.id || 'voxel-build',
         isCustomPartsSource: true,
       });
-      const stamp = await enhanceSelectedCustomPartsObject(target, userInstruction || '', partsSeed);
+      const stamp = await enhanceSelectedCustomPartsObject(target, userInstruction || '', partsSeed, opts);
       if (!stamp) throw new Error('No enhanced custom object returned');
       VOXEL_BUILD_STAMPS.push(stamp);
       saveCustomVoxelBuildStamps();
@@ -1781,7 +1781,7 @@
       return stamp;
     }
     const highResolutionSeed = upscaleVoxelBuildStampResolution(seed, 2, false) || seed;
-    const stamp = await enhanceVoxelBuildStamp(highResolutionSeed, userInstruction || '');
+    const stamp = await enhanceVoxelBuildStamp(highResolutionSeed, userInstruction || '', opts);
     if (!stamp) throw new Error('No enhanced build returned');
     VOXEL_BUILD_STAMPS.push(stamp);
     saveCustomVoxelBuildStamps();
@@ -1887,7 +1887,7 @@
     };
   }
 
-  async function enhanceVoxelBuildStamp(stamp, userInstruction) {
+  async function enhanceVoxelBuildStamp(stamp, userInstruction, opts = {}) {
     const ai = getAIProviderState();
     const def = AI_DEFAULTS[ai.provider] || AI_DEFAULTS.openai;
     const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
@@ -1918,6 +1918,7 @@
         ? Math.min(1800, Math.max(420, Math.round(stamp.voxels.length * 2.2)))
         : Math.min(1800, Math.max(180, Math.round(stamp.voxels.length * 1.25))),
       requirements: profile.requirements,
+      imageDataUrl: opts.imageDataUrl || null,
       voxels: stamp.voxels,
     };
     if (canUseLocalOpenAI) {
@@ -1929,6 +1930,7 @@
           instruction: userPayload.instruction,
           stamp: userPayload,
           schema,
+          imageDataUrl: userPayload.imageDataUrl,
         }),
       });
       const text = await r.text();
@@ -1963,10 +1965,10 @@
     ].join('\n');
     const user = JSON.stringify(userPayload);
     const raw = ai.provider === 'anthropic'
-      ? await callAnthropic(def.endpoint, ai.key, model, system, user, { name: 'emit_voxel_build', schema })
+      ? await callAnthropic(def.endpoint, ai.key, model, system, user, { name: 'emit_voxel_build', schema }, { imageDataUrl: userPayload.imageDataUrl })
       : ai.provider === 'gemini'
-        ? await callGemini(def.endpoint, ai.key, model, system, user)
-        : await callOpenAI(def.endpoint, ai.key, model, system, user);
+        ? await callGemini(def.endpoint, ai.key, model, system, user, { imageDataUrl: userPayload.imageDataUrl })
+        : await callOpenAI(def.endpoint, ai.key, model, system, user, { imageDataUrl: userPayload.imageDataUrl });
     const parsed = extractJSON(raw);
     if (!parsed) throw new Error('AI returned non-JSON');
     const filtered = filterVoxelsToBounds(parsed.voxels, allowedBounds);

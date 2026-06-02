@@ -230,7 +230,7 @@ if (!/function terrainSurfaceOffset/.test(html) || !/function addHeavyTerrainKer
 if (!/addVoxelTerrainTop\(g, terrain, x, z, visualRise - seamOverlap \* 0\.5/.test(html) || !/function terrainVisualRiseForCell/.test(html)) {
   fail('heavy terrain visual drop must drive tile tops and object/surface heights');
 }
-if (!/terrain === 'water'\) return -0\.070/.test(html) || !/terrain === 'dirt'\) return 0\.034/.test(html)) {
+if (!/const WATER_SURFACE_DROP = TOP_H/.test(html) || !/terrain === 'water'\) return -WATER_SURFACE_DROP/.test(html) || !/terrain === 'dirt'\) return 0\.034/.test(html)) {
   fail('terrain surface offsets must lower water channels and lift dirt/soil slightly');
 }
 if (!/waterfallFoamPuff/.test(html) || !/function getWaterfallFoamGeometry/.test(html) || !/kind: 'foamBatch'/.test(html)) {

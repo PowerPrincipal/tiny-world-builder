@@ -3,12 +3,14 @@
   const MODEL_STAMP_DEFAULTS_LS = 'tinyworld:model-stamp-defaults.v1';
   const MODEL_STAMP_SUPPORTED_FORMATS = new Set(['glb', 'gltf', 'obj']);
   const MODEL_STAMP_DETECTED_FORMATS = new Set(['glb', 'gltf', 'obj', 'fbx']);
+  const MODEL_STAMP_TEXTURE_FORMATS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif']);
   let MODEL_STAMP_ASSETS = [];
   let selectedModelStampId = null;
   let modelStampDefaults = loadModelStampDefaults();
   let modelStampScanMessage = 'Scanning models…';
   const modelStampAssetCache = new Map();
   const modelStampTextureCache = new Map();
+  const modelStampDroppedObjectUrls = new Map();
   const CROWD_MODEL_CHARACTER_RE = /(character|person|people|human|man|woman|girl|boy|child|townie|avatar|npc|rig|skinned|walk|run|hitman|heisenberg)/i;
   const CROWD_MODEL_NEGATIVE_RE = /(building|house|tower|city|plane|aircraft|airplane|boat|ship|vessel|engine|prop|trap|terrain|tree|rock|vehicle|car|truck)/i;
   const MODEL_STAMP_FALLBACK_PALETTES = {
@@ -218,7 +220,101 @@
       mtimeMs: Number(raw.mtimeMs) || 0,
       sidecars: normalizeModelStampSidecars(raw.sidecars),
       warnings: Array.isArray(raw.warnings) ? raw.warnings.map(item => String(item || '').slice(0, 120)).filter(Boolean) : [],
+      dropped: !!raw.dropped,
+      transient: !!raw.transient,
+      localFiles: raw.localFiles && typeof raw.localFiles === 'object' ? raw.localFiles : null,
     };
+  }
+
+  function modelStampFileExtension(name) {
+    const m = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+    return m ? m[1] : '';
+  }
+
+  function modelStampFileBaseName(path) {
+    const clean = String(path || '').split(/[?#]/)[0].replace(/\\/g, '/').split('/').pop() || '';
+    try { return decodeURIComponent(clean).toLowerCase(); } catch (_) { return clean.toLowerCase(); }
+  }
+
+  function modelStampSlug(name) {
+    return String(name || 'model')
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 42) || 'model';
+  }
+
+  function modelStampLocalUrlForRef(asset, ref) {
+    if (!asset || !asset.localFiles) return null;
+    const key = modelStampFileBaseName(ref);
+    return key ? asset.localFiles[key] || null : null;
+  }
+
+  function modelStampObjectUrlForFile(file) {
+    const key = file && (file.name + ':' + file.size + ':' + file.lastModified);
+    if (!key) return '';
+    if (!modelStampDroppedObjectUrls.has(key)) modelStampDroppedObjectUrls.set(key, URL.createObjectURL(file));
+    return modelStampDroppedObjectUrls.get(key);
+  }
+
+  function registerDroppedModelStampFiles(fileList) {
+    const files = Array.from(fileList || []).filter(file => file && typeof file.name === 'string');
+    if (!files.length) return [];
+    const localFiles = {};
+    const sidecars = { textures: [], mtl: [] };
+    const mains = [];
+    files.forEach(file => {
+      const format = modelStampFileExtension(file.name);
+      const url = modelStampObjectUrlForFile(file);
+      if (!format || !url) return;
+      const record = {
+        name: file.name,
+        path: file.name,
+        url,
+        format,
+        exists: true,
+        size: file.size || 0,
+      };
+      localFiles[modelStampFileBaseName(file.name)] = url;
+      if (MODEL_STAMP_DETECTED_FORMATS.has(format)) mains.push({ file, format, url });
+      else if (format === 'mtl') sidecars.mtl.push(record);
+      else if (MODEL_STAMP_TEXTURE_FORMATS.has(format)) sidecars.textures.push(record);
+    });
+    const batchId = Date.now().toString(36);
+    const assets = mains.map((main, index) => {
+      const slug = modelStampSlug(main.file.name);
+      let id = modelStampIdSafe('drop-' + batchId + '-' + index + '-' + slug);
+      if (!id) id = 'drop-' + batchId + '-' + index;
+      let suffix = 1;
+      while (MODEL_STAMP_ASSETS.some(asset => asset.id === id)) {
+        id = modelStampIdSafe('drop-' + batchId + '-' + index + '-' + suffix + '-' + slug) || ('drop-' + batchId + '-' + index + '-' + suffix);
+        suffix++;
+      }
+      const label = String(main.file.name || id).replace(/\.[^.]+$/, '').slice(0, 64) || id;
+      return {
+        id,
+        label,
+        name: label,
+        path: main.file.name,
+        url: main.url,
+        format: main.format,
+        supported: MODEL_STAMP_SUPPORTED_FORMATS.has(main.format),
+        size: main.file.size || 0,
+        mtimeMs: main.file.lastModified || Date.now(),
+        sidecars,
+        dropped: true,
+        transient: true,
+        localFiles,
+        warnings: MODEL_STAMP_SUPPORTED_FORMATS.has(main.format) ? [] : [main.format.toUpperCase() + ' detected but not placeable in this build'],
+      };
+    }).filter(Boolean);
+    if (!assets.length) return [];
+    mergeModelStampAssets(assets);
+    modelStampScanMessage = 'Imported ' + assets.length + ' dropped model' + (assets.length === 1 ? '' : 's');
+    updateStampBuilderSummary();
+    refreshOpenStampBuilderCards();
+    return assets.map(asset => getModelStamp(asset.id)).filter(Boolean);
   }
 
   function mergeModelStampAssets(list) {
@@ -320,6 +416,8 @@
   function modelStampResolveUrl(asset, ref, baseUrl = null) {
     const clean = String(ref || '').trim().replace(/\\/g, '/');
     if (!clean) return '';
+    const localUrl = modelStampLocalUrlForRef(asset, clean);
+    if (localUrl) return localUrl;
     try {
       if (/^(https?:|data:|blob:|\/)/i.test(clean) || clean.startsWith('models/')) {
         return new URL(clean, window.location.href).href;
@@ -353,6 +451,14 @@
       modelStampTextureCache.set(key, tex);
     }
     return modelStampTextureCache.get(key);
+  }
+
+  function createModelStampLoadingManager(asset) {
+    const manager = new THREE.LoadingManager();
+    if (asset && asset.localFiles) {
+      manager.setURLModifier(url => modelStampLocalUrlForRef(asset, url) || url);
+    }
+    return manager;
   }
 
   function modelStampTextureSidecars(asset) {
@@ -810,7 +916,7 @@
         fail(new Error('GLTFLoader missing'));
         return cache;
       }
-      const loader = new THREE.GLTFLoader();
+      const loader = new THREE.GLTFLoader(createModelStampLoadingManager(asset));
       loader.load(asset.url, gltf => {
         const scene = gltf.scene || (gltf.scenes && gltf.scenes[0]) || new THREE.Group();
         hydrateModelStampScene(scene, asset, { flipY: false });
@@ -856,6 +962,8 @@
     const placeholder = makeModelStampPlaceholder(asset, cache && cache.errorMessage ? cache.errorMessage : 'Loading model');
     return applyAppearanceToObject(placeholder, 'model-stamp', opts.appearance);
   }
+
+  window.__tinyworldRegisterDroppedModelStamps = registerDroppedModelStampFiles;
 
   function scheduleModelStampRefresh(modelStampId) {
     setTimeout(() => {
@@ -933,4 +1041,3 @@
 
   loadModelStampDefaultsConfig();
   refreshModelStampManifest();
-

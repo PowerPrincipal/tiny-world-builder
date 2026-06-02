@@ -5,6 +5,7 @@
   }
 
   const HEAVY_TERRAIN_KERB_DROP = 0.048;
+  const WATER_SURFACE_DROP = TOP_H;
 
   function isHeavyKerbTerrain(terrain) {
     return terrain === 'path' || terrain === 'stone';
@@ -12,7 +13,7 @@
 
   function terrainSurfaceOffset(terrain) {
     if (isHeavyKerbTerrain(terrain)) return -HEAVY_TERRAIN_KERB_DROP;
-    if (terrain === 'water') return -0.070;
+    if (terrain === 'water') return -WATER_SURFACE_DROP;
     if (terrain === 'dirt') return 0.034;
     return 0;
   }
@@ -564,6 +565,87 @@
     addSide('e');
 
     const dummy = addHeavyTerrainKerbStrips._dummy || (addHeavyTerrainKerbStrips._dummy = new THREE.Object3D());
+    for (const bucket of buckets.values()) {
+      const count = bucket.positions.length / 3;
+      const mesh = new THREE.InstancedMesh(bucket.geo, bucket.mat, count);
+      for (let i = 0; i < count; i++) {
+        dummy.position.set(bucket.positions[i * 3], bucket.positions[i * 3 + 1], bucket.positions[i * 3 + 2]);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      g.add(mesh);
+    }
+  }
+
+  function waterRimMaterials() {
+    return [
+      M.shore,
+      terrainShadeMaterial(M.shore, -10),
+      terrainShadeMaterial(M.shore, -20),
+      terrainShadeMaterial(M.stone, -18),
+    ];
+  }
+
+  function addSunkenWaterRimStrips(g, terrain, x, z, terrainN, topSize, visualTopY, spillSides = null) {
+    if (terrain !== 'water') return;
+    const drop = Math.abs(Math.min(0, terrainSurfaceOffset(terrain)));
+    if (!drop) return;
+    const mats = waterRimMaterials();
+    const rimH = drop + 0.014;
+    const rimD = 0.068;
+    const rimY = visualTopY + rimH * 0.5 - 0.007;
+    const off = topSize * 0.5 - rimD * 0.5;
+    const segments = 6;
+    const usable = Math.max(0.30, topSize - 0.12);
+    const step = usable / segments;
+    const buckets = new Map();
+
+    function shouldEdge(dir) {
+      if (spillSides && spillSides[dir]) return false;
+      return terrainN[dir] !== 'water';
+    }
+
+    function queue(geo, mat, px, py, pz) {
+      const key = (geo.id || geo.uuid) + ':' + (mat.id || mat.uuid);
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { geo, mat, positions: [] };
+        buckets.set(key, bucket);
+      }
+      bucket.positions.push(px, py, pz);
+    }
+
+    function pickMat(dir, i) {
+      const r = cellRand(x * 41 + i, z * 47 - i, 900 + dir.charCodeAt(0));
+      return mats[Math.min(mats.length - 1, Math.floor(r * mats.length))];
+    }
+
+    function addSide(dir) {
+      if (!shouldEdge(dir)) return;
+      const alongX = dir === 'n' || dir === 's';
+      for (let i = 0; i < segments; i++) {
+        const r = cellRand(x * 53 + i, z * 59 - i, 920 + dir.charCodeAt(0));
+        const len = step * (0.76 + r * 0.18);
+        const shift = (r - 0.5) * step * 0.12;
+        const across = -usable * 0.5 + step * (i + 0.5) + shift;
+        const py = rimY + (cellRand(x - i, z + i, 940 + dir.charCodeAt(0)) - 0.5) * 0.004;
+        if (alongX) {
+          queue(getBoxGeometry(len, rimH, rimD), pickMat(dir, i), across, py, dir === 'n' ? -off : off);
+        } else {
+          queue(getBoxGeometry(rimD, rimH, len), pickMat(dir, i), dir === 'w' ? -off : off, py, across);
+        }
+      }
+    }
+
+    addSide('n');
+    addSide('s');
+    addSide('w');
+    addSide('e');
+
+    const dummy = addSunkenWaterRimStrips._dummy || (addSunkenWaterRimStrips._dummy = new THREE.Object3D());
     for (const bucket of buckets.values()) {
       const count = bucket.positions.length / 3;
       const mesh = new THREE.InstancedMesh(bucket.geo, bucket.mat, count);

@@ -780,9 +780,43 @@
     function updatePanelHandleVisibility() {
       const handle = document.getElementById('agent-panel-handle');
       if (!handle) return;
-      const hasMessages = messages && messages.children.length > 0;
-      const shouldShow = hasAgentActivity && panel.classList.contains('hidden') && hasMessages;
-      handle.hidden = !shouldShow;
+      handle.hidden = true;
+    }
+
+    function syncAgentPanelPosition() {
+      const r = form.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const maxPanelHeight = Math.min(window.innerHeight * 0.42, 340);
+      const availableHeight = Math.max(48, r.top - 8);
+      const panelHeight = Math.min(
+        maxPanelHeight,
+        Math.max(96, panel.scrollHeight || panel.offsetHeight || maxPanelHeight),
+        availableHeight
+      );
+      const top = Math.max(8, Math.min(window.innerHeight - panelHeight - 8, r.top - panelHeight - 1));
+      panel.style.left = Math.round(r.left + r.width / 2) + 'px';
+      panel.style.right = 'auto';
+      panel.style.top = Math.round(top) + 'px';
+      panel.style.bottom = 'auto';
+      panel.style.width = Math.round(r.width) + 'px';
+      panel.style.height = Math.round(panelHeight) + 'px';
+      panel.style.transform = 'translateX(-50%)';
+    }
+
+    function syncAgentStackState() {
+      const open = !panel.classList.contains('hidden');
+      form.classList.toggle('conversation-open', open);
+      document.body.classList.toggle('agent-conversation-open', open);
+      updatePanelHandleVisibility();
+      if (open) requestAnimationFrame(syncAgentPanelPosition);
+    }
+
+    function hidePanel() {
+      panel.classList.add('hidden');
+      panel.classList.remove('collapsed');
+      pinnedOpen = false;
+      clearTimers();
+      syncAgentStackState();
     }
 
     function clearTimers() {
@@ -791,30 +825,24 @@
     }
 
     function scheduleAutoFlow() {
-      // After activity (when not pinned), briefly show the panel then slide it
-      // fully off-screen to the right (no collapsed pill). Grip handle appears.
+      // After activity (when not pinned), briefly show the panel, then fold it
+      // back into the prompt bar.
       clearTimers();
       if (pinnedOpen) return;
       collapseTimer = setTimeout(() => {
-        // We no longer collapse to a tiny pill for the right-middle panel.
-        // Go straight to hidden + handle after the linger period.
-        if (hasAgentActivity) {
-          panel.classList.add('hidden');
-          updatePanelHandleVisibility();
-        }
+        if (hasAgentActivity) hidePanel();
       }, AUTO_HIDE_MS);
     }
 
     function showPanel() {
-      // Bring the panel in from off-screen if it's hidden.
       panel.classList.remove('hidden');
-      updatePanelHandleVisibility();
+      syncAgentStackState();
     }
 
     function setPanelCollapsed(collapsed, opts) {
       showPanel();
       panel.classList.toggle('collapsed', collapsed);
-      updatePanelHandleVisibility();
+      syncAgentStackState();
       if (!collapsed) {
         messages.scrollTop = messages.scrollHeight;
         if (opts && opts.pin) {
@@ -830,10 +858,7 @@
           pinnedOpen = false;
           clearTimers();
           hideTimer = setTimeout(() => {
-            if (hasAgentActivity) {
-              panel.classList.add('hidden');
-              updatePanelHandleVisibility();
-            }
+            if (hasAgentActivity) hidePanel();
           }, AUTO_HIDE_MS);
         } else {
           pinnedOpen = false;
@@ -913,21 +938,19 @@
         targetChip.hidden = true;
         form.classList.remove('has-target');
       }
+      syncAgentPanelPosition();
     }
 
     function fireToast() {
-      // After a result, briefly show the open panel then slide it fully off-screen
-      // to the right. No shrinking "collapsed" pill. The right-edge grip handle
-      // (identical to the input bar grip) appears so the user can pull it back.
+      // After a result, briefly show the open panel, then fold the conversation
+      // back into the prompt bar.
       showPanel();
       panel.classList.remove('collapsed');
       pinnedOpen = false;
+      syncAgentStackState();
       clearTimers();
       hideTimer = setTimeout(() => {
-        if (hasAgentActivity) {
-          panel.classList.add('hidden');
-          updatePanelHandleVisibility();
-        }
+        if (hasAgentActivity) hidePanel();
       }, AUTO_HIDE_MS);
     }
 
@@ -978,6 +1001,7 @@
         form.style.top = Math.max(14, Math.min(window.innerHeight - 54, p.y)) + 'px';
         form.style.bottom = 'auto';
         form.style.transform = 'none';
+        syncAgentPanelPosition();
       } catch (_) {}
     }
 
@@ -987,11 +1011,7 @@
       e.preventDefault();
       e.stopPropagation();
       if (window.__tinyworldSelection) window.__tinyworldSelection.clear();
-      panel.classList.add('hidden');
-      panel.classList.remove('collapsed');
-      pinnedOpen = false;
-      clearTimers();
-      updatePanelHandleVisibility();
+      hidePanel();
     });
 
     // Clear conversation button: empties messages, resets activity flag so handle hides.
@@ -1003,10 +1023,7 @@
         messages.innerHTML = '';
         hasAgentActivity = false;
         panel.classList.remove('has-activity');
-        updatePanelHandleVisibility();
-        if (panel.classList.contains('hidden')) {
-          // already hidden, handle will be hidden now
-        }
+        syncAgentStackState();
       });
     }
 
@@ -1019,9 +1036,7 @@
 
       if (panel.classList.contains('hidden')) {
         if (!hasAgentActivity) return;
-        panel.classList.remove('hidden');
         setPanelCollapsed(false, { pin: true });
-        updatePanelHandleVisibility();
         return;
       }
       if (panel.classList.contains('collapsed')) {
@@ -1029,107 +1044,24 @@
       }
     });
 
-    // The right-edge grip handle — same design and ⋮⋮ cue as the agent input bar.
-    // Only rendered when there is history and the panel is slid off-screen.
+    // Legacy right-edge grip handle. The conversation now expands from the
+    // prompt itself, so the handle stays hidden.
     const panelHandle = document.getElementById('agent-panel-handle');
     if (panelHandle) {
       panelHandle.addEventListener('click', () => {
         if (!hasAgentActivity) return;
-        panel.classList.remove('hidden');
         setPanelCollapsed(false, { pin: true });
-        updatePanelHandleVisibility();
       });
     }
 
-    // -- drag-to-position the whole panel --
+    // The panel derives its position from the prompt bar. Keep the old storage
+    // key ignored for backward compatibility with browsers that saved it.
     const PANEL_POS_KEY = 'tinyworld:agent:panel-pos';
-    let panelDrag = null;
+    void PANEL_POS_KEY;
 
     function applyStoredPanelPosition() {
-      try {
-        const raw = localStorage.getItem(PANEL_POS_KEY);
-        if (raw) {
-          const p = JSON.parse(raw);
-          if (Number.isFinite(p.x) && Number.isFinite(p.y)) {
-            panel.style.left = Math.max(8, Math.min(window.innerWidth - 80, p.x)) + 'px';
-            panel.style.top = Math.max(8, Math.min(window.innerHeight - 80, p.y)) + 'px';
-            panel.style.right = 'auto';
-            panel.style.bottom = 'auto';
-            panel.style.transform = 'none';
-            return;
-          }
-          if (Number.isFinite(p.right) && Number.isFinite(p.bottom)) {
-            const left = window.innerWidth - p.right - panel.offsetWidth;
-            const top = window.innerHeight - p.bottom - panel.offsetHeight;
-            panel.style.left = Math.max(8, Math.min(window.innerWidth - 80, left)) + 'px';
-            panel.style.top = Math.max(8, Math.min(window.innerHeight - 80, top)) + 'px';
-            panel.style.right = 'auto';
-            panel.style.bottom = 'auto';
-            panel.style.transform = 'none';
-            return;
-          }
-        }
-      } catch (_) {}
-
-      // Default to right-middle as requested
-      panel.style.left = 'auto';
-      panel.style.right = '20px';
-      panel.style.top = '50%';
-      panel.style.transform = 'translateY(-50%)';
-      panel.style.bottom = 'auto';
+      syncAgentPanelPosition();
     }
-
-    panel.addEventListener('pointerdown', e => {
-      // Don't steal pointer events from interactive children.
-      if (e.target.closest('button, input, textarea, a, .agent-messages, .agent-selection-properties')) return;
-      if (!e.target.closest('.agent-panel-head, .agent-panel.collapsed')) return;
-      const r = panel.getBoundingClientRect();
-      panelDrag = {
-        startX: e.clientX,
-        startY: e.clientY,
-        leftAtStart: r.left,
-        topAtStart: r.top,
-        moved: false,
-      };
-      try { panel.setPointerCapture(e.pointerId); } catch (_) {}
-    });
-
-    panel.addEventListener('pointermove', e => {
-      if (!panelDrag) return;
-      const dx = e.clientX - panelDrag.startX;
-      const dy = e.clientY - panelDrag.startY;
-      if (!panelDrag.moved && Math.hypot(dx, dy) < 4) return;
-      panelDrag.moved = true;
-      panel.classList.add('dragging');
-      const w = panel.offsetWidth;
-      const h = panel.offsetHeight;
-      const left = Math.max(8, Math.min(window.innerWidth - w - 8, panelDrag.leftAtStart + dx));
-      const top = Math.max(8, Math.min(window.innerHeight - h - 8, panelDrag.topAtStart + dy));
-      panel.style.left = left + 'px';
-      panel.style.top = top + 'px';
-      panel.style.right = 'auto';
-      panel.style.bottom = 'auto';
-      panel.style.transform = 'none';
-    });
-
-    function endPanelDrag(e) {
-      if (!panelDrag) return;
-      const moved = panelDrag.moved;
-      panelDrag = null;
-      panel.classList.remove('dragging');
-      if (moved) {
-        suppressNextClick = true;
-        const r = panel.getBoundingClientRect();
-        try {
-          localStorage.setItem(PANEL_POS_KEY, JSON.stringify({
-            x: Math.round(r.left),
-            y: Math.round(r.top),
-          }));
-        } catch (_) {}
-      }
-    }
-    panel.addEventListener('pointerup', endPanelDrag);
-    panel.addEventListener('pointercancel', endPanelDrag);
 
     // Start fully hidden with no handle until the agent actually does something.
     panel.classList.add('collapsed');
@@ -1137,6 +1069,8 @@
     
     applyStoredPosition();
     applyStoredPanelPosition();
+    syncAgentStackState();
+    window.addEventListener('resize', syncAgentPanelPosition);
 
     // Up arrow in the chat input slides the panel in and expands it to
     // show the full conversation (pinned open).
@@ -2377,6 +2311,7 @@
       form.style.top = y + 'px';
       form.style.bottom = 'auto';
       form.style.transform = 'none';
+      syncAgentPanelPosition();
     });
     function endDrag() {
       if (!drag) return;
@@ -2384,6 +2319,7 @@
       form.classList.remove('dragging');
       const r = form.getBoundingClientRect();
       try { localStorage.setItem(POS_KEY, JSON.stringify({ x: r.left, y: r.top })); } catch (_) {}
+      syncAgentPanelPosition();
     }
     grip.addEventListener('pointerup', endDrag);
     grip.addEventListener('pointercancel', endDrag);
@@ -2392,6 +2328,12 @@
       e.preventDefault();
       const userText = input.value.trim();
       if (!userText || send.disabled) return;
+      const dropBridge = window.__tinyworldAgentDropAttachments || null;
+      const dropAttachments = dropBridge && dropBridge.peek ? dropBridge.peek() : [];
+      const attachmentPrompt = dropBridge && dropBridge.promptContext ? dropBridge.promptContext(dropAttachments) : '';
+      const attachmentSummary = dropBridge && dropBridge.summaryText ? dropBridge.summaryText(dropAttachments) : '';
+      const imageAttachment = dropAttachments.find(item => item && item.type === 'image' && item.dataUrl);
+      const imageDataUrl = imageAttachment ? imageAttachment.dataUrl : null;
       const intent = floatingAgentIntent(userText);
       // If there's an active selection, prepend its context so the agent
       // scopes its work to those cells.
@@ -2399,6 +2341,7 @@
       const summary = sel && sel.summary();
       let selectionBounds = null;
       let prompt = intent.prompt || userText;
+      if (attachmentPrompt) prompt += attachmentPrompt;
       let selectedObjectTarget = null;
 
       if (summary) {
@@ -2417,13 +2360,13 @@
           (selectedObjectTarget
             ? `Selected object chip: ${selectedBoardObjectLabel(selectedObjectTarget)} at x=${selectedObjectTarget.x}, z=${selectedObjectTarget.z}. Current cell intent: ${JSON.stringify(cloneCellIntent(selectedObjectTarget.cell))}\n\n`
             : '') +
-          userText;
+          userText + attachmentPrompt;
       }
       setPanelCollapsed(false, { pin: true });
       sugBox.hidden = true;
       markAgentActivity();
       // User message lives only in the conversation history; no toast.
-      addAgentMessage('user', userText);
+      addAgentMessage('user', attachmentSummary ? userText + '\n' + attachmentSummary : userText);
       input.value = '';
       // Progress flows through the placeholder while work runs.
       const thinking = addAgentMessage('assistant', 'Working on it…');
@@ -2445,7 +2388,7 @@
           (cfg.provider === 'openai' || !cfg.key);
         if (selectedObjectTarget && (shouldEnhanceSelectedObjectPrompt(userText) || (!cfg.key && localOpenAIEnhance))) {
           if (!cfg.key && !localOpenAIEnhance) throw new Error('Add an API key in Settings → AI first.');
-          const stamp = await enhanceSelectedBoardObject(userText);
+          const stamp = await enhanceSelectedBoardObject(userText, { imageDataUrl, attachments: dropAttachments });
           const doneText = 'Enhanced selected object into ' + stamp.name + '.';
           thinking.textContent = doneText;
           window.__tinyworldAgent && window.__tinyworldAgent.done && window.__tinyworldAgent.done(doneText);
@@ -2455,7 +2398,7 @@
         if (!cfg.key) throw new Error('Add an API key in Settings → AI first.');
         if (intent.clearFirst) doClear();
         const requestPrompt = intent.mode === 'add' ? buildFloatingAdditionPrompt(prompt) : prompt;
-        let data = await generateWorld(cfg.provider, cfg.model, cfg.key, requestPrompt, GRID);
+        let data = await generateWorld(cfg.provider, cfg.model, cfg.key, requestPrompt, GRID, { imageDataUrl });
 
         // If user had a selection active, mask the result to only affect that region (powerful "customize this area" feature)
         if (selectionBounds && data && Array.isArray(data.cells)) {
@@ -2493,6 +2436,7 @@
         // errors, keep the chip/target so the user can fix the prompt or
         // retry without reselecting the object.
         if (submitSucceeded && window.__tinyworldSelection) window.__tinyworldSelection.clear();
+        if (submitSucceeded && dropBridge && dropBridge.clear) dropBridge.clear(dropAttachments);
       }
     });
 

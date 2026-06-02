@@ -76,6 +76,12 @@ Raised, outlined square (per posType; same pattern for `.tool` and
   buttons at the front of the bottom toolbar; Shield uses `data-pos-type="shield"`
   and reflects the raised/lowered `VoxelShield` state with `.active` and
   `aria-pressed`.
+- Active/pressed toolbar states must override dark/after-hours theme rules: keep
+  the category outline color, use a light raised fill, a visible 2px outer ring,
+  and a short bottom accent bar so selected tools do not read like pale disabled
+  buttons. Because the theme blocks use `body.ui-theme-dark ... !important`,
+  add matching `body.ui-theme-dark` active selectors after the generic selected
+  block; a lower-specificity late rule is not enough.
 - Mono/utility icons (select, erase) use `.tool-icon` and render as
   `fill:none; stroke:currentColor` outlines (the rule is shared between
   `.toolbar`, `.flyout`, and `.tool-palette`). Keep them line-art, not filled.

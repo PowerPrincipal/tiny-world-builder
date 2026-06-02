@@ -35,7 +35,7 @@
         document.body.appendChild(__twToastHost);
       }
       const el = document.createElement('div');
-      const bg = kind === 'err' ? '#c0392b' : (kind === 'ok' ? '#2e7d32' : '#333');
+      const bg = kind === 'err' ? '#c0392b' : (kind === 'ok' ? '#2e7d32' : (kind === 'warn' ? '#7a5b18' : '#333'));
       el.style.cssText = 'pointer-events:auto;max-width:min(92vw,420px);padding:10px 14px;border-radius:8px;color:#fff;font:500 13px/1.4 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);background:' + bg + ';opacity:0;transition:opacity .18s ease;';
       el.textContent = String(message);
       __twToastHost.appendChild(el);

@@ -20,7 +20,9 @@ Expected behavior:
 - Object variations should remain the same `kind` unless a schema change is explicitly requested.
 - Same-kind rock neighbours should blend by neighbour strength, not render as identical stamped cells.
 - Terrain surface detail should stay batched/instanced per tile. Add grass blades, pavers, scuffs, pebbles, or flowers through lightweight instanced detail layers, not individual loose meshes per fleck.
-- Heavy terrain such as path and stone can have a render-only kerb drop through `terrainVisualRiseForCell`; water can sit lower and dirt can sit slightly raised through the same `terrainSurfaceOffset` path. Do not store these visual offsets in `terrainFloors` or saved world data.
+- Heavy terrain such as path and stone can have a render-only kerb drop through `terrainVisualRiseForCell`; water sits one top-cap height lower via `WATER_SURFACE_DROP = TOP_H` while its rim/shore strips stay at the tile edge, and dirt can sit slightly raised through the same `terrainSurfaceOffset` path. Do not store these visual offsets in `terrainFloors` or saved world data.
+- Waterfall curtains, surface sheets, falling cubes, and froth should start from the lowered water surface (`topY` after `terrainSurfaceOffset`), not from the tile rim height.
+- Sunken water bank/rim strips should be suppressed on spill/waterfall sides; those edges must remain open so the water reads as falling over the edge rather than blocked by bricks.
 
 Fence levels:
 

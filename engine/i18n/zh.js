@@ -60,7 +60,7 @@
     'worldmenu.empty': '还没有保存的世界。建一个，然后选择“另存为新世界”。',
     'worldmenu.saveAs': '另存为新世界',
     'worldmenu.share': '复制分享链接',
-    'worldmenu.collaborate': '复制协作链接',
+    'worldmenu.collaborate': '启动协作房间',
     'worldmenu.cloud': '云端世界',
     'unsaved.banner': '主网格之外的区域不会被保存',
 

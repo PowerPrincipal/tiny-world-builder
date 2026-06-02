@@ -61,6 +61,15 @@
     return isImageOnlyModel(model) ? def.model : (model || def.model);
   }
 
+  function imageDataUrlParts(dataUrl) {
+    const match = String(dataUrl || '').match(/^data:([^;,]+);base64,(.+)$/);
+    if (!match) return null;
+    return {
+      mimeType: match[1],
+      base64: match[2],
+    };
+  }
+
   const AUTO_ACTION_SCHEMA = {
     type: 'object',
     additionalProperties: false,
@@ -466,13 +475,20 @@
     try { return JSON.parse(s.slice(first, last + 1)); } catch (_) { return null; }
   }
 
-  async function callOpenAI(endpoint, key, model, system, user) {
+  async function callOpenAI(endpoint, key, model, system, user, opts = {}) {
     const isOpenAI = /api\.openai\.com/.test(endpoint);
+    const imageData = opts && opts.imageDataUrl ? String(opts.imageDataUrl) : '';
+    const userContent = imageData
+      ? [
+          { type: 'text', text: user },
+          { type: 'image_url', image_url: { url: imageData } },
+        ]
+      : user;
     const body = {
       model,
       messages: [
         { role: 'system', content: system },
-        { role: 'user',   content: user },
+        { role: 'user',   content: userContent },
       ],
       response_format: { type: 'json_object' },
     };
@@ -499,9 +515,23 @@
     return text;
   }
 
-  async function callAnthropic(endpoint, key, model, system, user, toolSpec) {
+  async function callAnthropic(endpoint, key, model, system, user, toolSpec, opts = {}) {
     // Tool-use forces the model to emit JSON matching our schema.
     const toolName = (toolSpec && toolSpec.name) || 'emit_world';
+    const image = imageDataUrlParts(opts && opts.imageDataUrl);
+    const content = image
+      ? [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: image.mimeType,
+              data: image.base64,
+            },
+          },
+          { type: 'text', text: user },
+        ]
+      : user;
     const r = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -520,7 +550,7 @@
           input_schema: (toolSpec && toolSpec.schema) || WORLD_SCHEMA,
         }],
         tool_choice: { type: 'tool', name: toolName },
-        messages: [{ role: 'user', content: user }],
+        messages: [{ role: 'user', content }],
       }),
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (await r.text()).slice(0, 200));
@@ -530,10 +560,13 @@
     return JSON.stringify(block.input);
   }
 
-  async function callGemini(endpoint, key, model, system, user) {
+  async function callGemini(endpoint, key, model, system, user, opts = {}) {
     const m = model || AI_DEFAULTS.gemini.model;
     const safeModel = encodeURIComponent(m);
     const url = `${endpoint}/${safeModel}:generateContent?key=${encodeURIComponent(key)}`;
+    const image = imageDataUrlParts(opts && opts.imageDataUrl);
+    const parts = [{ text: user }];
+    if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -543,7 +576,7 @@
         },
         contents: [{
           role: 'user',
-          parts: [{ text: user }],
+          parts,
         }],
         generationConfig: {
           responseMimeType: 'application/json',
@@ -553,8 +586,8 @@
     });
     if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (await r.text()).slice(0, 200));
     const j = await r.json();
-    const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-    return (parts || []).map(part => part.text || '').join('\n');
+    const responseParts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+    return (responseParts || []).map(part => part.text || '').join('\n');
   }
 
   // Item 4 — procedural map generator (offline, deterministic). Emits a

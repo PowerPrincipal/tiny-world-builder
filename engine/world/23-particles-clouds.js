@@ -350,19 +350,49 @@
     // clouds in a soft perimeter around the camera target; under-island clouds
     // still provide the low mist layer below the board.
     const boardSpan = GRID * TILE;
-    const noFlyX = Math.min(CLOUD_RANGE_X * 0.86, Math.max(12, boardSpan * 0.95 + 4.5, viewSize * 1.08));
-    const noFlyZ = Math.min(CLOUD_Z_RANGE * 0.86, Math.max(10, boardSpan * 0.95 + 3.5, viewSize * 1.02));
+    const noFlyX = Math.min(CLOUD_RANGE_X * 0.96, Math.max(14, boardSpan * 1.25 + 6, viewSize * 1.32));
+    const noFlyZ = Math.min(CLOUD_Z_RANGE * 0.96, Math.max(12, boardSpan * 1.25 + 5, viewSize * 1.24));
     const dx = cloud.position.x - target.x;
     const dz = cloud.position.z - target.z;
-    if (Math.abs(dx) >= noFlyX || Math.abs(dz) >= noFlyZ) return;
-    const pushX = noFlyX - Math.abs(dx);
-    const pushZ = noFlyZ - Math.abs(dz);
-    if (pushX < pushZ) {
-      const sign = dx < 0 ? -1 : 1;
-      cloud.position.x = target.x + sign * (noFlyX + Math.random() * 2.5);
-    } else {
-      const sign = dz < 0 ? -1 : 1;
-      cloud.position.z = target.z + sign * (noFlyZ + Math.random() * 2.0);
+    if (Math.abs(dx) < noFlyX && Math.abs(dz) < noFlyZ) {
+      const pushX = noFlyX - Math.abs(dx);
+      const pushZ = noFlyZ - Math.abs(dz);
+      if (pushX < pushZ) {
+        const sign = dx < 0 ? -1 : 1;
+        cloud.position.x = target.x + sign * (noFlyX + Math.random() * 2.5);
+      } else {
+        const sign = dz < 0 ? -1 : 1;
+        cloud.position.z = target.z + sign * (noFlyZ + Math.random() * 2.0);
+      }
+      return;
+    }
+
+    // The isometric camera can project a foreground cloud over a roof even
+    // when its X/Z footprint is outside the board. Guard the same central
+    // area in camera-facing space so buildings do not get veiled by sky puffs.
+    const cam = (typeof camera !== 'undefined' && camera) ? camera : null;
+    const camDx = cam ? cam.position.x - target.x : 0;
+    const camDz = cam ? cam.position.z - target.z : 0;
+    const camLen = Math.hypot(camDx, camDz);
+    if (camLen > 0.001) {
+      const frontX = camDx / camLen;
+      const frontZ = camDz / camLen;
+      const sideX = frontZ;
+      const sideZ = -frontX;
+      const side = dx * sideX + dz * sideZ;
+      const front = dx * frontX + dz * frontZ;
+      const noFlySide = Math.min(CLOUD_RANGE_X * 0.96, Math.max(14, boardSpan * 1.45 + 6, viewSize * 1.34));
+      const noFlyFront = Math.min(CLOUD_Z_RANGE * 0.98, Math.max(12, boardSpan * 1.35 + 5, viewSize * 1.28));
+      if (Math.abs(side) < noFlySide && Math.abs(front) < noFlyFront) {
+        const pushSide = noFlySide - Math.abs(side);
+        const pushFront = noFlyFront - Math.abs(front);
+        const useSide = pushSide < pushFront;
+        const sign = (useSide ? side : front) < 0 ? -1 : 1;
+        const wanted = (useSide ? noFlySide : noFlyFront) + Math.random() * (useSide ? 2.5 : 2.0);
+        const delta = sign * wanted - (useSide ? side : front);
+        cloud.position.x += (useSide ? sideX : frontX) * delta;
+        cloud.position.z += (useSide ? sideZ : frontZ) * delta;
+      }
     }
   }
 
@@ -378,6 +408,7 @@
       m.emissive.setHex(0xff9a64);
       m.emissiveIntensity = 0;
     }
+    m.depthTest = true;
     m.depthWrite = false;
     // Keep visual cloud opacity independent from the shadow slider. Shadow
     // breakup is handled by per-mesh customDepthMaterial below; using

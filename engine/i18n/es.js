@@ -60,7 +60,7 @@
     'worldmenu.empty': 'Aún no hay mundos guardados. Crea uno y elige «Guardar como nuevo».',
     'worldmenu.saveAs': 'Guardar como nuevo',
     'worldmenu.share': 'Copiar enlace para compartir',
-    'worldmenu.collaborate': 'Copiar enlace de colaboración',
+    'worldmenu.collaborate': 'Iniciar sala de colaboración',
     'worldmenu.cloud': 'Mundos en la nube',
     'unsaved.banner': 'Las áreas fuera de tu cuadrícula principal no se guardan',
 

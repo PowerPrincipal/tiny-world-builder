@@ -291,14 +291,16 @@
         }
       }
       addHeavyTerrainKerbStrips(g, terrain, x, z, terrainN, topSize, topY);
+      const waterfallSides = terrain === 'water' ? {
+        e: !skipE && (typeof levelN.e !== 'number' || levelN.e < level),
+        w: !skipW && (typeof levelN.w !== 'number' || levelN.w < level),
+        s: !skipS && (typeof levelN.s !== 'number' || levelN.s < level),
+        n: !skipN && (typeof levelN.n !== 'number' || levelN.n < level),
+      } : null;
+      addSunkenWaterRimStrips(g, terrain, x, z, terrainN, topSize, topY, waterfallSides);
       addSurfaceEdgeWeeds(g, terrain, x, z, terrainN, topSize, topY);
       if (terrain === 'water') {
-        addWaterfallRiserEffects(g, x, z, riserSize, topY - 0.018, {
-          e: !skipE && (typeof levelN.e !== 'number' || levelN.e < level),
-          w: !skipW && (typeof levelN.w !== 'number' || levelN.w < level),
-          s: !skipS && (typeof levelN.s !== 'number' || levelN.s < level),
-          n: !skipN && (typeof levelN.n !== 'number' || levelN.n < level),
-        });
+        addWaterfallRiserEffects(g, x, z, riserSize, topY - 0.018, waterfallSides);
       }
     }
 
@@ -819,4 +821,3 @@
     g.userData.level = level;
     return g;
   }
-

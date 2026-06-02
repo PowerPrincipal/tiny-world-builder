@@ -114,16 +114,6 @@
     const windowH = Math.max(0.10, size.y);
     const effects = [];
 
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(windowW * 2.6, windowH * 2.4), M.windowWallGlow);
-    wall.position.set(local.x + normal.x * 0.030, Math.max(0.14, local.y - windowH * 0.12), local.z + normal.z * 0.030);
-    orientWindowGlowPlane(wall, normal);
-    wall.visible = false;
-    wall.renderOrder = 5;
-    wall.userData.noShadow = true;
-    wall.userData.windowLightEffect = true;
-    root.add(wall);
-    effects.push(wall);
-
     const length = Math.max(0.82, Math.min(1.45, windowH * 4.2));
     const spill = new THREE.Mesh(new THREE.PlaneGeometry(windowW * 2.8, length), M.windowGroundGlow);
     spill.rotation.x = -Math.PI / 2;
@@ -138,7 +128,7 @@
 
     const halo = new THREE.Sprite(M.windowHalo);
     halo.position.set(local.x + normal.x * 0.045, local.y, local.z + normal.z * 0.045);
-    halo.scale.set(windowW * 2.2, windowH * 2.0, 1);
+    halo.scale.set(windowW * 1.05, windowH * 1.05, 1);
     halo.visible = false;
     halo.renderOrder = 6;
     halo.userData.noShadow = true;

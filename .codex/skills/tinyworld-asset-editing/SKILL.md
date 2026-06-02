@@ -92,6 +92,11 @@ Stamps panel:
 - Model-stamp OBJ/MTL support must preserve filenames with spaces in `mtllib` and `map_Kd` lines. VoxEdit-style `Tr 1.000000` should not make a textured model fully transparent; treat it as opaque unless a `d` dissolve value says otherwise.
 - Rigged GLTF/GLB model stamps need a skinned-mesh-aware clone path. Plain `clone(true)` can leave skeletons tied to the cached source scene when multiple stamps are placed.
 - Preserve `gltf.animations` in the model-stamp asset cache. Runtime systems such as crowd character replacements use those clips after cloning the cached scene.
+- Drag/drop imports live in `43-drag-drop-import.js`. Model files register through
+  `window.__tinyworldRegisterDroppedModelStamps`, including local sidecars and
+  object URLs, while chat attachments expose `window.__tinyworldAgentDropAttachments`
+  for image/model prompt context. Canvas model drops must still place via `setCell()`
+  and keep selection sync through `window.__tinyworldSelection`.
 
 Validation:
 

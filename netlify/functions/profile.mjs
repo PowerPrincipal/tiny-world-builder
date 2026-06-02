@@ -1,5 +1,5 @@
 import { requireAuthUser } from './lib/auth.mjs';
-import { getSql } from './lib/db.mjs';
+import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { ensureProfile, normalizeUsername, profileDto } from './lib/profiles.mjs';
 
@@ -53,6 +53,9 @@ export default async function profileFunction(request) {
 
     return errorResponse('Method not allowed', 405, origin);
   } catch (err) {
+    if (isDatabaseUnavailable(err)) {
+      return errorResponse('Netlify Database is not available in this local session.', 503, origin);
+    }
     if (err && err.code === '23505') return errorResponse('Username is already taken', 409, origin);
     console.error('[profile]', err);
     return errorResponse('Profile request failed', 500, origin);

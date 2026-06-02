@@ -224,7 +224,7 @@
       </button>
       <button class="world-menu-foot-btn" data-action="collaborate" role="menuitem">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11c1.66 0 3-1.12 3-2.5S17.66 6 16 6s-3 1.12-3 2.5S14.34 11 16 11Z"/><path d="M8 12c1.66 0 3-1.12 3-2.5S9.66 7 8 7 5 8.12 5 9.5 6.34 12 8 12Z"/><path d="M2 20c.8-3 3-4.5 6-4.5 1.5 0 2.8.38 3.8 1.14"/><path d="M22 20c-.65-2.42-2.32-3.93-5-4.4"/><path d="M14 17h6"/><path d="M17 14v6"/></svg>
-        <span data-i18n="worldmenu.collaborate">Copy collaborate URL</span>
+        <span data-i18n="worldmenu.collaborate">Start collaborate room</span>
       </button>
       <button class="world-menu-foot-btn" data-action="manage" role="menuitem">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -470,6 +470,8 @@
       <div class="tab-bar">
         <button type="button" id="tab-profile" class="active">Profile</button>
         <button type="button" id="tab-saves">My Worlds</button>
+        <button type="button" id="tab-wallet">Wallet</button>
+        <button type="button" id="tab-players">Players</button>
         <button type="button" id="tab-api">Developer</button>
       </div>
       <div id="panel-profile">
@@ -516,6 +518,69 @@
         <ul class="saves-list" id="saves-list"></ul>
         <div class="save-empty" id="saves-empty" hidden>No saved worlds yet. Build one and save it above.</div>
       </div>
+      <div id="panel-wallet" hidden>
+        <div class="profile-section">
+          <div class="wallet-summary">
+            <div>
+              <span class="wallet-kicker">Phantom</span>
+              <strong id="wallet-address">Not connected</strong>
+              <span id="wallet-token-count">TINYWORLD: 0</span>
+            </div>
+            <span id="wallet-status" class="wallet-status">Offline</span>
+          </div>
+          <div class="wallet-actions">
+            <button class="btn" id="wallet-connect" type="button">Connect Phantom</button>
+            <button class="btn" id="wallet-refresh" type="button">Refresh</button>
+            <button class="btn" id="wallet-disconnect" type="button">Disconnect</button>
+          </div>
+        </div>
+        <div class="profile-section">
+          <label>Payment
+            <div class="wallet-payment-row">
+              <input type="text" id="wallet-payment-amount" inputmode="decimal" placeholder="Amount" />
+              <button class="btn" id="wallet-payment-create" type="button">Create payment</button>
+            </div>
+            <a class="wallet-payment-link" id="wallet-payment-link" href="" hidden>Open payment</a>
+          </label>
+        </div>
+        <div class="profile-section">
+          <label>Wallet activity</label>
+          <ul class="wallet-activity-list" id="wallet-activity-list"></ul>
+          <div class="save-empty wallet-empty" id="wallet-activity-empty">No wallet activity loaded.</div>
+        </div>
+      </div>
+      <div id="panel-players" hidden>
+        <div class="profile-section">
+          <div class="players-stats" id="players-stats"></div>
+        </div>
+        <div class="profile-section">
+          <label>Find players
+            <div class="players-search-row">
+              <input type="text" id="players-search" autocomplete="off" placeholder="username or display name" />
+              <button class="btn" id="players-search-btn" type="button">Search</button>
+            </div>
+          </label>
+          <ul class="players-list" id="players-list"></ul>
+        </div>
+        <div class="profile-section">
+          <label>Party
+            <div class="players-search-row">
+              <input type="text" id="party-name" maxlength="80" placeholder="Party name" />
+              <button class="btn" id="party-create" type="button">Create party</button>
+            </div>
+            <a class="wallet-payment-link" id="party-link" href="" hidden>Open party room</a>
+          </label>
+        </div>
+        <div class="profile-section">
+          <label>Voice
+            <div class="players-search-row">
+              <input type="text" id="voice-room" maxlength="120" placeholder="Voice room" />
+              <button class="btn" id="voice-token" type="button">Prepare voice</button>
+            </div>
+            <div class="profile-hint" id="voice-status">LiveKit token not requested.</div>
+          </label>
+        </div>
+      </div>
       <div id="panel-api" hidden>
         <div class="profile-section">
           <label>API keys
@@ -560,9 +625,13 @@
       <!-- Login form -->
       <form id="auth-login" class="auth-form" onsubmit="return false">
         <div id="auth-oauth-login" class="auth-oauth-section" hidden>
-          <button class="auth-google-btn" id="auth-google-login" type="button">
+          <button class="auth-oauth-btn" id="auth-google-login" type="button" data-provider="google" hidden>
             <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Sign in with Google
+          </button>
+          <button class="auth-oauth-btn" id="auth-github-login" type="button" data-provider="github" hidden>
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5A11.5 11.5 0 0 0 8.36 23.4c.58.11.79-.25.79-.56v-2c-3.22.7-3.9-1.38-3.9-1.38-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.04 1.76 2.72 1.25 3.38.95.11-.75.41-1.25.74-1.54-2.57-.29-5.28-1.29-5.28-5.73 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.07 0 0 .98-.31 3.18 1.19a10.96 10.96 0 0 1 5.8 0c2.2-1.5 3.17-1.19 3.17-1.19.64 1.6.24 2.78.12 3.07.74.81 1.19 1.84 1.19 3.11 0 4.45-2.71 5.43-5.3 5.72.42.36.79 1.08.79 2.18v3.24c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            Sign in with GitHub
           </button>
           <div class="auth-divider">or</div>
         </div>
@@ -583,9 +652,13 @@
       <!-- Signup form -->
       <form id="auth-signup" class="auth-form" hidden onsubmit="return false">
         <div id="auth-oauth-signup" class="auth-oauth-section" hidden>
-          <button class="auth-google-btn" id="auth-google-signup" type="button">
+          <button class="auth-oauth-btn" id="auth-google-signup" type="button" data-provider="google" hidden>
             <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Sign up with Google
+          </button>
+          <button class="auth-oauth-btn" id="auth-github-signup" type="button" data-provider="github" hidden>
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5A11.5 11.5 0 0 0 8.36 23.4c.58.11.79-.25.79-.56v-2c-3.22.7-3.9-1.38-3.9-1.38-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.04 1.76 2.72 1.25 3.38.95.11-.75.41-1.25.74-1.54-2.57-.29-5.28-1.29-5.28-5.73 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.07 0 0 .98-.31 3.18 1.19a10.96 10.96 0 0 1 5.8 0c2.2-1.5 3.17-1.19 3.17-1.19.64 1.6.24 2.78.12 3.07.74.81 1.19 1.84 1.19 3.11 0 4.45-2.71 5.43-5.3 5.72.42.36.79 1.08.79 2.18v3.24c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+            Sign up with GitHub
           </button>
           <div class="auth-divider">or</div>
         </div>
@@ -1503,6 +1576,8 @@
   <script src="engine/world/39-atmosphere-effects.js"></script>
   <script src="engine/world/40-shield-system.js"></script>
   <script src="engine/world/41-flight-combat.js"></script>
+  <script src="engine/world/42-account-wallet-players.js"></script>
+  <script src="engine/world/43-drag-drop-import.js"></script>
   <script src="engine/world/99-late-boot.js"></script>
 </body>
 </html>
