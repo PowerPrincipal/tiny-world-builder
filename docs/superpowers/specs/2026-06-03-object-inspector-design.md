@@ -35,9 +35,23 @@ Status: Implemented (slice 1 of the editing-system overhaul)
 - Persistence: round-trips through localStorage + reload, re-renders identically.
 - Flag OFF: no new inspector rows; light-attach suppressed even when a cell carries
   a `light` spec.
-- NOT verified live: cross-island (sky-island) object editing — the default Farm
-  preset has 0 editable islands. The code path is the same coordinate-keyed
-  `setCell`/appearance flow, but it was not exercised on an island here.
+- Cross-island object editing: VERIFIED live. Spawned an editable island via
+  `createEditableIsland`, placed a tree on it (global coord `boardX*GRID + lx`), and
+  confirmed the emissive/opacity material override renders on the island object
+  (island meshes carry LOCAL `gx/gz` under the island group; selection uses global
+  coords — the engine maps between them).
+
+## Slice 2 (reqs 1–3) — verified working, no code change needed
+Live-app check (real app, after opening the layers panel which renders lazily):
+- Req 1 (select on any island): selecting a sky-island cell via
+  `__tinyworldSelection.replaceWorldCoords` → `containsWorldCoord` true.
+- Req 2 (selection → layers highlight): the island cell's layers row gains
+  `is-selected` when selected in-scene.
+- Req 3 (layers → scene): clicking the island cell's layers row selects it in-scene
+  (`containsWorldCoord` true after click).
+All three already work, cross-island included. No fix required. Reqs 6–9 (hover
+sub-parts, explode, sculpt, sub-object transform) remain as later slices and each
+needs its own design pass (HARD-GATE: no implementation before approval).
 
 ## Background
 
