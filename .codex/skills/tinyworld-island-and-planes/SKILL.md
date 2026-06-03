@@ -77,17 +77,15 @@ top is anchored to `ISLAND_SIDE_STRATA_TOP_Y = TOP_H`, the visible top of the
 grass cap. The shader samples the internal image-style slice
 `texIslandSideStrataReference`; do not rebuild this as normalized fragment math
 or the grass/dirt/rock bands will stretch into tall green columns. The function
-still keeps the cheap plain `M.boardSide` backing wall that the island needs
-below the effect. The strata carrier itself is a very shallow top-edge slice:
-`ISLAND_SIDE_STRATA_HEIGHT = TILE * 0.035`; do not stretch it to fit the full
-side height. The carrier is a single wraparound `BufferGeometry` band whose
-outer edge sits just proud of the grass cap edge (`TILE * 0.055`) so corners
-meet cleanly and the layer reads through the edge dressing without becoming a
-floating pane. Do not render the strata carrier as four thick boxes with
-interior faces, because that creates corner gaps and green panes through the
-island. Keep the side-carrier mesh out of static base merging so the shader
-stays inspectable and continues to sit behind the current edge greebles/lumps;
-do not add separate overlay panels or per-tile decal geometry for this effect.
+uses that material on the real side-backing faces from `TOP_H` down through the
+dirt/stone side (`ISLAND_SIDE_STRATA_HEIGHT = TOP_H + DIRT_H + 0.035`). Do not
+add a separate shallow overlay strip over a plain brown backing; it leaves the
+old wall visible and looks like a decal. The four backing faces are widened by
+the edge outset so corners meet cleanly, and hidden faces stay stripped with
+`skipTop` / `skipBottom` / interior-side skips. Keep the side-carrier meshes out
+of static base merging so the shader stays inspectable and continues to sit
+behind the current edge greebles/lumps; do not add separate overlay panels or
+per-tile decal geometry for this effect.
 
 Underside pipes and water details are material-driven: `M.utilityPipe`,
 `M.utilityPipeD`, and `M.utilityClamp` use the internal `pipe-metal` canvas

@@ -1246,7 +1246,7 @@
   ];
 
   const ISLAND_SIDE_STRATA_TOP_Y = TOP_H;
-  const ISLAND_SIDE_STRATA_HEIGHT = TILE * 0.035;
+  const ISLAND_SIDE_STRATA_HEIGHT = TOP_H + DIRT_H + 0.035;
   const ISLAND_SIDE_STRATA_TEXTURE_ASPECT = 1024 / 192;
 
   function makeIslandSideStrataMaterial() {
