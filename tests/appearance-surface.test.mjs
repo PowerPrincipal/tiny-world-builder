@@ -63,6 +63,14 @@ test('parts: identity override is dropped, invalid keys rejected', () => {
   assert.equal(normalizeAppearance({ parts: { 'p:cable-1': { sx: 2 } } }).parts['p:cable-1'].sx, 2);
 });
 
+test('parts: house role keys (window:0, wall, door) are accepted', () => {
+  const a = normalizeAppearance({ parts: { 'window:0': { oy: 0.5 }, 'wall': { sx: 1.2 }, 'door': { oz: 0.1 } } });
+  assert.equal(a.parts['window:0'].oy, 0.5);
+  assert.equal(a.parts['wall'].sx, 1.2);
+  assert.equal(a.parts['door'].oz, 0.1);
+  assert.equal(normalizeAppearance({ parts: { 'bad key': { ox: 1 } } }), null); // space still rejected
+});
+
 test('voxelsRemoved: dedups + filters malformed keys', () => {
   const a = normalizeAppearance({ voxelsRemoved: ['1,2,3', '1,2,3', 'nope', '4,5,6'] });
   assert.deepEqual(a.voxelsRemoved.sort(), ['1,2,3', '4,5,6']);

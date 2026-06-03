@@ -707,6 +707,7 @@
   function voxelDoor(parent, x, z, face = 'z', h = 0.34) {
     const y = h / 2;
     const d = new THREE.Group();
+    d.userData.doorPart = true;
     d.position.set(x, 0, z);
     if (face === 'x') {
       const s = Math.sign(x || 1);
@@ -1462,7 +1463,8 @@
     const house = new THREE.Group();
     const chimneyTops = [];
 
-    vbox(house, bodyW, wallH, bodyD, 0, wallH / 2, 0, wallMat);
+    const wallMesh = vbox(house, bodyW, wallH, bodyD, 0, wallH / 2, 0, wallMat);
+    wallMesh.userData.partKey = 'wall';
     vbox(house, bodyW + 0.04, 0.06, bodyD + 0.04, 0, 0.03, 0, wallDark);
     voxelSteppedRoof(house, bodyW, bodyD, wallH, roofMat, roofDark, 'z');
 
@@ -1502,9 +1504,39 @@
     } else {
       g.userData = { kind: 'house', chimneyTops };
     }
+    // Key editable sub-parts so they can be hovered/selected/moved/recoloured.
+    // Houses are unbatched + small, so we always key (no per-mesh string-alloc
+    // concern like the 1000+-voxel builds). Windows index in deterministic
+    // build order; door + wall by role. Per-part offset applied below from
+    // appearance.parts so moves persist + reattach on re-render.
+    keyAndApplyHouseParts(house, opts.appearance);
     g.add(house);
     castReceive(g);
     return g;
+  }
+
+  // Assign stable role/index part keys to a house group's sub-parts, then apply
+  // any persisted per-part transform overrides (appearance.parts) so a moved
+  // window/door reattaches to the same part across re-render + reload.
+  function keyAndApplyHouseParts(house, appearance) {
+    let wi = 0;
+    for (const ch of house.children) {
+      if (!ch.userData) continue;
+      if (ch.userData.windowFace !== undefined) ch.userData.partKey = 'window:' + (wi++);
+      else if (ch.userData.doorPart) ch.userData.partKey = 'door';
+    }
+    const a = (typeof normalizeAppearance === 'function') ? normalizeAppearance(appearance) : appearance;
+    const parts = a && a.parts;
+    if (!parts) return;
+    house.traverse(n => {
+      const key = n.userData && n.userData.partKey;
+      if (!key || !parts[key]) return;
+      const ov = parts[key];
+      n.position.x += (ov.ox || 0);
+      n.position.y += (ov.oy || 0);
+      n.position.z += (ov.oz || 0);
+      if (ov.sx !== 1 || ov.sy !== 1 || ov.sz !== 1) n.scale.set(n.scale.x * (ov.sx || 1), n.scale.y * (ov.sy || 1), n.scale.z * (ov.sz || 1));
+    });
   }
 
   function makeVoxelSquareHouse(floors = 1) {
@@ -2278,9 +2310,9 @@
         if (cluster.kind === 'turret') {
           mesh = makeVoxelTurret(floors, false);
         } else if (cluster.kind === 'solo') {
-          mesh = makeVoxelLinearHouse(1, 'z', floors);
+          mesh = makeVoxelLinearHouse(1, 'z', floors, { appearance: cell.appearance });
         } else if (cluster.kind === 'linear') {
-          mesh = makeVoxelLinearHouse(cluster.length, cluster.orientation, floors);
+          mesh = makeVoxelLinearHouse(cluster.length, cluster.orientation, floors, { appearance: cell.appearance });
           const a = tilePos(cluster.anchorX, cluster.anchorZ);
           posX = a.x;
           posZ = a.z;

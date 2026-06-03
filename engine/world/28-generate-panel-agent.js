@@ -2038,19 +2038,23 @@
         }
         if (window.__tinyworldFlags && window.__tinyworldFlags.inspectorV2) {
           const ap = cell => normalizeAppearance(cell.appearance) || {};
-          // Sub-object part editing only works for home-board voxel-builds whose
-          // stamp is voxel-based (customParts stamps have no per-part key path, and
-          // island objects render outside the home cellMeshes path). Only offer the
-          // affordance where it actually does something.
+          // Sub-object part editing works on home-board objects that expose keyed
+          // parts: voxel-builds with a voxel-based stamp, and cottage houses
+          // (makeVoxelLinearHouse keys wall/door/windows). Island objects render
+          // outside the home cellMeshes path; customParts stamps + special
+          // buildingTypes (manor/tower/turret) have no part keys yet.
           const subT = selectedTargets[0] || null;
-          const subStamp = (subT && typeof getVoxelBuildStamp === 'function')
-            ? getVoxelBuildStamp(subT.cell && subT.cell.appearance && subT.cell.appearance.voxelBuildId)
-            : null;
-          const subSupported = !!(subT && subStamp
-            && Array.isArray(subStamp.voxels) && subStamp.voxels.length
-            && !(Array.isArray(subStamp.customParts) && subStamp.customParts.length)
-            && (typeof isOutsideHomeGrid !== 'function' || !isOutsideHomeGrid(subT.x, subT.z)));
-          if (objectCells.length === 1 && objectCells[0].kind === 'voxel-build' && subSupported) {
+          const onHome = !!(subT && (typeof isOutsideHomeGrid !== 'function' || !isOutsideHomeGrid(subT.x, subT.z)));
+          const isVoxelStampObj = (() => {
+            if (!subT || subT.cell.kind !== 'voxel-build') return false;
+            const st = (typeof getVoxelBuildStamp === 'function')
+              ? getVoxelBuildStamp(subT.cell.appearance && subT.cell.appearance.voxelBuildId) : null;
+            return !!(st && Array.isArray(st.voxels) && st.voxels.length
+              && !(Array.isArray(st.customParts) && st.customParts.length));
+          })();
+          const isCottage = !!(subT && subT.cell.kind === 'house' && !subT.cell.buildingType);
+          const subSupported = onHome && (isVoxelStampObj || isCottage);
+          if (objectCells.length === 1 && subSupported) {
             const editing = !!(window.__tinyworldSubEdit && window.__tinyworldSubEdit.isActive && window.__tinyworldSubEdit.isActive());
             addRow('Edit', { key: 'subEdit', label: 'Parts', control: 'actions', options: [
               { label: editing ? 'Exit part edit' : 'Edit parts', value: 'toggle' },

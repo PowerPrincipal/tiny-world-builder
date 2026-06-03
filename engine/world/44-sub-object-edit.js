@@ -57,19 +57,28 @@
     currentHoverPart = null;
   }
 
-  // Inverted-hull highlight of one part mesh, placed in world space from the
-  // part's world matrix (mirrors addObjectOutline so it works under any parent).
+  // Inverted-hull outline of a part, placed in world space from each mesh's
+  // world matrix (mirrors addObjectOutline so it works under any parent). The
+  // part may be a single voxel mesh OR a group (e.g. a house window = 4 boxes);
+  // in the group case we outline every child mesh.
+  function addPartHulls(part, group, mat, scale, renderOrder) {
+    if (!part) return;
+    const meshes = [];
+    if (part.isMesh && part.geometry) meshes.push(part);
+    else part.traverse(o => { if (o.isMesh && o.geometry) meshes.push(o); });
+    for (const m of meshes) {
+      m.updateMatrixWorld(true);
+      const hull = new THREE.Mesh(m.geometry, mat);
+      hull.matrixAutoUpdate = false;
+      hull.matrix.copy(m.matrixWorld).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
+      hull.renderOrder = renderOrder;
+      group.add(hull);
+    }
+  }
   // Clears only the overlay meshes — the handler owns currentHoverPart state.
-  function highlightPart(partMesh) {
+  function highlightPart(part) {
     clearHoverMeshes();
-    if (!partMesh || !partMesh.geometry) return;
-    partMesh.updateMatrixWorld(true);
-    const hull = new THREE.Mesh(partMesh.geometry, subEditHoverMat);
-    hull.matrixAutoUpdate = false;
-    hull.matrix.copy(partMesh.matrixWorld);
-    hull.matrix.multiply(new THREE.Matrix4().makeScale(SUBEDIT_HOVER_SCALE, SUBEDIT_HOVER_SCALE, SUBEDIT_HOVER_SCALE));
-    hull.renderOrder = 1000;
-    subEditHoverGroup.add(hull);
+    addPartHulls(part, subEditHoverGroup, subEditHoverMat, SUBEDIT_HOVER_SCALE, 1000);
   }
 
   // Raycast the edited object's children; return the nearest hit mesh that
@@ -104,14 +113,7 @@
   }
   function highlightSelectedMesh(partMesh) {
     clearSelMeshes();
-    if (!partMesh || !partMesh.geometry) return;
-    partMesh.updateMatrixWorld(true);
-    const hull = new THREE.Mesh(partMesh.geometry, subEditSelMat);
-    hull.matrixAutoUpdate = false;
-    hull.matrix.copy(partMesh.matrixWorld);
-    hull.matrix.multiply(new THREE.Matrix4().makeScale(SUBEDIT_SEL_SCALE, SUBEDIT_SEL_SCALE, SUBEDIT_SEL_SCALE));
-    hull.renderOrder = 1001;
-    subEditSelGroup.add(hull);
+    addPartHulls(partMesh, subEditSelGroup, subEditSelMat, SUBEDIT_SEL_SCALE, 1001);
   }
   function findPartMesh(partKey) {
     const obj = subEditObject();

@@ -2070,7 +2070,9 @@
     // validated to the partKey shapes; values clamped. Reattaches by key on reload.
     let parts = null;
     if (value.parts && typeof value.parts === 'object') {
-      const keyOk = k => typeof k === 'string' && /^(v:-?\d+,-?\d+,-?\d+|p:[a-z0-9_-]{1,64})$/i.test(k);
+      // Accept voxel grid keys (v:x,y,z), customParts ids (p:id), and house role
+      // keys (wall, roof, door, window:0, chimney:1, ...).
+      const keyOk = k => typeof k === 'string' && /^(v:-?\d+,-?\d+,-?\d+|p:[a-z0-9_-]{1,64}|[a-z][a-z0-9_-]{0,31}(:\d+)?)$/i.test(k);
       const num = (raw, lo, hi, dflt) => {
         const n = Number(raw);
         return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : dflt;
