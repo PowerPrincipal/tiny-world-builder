@@ -1,4 +1,15 @@
   // -------- prelude (hoisted pure utils) --------
+  // Inspector v2 (extended object inspector) — opt-in while it stabilises.
+  // Resolved once at boot from ?inspectorV2=1 or localStorage.
+  try {
+    const qs = new URLSearchParams(location.search);
+    const stored = localStorage.getItem('tinyworld:flags.inspectorV2');
+    window.__tinyworldFlags = window.__tinyworldFlags || {};
+    window.__tinyworldFlags.inspectorV2 = qs.get('inspectorV2') === '1' || stored === '1';
+  } catch (_) {
+    window.__tinyworldFlags = window.__tinyworldFlags || { inspectorV2: false };
+  }
+
   // Relocated here from module 28 so they are defined before any later
   // module's top-level code runs. The god-file split turned one shared
   // <script> (where function declarations hoisted across the whole block)

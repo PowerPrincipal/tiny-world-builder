@@ -2007,6 +2007,30 @@
       : null;
     const rawFenceStyle = String(value.fenceStyle || value.fence || '').toLowerCase();
     const fenceStyle = rawFenceStyle === 'garden' ? 'garden' : null;
+    const clampNum = (raw, lo, hi) => {
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : null;
+    };
+    const emissiveColor = normalizeHexColor(value.emissiveColor || value.emissive || value.glowColor);
+    const emissiveIntensity = clampNum(value.emissiveIntensity !== undefined ? value.emissiveIntensity : value.glow, 0, 2);
+    const opacity = clampNum(value.opacity, 0, 1);
+    const rawFinish = String(value.finish || '').toLowerCase();
+    const finish = (rawFinish === 'matte' || rawFinish === 'satin' || rawFinish === 'glow') ? rawFinish : null;
+    let light = null;
+    if (value.light && typeof value.light === 'object') {
+      const lt = String(value.light.type || '').toLowerCase();
+      const lightType = (lt === 'point' || lt === 'spot') ? lt : null;
+      if (lightType) {
+        const li = clampNum(value.light.intensity, 0, 4);
+        const lr = clampNum(value.light.range, 0, 20);
+        light = {
+          type: lightType,
+          color: normalizeHexColor(value.light.color) || '#ffd9a0',
+          intensity: li === null ? 1 : +li.toFixed(3),
+          range: lr === null ? 6 : +lr.toFixed(3),
+        };
+      }
+    }
     const out = {};
     if (bodyColor) out.bodyColor = bodyColor;
     if (topColor) out.topColor = topColor;
@@ -2030,6 +2054,11 @@
     }
     if (objectStyle) out.objectStyle = objectStyle;
     if (fenceStyle) out.fenceStyle = fenceStyle;
+    if (emissiveColor) out.emissiveColor = emissiveColor;
+    if (emissiveIntensity !== null && emissiveIntensity > 0.001) out.emissiveIntensity = +emissiveIntensity.toFixed(3);
+    if (opacity !== null && opacity < 0.999) out.opacity = +opacity.toFixed(3);
+    if (finish && finish !== 'matte') out.finish = finish;
+    if (light) out.light = light;
     return Object.keys(out).length ? out : null;
   }
   function sameAppearance(a, b) {
