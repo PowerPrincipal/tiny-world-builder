@@ -2052,8 +2052,8 @@
             return !!(st && Array.isArray(st.voxels) && st.voxels.length
               && !(Array.isArray(st.customParts) && st.customParts.length));
           })();
-          const isCottage = !!(subT && subT.cell.kind === 'house' && !subT.cell.buildingType);
-          const subSupported = onHome && (isVoxelStampObj || isCottage);
+          const isHouse = !!(subT && subT.cell.kind === 'house');
+          const subSupported = onHome && (isVoxelStampObj || isHouse);
           if (objectCells.length === 1 && subSupported) {
             const editing = !!(window.__tinyworldSubEdit && window.__tinyworldSubEdit.isActive && window.__tinyworldSubEdit.isActive());
             addRow('Edit', { key: 'subEdit', label: 'Parts', control: 'actions', options: [

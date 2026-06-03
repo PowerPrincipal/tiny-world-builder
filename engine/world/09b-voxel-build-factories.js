@@ -1516,9 +1516,8 @@
     // Key editable sub-parts so they can be hovered/selected/moved/recoloured.
     // Houses are unbatched + small, so we always key (no per-mesh string-alloc
     // concern like the 1000+-voxel builds). Windows index in deterministic
-    // build order; door + wall by role. Per-part offset applied below from
-    // appearance.parts so moves persist + reattach on re-render.
-    keyAndApplyHouseParts(house, opts.appearance);
+    // build order; door + wall by role. Keying + per-part overrides are applied
+    // once by makeVoxelRenderForCell (for ALL house types), not here.
     g.add(house);
     castReceive(g);
     return g;
@@ -1529,12 +1528,15 @@
   // window/door reattaches to the same part across re-render + reload.
   function keyAndApplyHouseParts(house, appearance) {
     let wi = 0;
-    for (const ch of house.children) {
-      if (!ch.userData) continue;
+    // Traverse (not just direct children) so marked window/door/roof parts are
+    // found at any depth — works for every house factory (manor/tower/turret/
+    // high-rise/square/composite), not just the cottage.
+    house.traverse(ch => {
+      if (ch === house || !ch.userData || ch.userData.partKey) return;
       if (ch.userData.windowFace !== undefined) ch.userData.partKey = 'window:' + (wi++);
       else if (ch.userData.doorPart) ch.userData.partKey = 'door';
       else if (ch.userData.roofPart) ch.userData.partKey = 'roof';
-    }
+    });
     const a = (typeof normalizeAppearance === 'function') ? normalizeAppearance(appearance) : appearance;
     const parts = a && a.parts;
     if (!parts) return;
@@ -2352,6 +2354,10 @@
           setGridUserData = false;
         }
       }
+      // Key sub-parts (window/door/roof/wall) for EVERY house type so they're
+      // selectable/movable/recolorable in sub-edit (factories no longer key
+      // internally). Traverse-based, so it works regardless of factory structure.
+      if (mesh) keyAndApplyHouseParts(mesh, cell.appearance);
     }
 
     return mesh ? { mesh, posX, posZ, setGridUserData } : null;

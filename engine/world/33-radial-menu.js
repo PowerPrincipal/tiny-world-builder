@@ -70,7 +70,7 @@
       const t = subEditTargetCell();
       if (!t || !t.cell) return false;
       if (typeof isOutsideHomeGrid === 'function' && isOutsideHomeGrid(t.x, t.z)) return false;
-      if (t.cell.kind === 'house' && !t.cell.buildingType) return true;
+      if (t.cell.kind === 'house') return true;
       if (t.cell.kind === 'voxel-build') {
         const st = (typeof getVoxelBuildStamp === 'function')
           ? getVoxelBuildStamp(t.cell.appearance && t.cell.appearance.voxelBuildId) : null;
