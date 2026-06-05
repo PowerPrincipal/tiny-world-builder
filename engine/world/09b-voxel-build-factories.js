@@ -691,22 +691,30 @@
   // A window is built as one positioned sub-group (boxes relative to it) so it
   // can be hovered/selected/moved as a single sub-object part. World positions
   // are identical to the old flat layout (group at the anchor, boxes relative).
-  function voxelWindow(parent, x, y, z, face = 'z', mat = M.windowB) {
+  function voxelWindow(parent, x, y, z, face = 'z') {
     // Boxes keep their ABSOLUTE positions inside a group that stays at the
     // origin — relative-0 coords would hit vbox's `y || h/2` default and shove
     // the window upward. The group's own position is the sub-object move handle.
+    // The glass itself is an interior-mapped pane (a fake recessed room), the
+    // same treatment as the classic house windows.
     const w = new THREE.Group();
     w.userData.windowFace = face;
+    const R = WINDOW.glassRatio;
+    const gw = 0.17 * R, gh = 0.19 * R;               // glass span; rest of the frame is wood border
     if (face === 'x') {
-      vbox(w, 0.034, 0.19, 0.17, x, y, z, M.woodTrim);
-      vbox(w, 0.038, 0.135, 0.120, x + Math.sign(x || 1) * 0.004, y, z, mat);
-      vbox(w, 0.042, 0.016, 0.120, x + Math.sign(x || 1) * 0.008, y, z, M.woodTrim);
-      vbox(w, 0.042, 0.135, 0.014, x + Math.sign(x || 1) * 0.009, y, z, M.woodTrim);
+      const sx = Math.sign(x || 1);
+      vbox(w, 0.034, 0.19, 0.17, x, y, z, M.woodTrim);                  // frame
+      const pane = makeWindowPane(gw, gh, sx > 0 ? '+x' : '-x', 0.02);  // interior glass
+      pane.position.set(x + sx * 0.02, y, z); w.add(pane);
+      vbox(w, 0.042, 0.016, gw, x + sx * 0.024, y, z, M.woodTrim);      // muntins, proud of the glass
+      vbox(w, 0.042, gh, 0.014, x + sx * 0.024, y, z, M.woodTrim);
     } else {
+      const sz = Math.sign(z || 1);
       vbox(w, 0.17, 0.19, 0.034, x, y, z, M.woodTrim);
-      vbox(w, 0.120, 0.135, 0.038, x, y, z + Math.sign(z || 1) * 0.004, mat);
-      vbox(w, 0.120, 0.016, 0.042, x, y, z + Math.sign(z || 1) * 0.008, M.woodTrim);
-      vbox(w, 0.014, 0.135, 0.042, x, y, z + Math.sign(z || 1) * 0.009, M.woodTrim);
+      const pane = makeWindowPane(gw, gh, sz > 0 ? '+z' : '-z', 0.02);
+      pane.position.set(x, y, z + sz * 0.02); w.add(pane);
+      vbox(w, gw, 0.016, 0.042, x, y, z + sz * 0.024, M.woodTrim);
+      vbox(w, 0.014, gh, 0.042, x, y, z + sz * 0.024, M.woodTrim);
     }
     parent.add(w);
     return w;

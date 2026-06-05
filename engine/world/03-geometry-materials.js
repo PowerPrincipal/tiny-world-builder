@@ -497,6 +497,14 @@
   // house is torn down (safeDisposeGeometry honours this flag, like the cached
   // box geometries the frames/trims use).
   _windowPaneGeo.userData.cached = true;
+
+  // Window appearance config — single source of truth for both the classic
+  // house primitives (07) and the voxel buildings (09b). `glassRatio` is the
+  // fraction of the frame opening that is glass (rest is the wood border):
+  // larger = bigger glass / thinner wood. Exposed on window.* so a UI setting
+  // can drive it and trigger a rebuild.
+  const WINDOW = { glassRatio: 0.86 };
+  if (typeof window !== 'undefined') window.__tinyworldWindow = WINDOW;
   const _wiInvMat  = new THREE.Matrix4();
   const _wiCamLoc  = new THREE.Vector3();
   const _wiPos     = new THREE.Vector3();
@@ -578,6 +586,7 @@
   // rooms. Square calls (w === h) reproduce the simple cottage window.
   function makeWindowPane(w, h, dir, offset) {
     const mesh = new THREE.Mesh(_windowPaneGeo, M.windowInterior);
+    mesh.userData.sharedGeometry = true;              // never dispose the shared plane on teardown
     mesh.scale.set(w, h, Math.min(w, h));             // unit pane -> opening; z sets room depth scale
     switch (dir) {
       case '-z': mesh.rotation.y = Math.PI;      mesh.position.z = -offset; break;
