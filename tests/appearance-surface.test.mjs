@@ -89,3 +89,13 @@ test('voxelsAdded: rounds coords, defaults+normalizes color, drops invalid', () 
   assert.equal(a.voxelsAdded.length, 1);
   assert.deepEqual(a.voxelsAdded[0], { x: 1, y: 2, z: -3, color: '#ff0000' });
 });
+
+test('window: keeps set keys, clamps, normalizes tint; empty/no-op drops', () => {
+  const a = normalizeAppearance({ window: { glassRatio: 2, tint: 'ff8800', darkness: -1, brightness: 5, reflect: 0.3 } });
+  assert.deepEqual(a.window, { glassRatio: 1, tint: '#ff8800', darkness: 0, brightness: 3, reflect: 0.3 });
+  // only the keys the caller set are kept
+  assert.deepEqual(normalizeAppearance({ window: { darkness: 0.5 } }).window, { darkness: 0.5 });
+  // an empty / all-invalid window spec is dropped entirely
+  assert.equal(normalizeAppearance({ window: {} }), null);
+  assert.equal(normalizeAppearance({ window: { tint: 'not-a-color' } }), null);
+});

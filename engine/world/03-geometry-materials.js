@@ -512,9 +512,18 @@
   const WINDOW = { glassRatio: 0.86, tint: 0xd6e6ff, darkness: 0.04, brightness: 1.0, reflect: 0.5 };
   if (typeof window !== 'undefined') window.__tinyworldWindow = WINDOW;
 
-  // Resolve the effective glass ratio for an optional per-object override.
+  // Build-scoped per-object override (an appearance.window spec). renderCellObject
+  // (17) sets this around an object's build so the deep window builders pick up
+  // the editing object's overrides without threading it through every call site;
+  // it is cleared after each render. undefined override args fall back to it.
+  let _activeWindowOverride = null;
+  function setActiveWindowOverride(o) { _activeWindowOverride = o || null; }
+
+  // Resolve the effective glass ratio for an optional per-object override
+  // (defaults to the active build override, then the global WINDOW default).
   function windowGlassRatio(override) {
-    const r = override && override.glassRatio;
+    const o = (override === undefined) ? _activeWindowOverride : override;
+    const r = o && o.glassRatio;
     return (typeof r === 'number') ? r : WINDOW.glassRatio;
   }
   const _wiInvMat  = new THREE.Matrix4();
@@ -602,9 +611,10 @@
   // { tint, darkness, brightness, reflect } it sets wins over the global WINDOW
   // defaults for this pane (glassRatio is consumed earlier, for geometry).
   function makeWindowPane(w, h, dir, offset, override) {
+    const o = (override === undefined) ? _activeWindowOverride : override;
     const mesh = new THREE.Mesh(_windowPaneGeo, M.windowInterior);
     mesh.userData.sharedGeometry = true;              // never dispose the shared plane on teardown
-    mesh.userData.winOverride = override || null;     // per-object shader overrides (read each draw)
+    mesh.userData.winOverride = o || null;            // per-object shader overrides (read each draw)
     mesh.scale.set(w, h, Math.min(w, h));             // unit pane -> opening; z sets room depth scale
     switch (dir) {
       case '-z': mesh.rotation.y = Math.PI;      mesh.position.z = -offset; break;
@@ -636,12 +646,15 @@
       u.uLit.value = lit;
 
       // Resolve shader appearance: per-object override (if any) over global WINDOW.
+      // tint may be a number (global default, e.g. 0xd6e6ff) or a '#rrggbb' string
+      // (per-object, from the inspector colour picker).
       const o = this.userData.winOverride;
-      const tint     = (o && typeof o.tint === 'number')       ? o.tint       : WINDOW.tint;
+      const tint     = (o && o.tint != null)                   ? o.tint       : WINDOW.tint;
       const darkness = (o && typeof o.darkness === 'number')   ? o.darkness   : WINDOW.darkness;
       const bright   = (o && typeof o.brightness === 'number') ? o.brightness : WINDOW.brightness;
       const reflect  = (o && typeof o.reflect === 'number')    ? o.reflect    : WINDOW.reflect;
-      u.uGlass.value.setHex(tint).multiplyScalar(1.0 - Math.max(0, Math.min(1, darkness)));
+      if (typeof tint === 'string') u.uGlass.value.set(tint); else u.uGlass.value.setHex(tint);
+      u.uGlass.value.multiplyScalar(1.0 - Math.max(0, Math.min(1, darkness)));
       u.uInteriorBright.value = bright;
       u.uReflectAmt.value = reflect;
     };

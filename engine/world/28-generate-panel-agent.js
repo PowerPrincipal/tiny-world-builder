@@ -1671,6 +1671,20 @@
         });
         return;
       }
+      if (rowKey === 'windowGlassRatio' || rowKey === 'windowTint' || rowKey === 'windowDarkness' || rowKey === 'windowBrightness' || rowKey === 'windowReflect') {
+        updateSelectedBoardObjects(target => {
+          const appearance = Object.assign({}, normalizeAppearance(target.cell.appearance) || {});
+          const w = Object.assign({}, appearance.window || {});
+          if (rowKey === 'windowGlassRatio') w.glassRatio = Number(value);
+          else if (rowKey === 'windowTint') w.tint = value;
+          else if (rowKey === 'windowDarkness') w.darkness = Number(value);
+          else if (rowKey === 'windowBrightness') w.brightness = Number(value);
+          else if (rowKey === 'windowReflect') w.reflect = Number(value);
+          appearance.window = w;
+          return { appearance: Object.keys(appearance).length ? appearance : null };
+        });
+        return;
+      }
       if (rowKey === 'subEdit') {
         const se = window.__tinyworldSubEdit;
         if (se) {
@@ -2117,6 +2131,20 @@
             { key: 'lightIntensity', label: 'Light int', control: 'slider', min: 0, max: 4, step: 0.1, currentValue: uniformValue(objectCells, c => (lightOf(c) ? lightOf(c).intensity : 0)) },
             { key: 'lightRange', label: 'Light range', control: 'slider', min: 1, max: 20, step: 0.5, currentValue: uniformValue(objectCells, c => (lightOf(c) ? lightOf(c).range : 6)) },
           ]);
+          // Window glass — only meaningful for buildings (they have window panes).
+          if (objectCells.some(c => c.kind === 'house' || c.kind === 'voxel-build')) {
+            const WG = (typeof window !== 'undefined' && window.__tinyworldWindow) || {};
+            const defTint = '#' + ((WG.tint != null ? WG.tint : 0xd6e6ff) & 0xffffff).toString(16).padStart(6, '0');
+            const winOf = c => ap(c).window || null;
+            const winVal = (c, k, dflt) => { const w = winOf(c); return (w && w[k] != null) ? w[k] : dflt; };
+            addRows('Windows', [
+              { key: 'windowGlassRatio', label: 'Glass size', control: 'slider', min: 0.4, max: 0.98, step: 0.02, currentValue: uniformValue(objectCells, c => +Number(winVal(c, 'glassRatio', WG.glassRatio != null ? WG.glassRatio : 0.86)).toFixed(2)) },
+              { key: 'windowTint', label: 'Glass tint', control: 'colorpicker', currentValue: uniformValue(objectCells, c => winVal(c, 'tint', defTint)) },
+              { key: 'windowDarkness', label: 'Darkness', control: 'slider', min: 0, max: 1, step: 0.05, currentValue: uniformValue(objectCells, c => +Number(winVal(c, 'darkness', WG.darkness != null ? WG.darkness : 0.04)).toFixed(2)) },
+              { key: 'windowBrightness', label: 'Interior', control: 'slider', min: 0, max: 2, step: 0.05, currentValue: uniformValue(objectCells, c => +Number(winVal(c, 'brightness', WG.brightness != null ? WG.brightness : 1)).toFixed(2)) },
+              { key: 'windowReflect', label: 'Reflection', control: 'slider', min: 0, max: 1, step: 0.05, currentValue: uniformValue(objectCells, c => +Number(winVal(c, 'reflect', WG.reflect != null ? WG.reflect : 0.5)).toFixed(2)) },
+            ]);
+          }
         }
       }
       addRows('Ground', [

@@ -132,6 +132,8 @@
     try {
       return renderCellObjectImpl(x, z, opts);
     } finally {
+      // Always clear the build-scoped window override, even on early returns.
+      if (typeof setActiveWindowOverride === 'function') setActiveWindowOverride(null);
       repaintProfileEnd('object.total', profileStart);
     }
   }
@@ -167,6 +169,11 @@
     if (!kind) return;
     const level = cell.floors || 1;
     const appearanceForRender = normalizeAppearance(cell.appearance);
+    // Make this object's per-object window overrides visible to the deep window
+    // builders (07 Parts.window / 09b voxelWindow) for the duration of the build.
+    if (typeof setActiveWindowOverride === 'function') {
+      setActiveWindowOverride(appearanceForRender && appearanceForRender.window);
+    }
     const renderStyle = appearanceForRender && appearanceForRender.objectStyle;
     const forceSubEditVoxelRender = typeof isVoxelSubEditCell === 'function'
       && isVoxelSubEditCell(x, z)

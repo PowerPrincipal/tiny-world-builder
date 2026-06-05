@@ -128,7 +128,7 @@
     window(orientation, size = 'large') {
       const g = new THREE.Group();
       const f = size === 'small' ? 0.20 : 0.24; // frame
-      const p = f * WINDOW.glassRatio;          // glass / cross length (bigger ratio = more glass, thinner wood)
+      const p = f * windowGlassRatio();         // glass / cross length (bigger ratio = more glass, thinner wood)
       if (orientation === 'gable') {
         const wf = new THREE.Mesh(getBoxGeometry(f, f, 0.04), M.woodTrim); wf.position.set(0, 0, 0); g.add(wf);
         const wg = makeWindowPane(p, p, '+z', 0.03); g.add(wg);

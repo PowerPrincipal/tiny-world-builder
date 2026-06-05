@@ -699,7 +699,7 @@
     // same treatment as the classic house windows.
     const w = new THREE.Group();
     w.userData.windowFace = face;
-    const R = WINDOW.glassRatio;
+    const R = windowGlassRatio();
     const gw = 0.17 * R, gh = 0.19 * R;               // glass span; rest of the frame is wood border
     if (face === 'x') {
       const sx = Math.sign(x || 1);

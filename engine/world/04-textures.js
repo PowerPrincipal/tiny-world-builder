@@ -2135,6 +2135,25 @@
         };
       }
     }
+    // Per-object window glass overrides: any of glassRatio (geometry — bigger
+    // glass / thinner wood), tint (hex), darkness, brightness, reflect. Only the
+    // keys the caller actually set are kept; missing ones fall back to the global
+    // WINDOW defaults at build/draw time.
+    let win = null;
+    if (value.window && typeof value.window === 'object') {
+      const w = {};
+      const gr = clampNum(value.window.glassRatio, 0.3, 1);
+      if (gr !== null) w.glassRatio = +gr.toFixed(3);
+      const tint = normalizeHexColor(value.window.tint);
+      if (tint) w.tint = tint;
+      const dk = clampNum(value.window.darkness, 0, 1);
+      if (dk !== null) w.darkness = +dk.toFixed(3);
+      const br = clampNum(value.window.brightness, 0, 3);
+      if (br !== null) w.brightness = +br.toFixed(3);
+      const rf = clampNum(value.window.reflect, 0, 1);
+      if (rf !== null) w.reflect = +rf.toFixed(3);
+      if (Object.keys(w).length) win = w;
+    }
     // Per-part overrides (sub-object editing, req 9): map of stable partKey →
     // { ox,oy,oz, sx,sy,sz, rx,ry,rz } (offset, scale, rotation). Keys are
     // validated to the partKey shapes; values clamped. Reattaches by key on reload.
@@ -2215,6 +2234,7 @@
     if (opacity !== null && opacity < 0.999) out.opacity = +opacity.toFixed(3);
     if (finish && finish !== 'matte') out.finish = finish;
     if (light) out.light = light;
+    if (win) out.window = win;
     if (parts) out.parts = parts;
     if (voxelsRemoved) out.voxelsRemoved = voxelsRemoved;
     if (voxelsAdded) out.voxelsAdded = voxelsAdded;
