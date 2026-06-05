@@ -3299,3 +3299,58 @@
   })();
 
   initAuth();
+
+  // Global "Building windows" controls (Settings → Materials). Isolated from the
+  // big render-settings apply pipeline on purpose: each control writes the
+  // global WINDOW defaults (engine/world/03), persists them, and only rebuilds
+  // objects when the glass SIZE changes (tint/darkness/interior/reflection are
+  // read by the shader every frame, so they update live). Called from late boot.
+  function setupWindowGlobalSettings() {
+    const W = (typeof window !== 'undefined' && window.__tinyworldWindow) || null;
+    if (!W || typeof document === 'undefined') return;
+    const ratio  = document.getElementById('render-window-glass');
+    const tint   = document.getElementById('render-window-tint');
+    const dark   = document.getElementById('render-window-darkness');
+    const bright = document.getElementById('render-window-interior');
+    const refl   = document.getElementById('render-window-reflect');
+    const reset  = document.getElementById('render-window-reset');
+    const clamp = (n, lo, hi, d) => { n = Number(n); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+    const toHex = n => '#' + (Number(n) & 0xffffff).toString(16).padStart(6, '0');
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('tinyworld:windowStyle') || 'null');
+      if (saved && typeof saved === 'object') {
+        ['glassRatio', 'tint', 'darkness', 'brightness', 'reflect'].forEach(k => {
+          if (typeof saved[k] === 'number') W[k] = saved[k];
+        });
+      }
+    } catch (_) {}
+
+    function syncInputs() {
+      if (ratio)  ratio.value  = String(Math.round(W.glassRatio * 100));
+      if (tint)   tint.value   = toHex(W.tint);
+      if (dark)   dark.value   = String(Math.round(W.darkness * 100));
+      if (bright) bright.value = String(Math.round(W.brightness * 100));
+      if (refl)   refl.value   = String(Math.round(W.reflect * 100));
+    }
+    function persist() { try { localStorage.setItem('tinyworld:windowStyle', JSON.stringify(W)); } catch (_) {} }
+    function commit(rebuild) {
+      persist();
+      if (rebuild && typeof rebuildObjectsRender === 'function') rebuildObjectsRender();
+    }
+
+    if (ratio)  ratio.addEventListener('input',  () => { W.glassRatio = clamp(ratio.value / 100, 0.4, 0.98, 0.86); commit(true); });
+    if (tint)   tint.addEventListener('input',   () => { W.tint = parseInt(String(tint.value).replace('#', ''), 16) || W.tint; commit(false); });
+    if (dark)   dark.addEventListener('input',   () => { W.darkness = clamp(dark.value / 100, 0, 1, 0.04); commit(false); });
+    if (bright) bright.addEventListener('input', () => { W.brightness = clamp(bright.value / 100, 0, 2, 1); commit(false); });
+    if (refl)   refl.addEventListener('input',   () => { W.reflect = clamp(refl.value / 100, 0, 1, 0.5); commit(false); });
+    if (reset)  reset.addEventListener('click',  () => {
+      W.glassRatio = 0.86; W.tint = 0xd6e6ff; W.darkness = 0.04; W.brightness = 1.0; W.reflect = 0.5;
+      syncInputs(); commit(true);
+    });
+
+    syncInputs();
+    // Reflect a persisted non-default glass SIZE in already-built objects on
+    // boot (shader-only params don't need a rebuild — they're read each frame).
+    if (Math.abs(W.glassRatio - 0.86) > 0.001 && typeof rebuildObjectsRender === 'function') rebuildObjectsRender();
+  }

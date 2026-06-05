@@ -36,3 +36,10 @@
   if (typeof applyStarlitAtmosphereSettings === 'function') {
     applyStarlitAtmosphereSettings();
   }
+
+  // Wire the global "Building windows" controls (Settings -> Materials) and
+  // apply any persisted window defaults. Runs after the settings DOM + the
+  // WINDOW config exist.
+  if (typeof setupWindowGlobalSettings === 'function') {
+    setupWindowGlobalSettings();
+  }

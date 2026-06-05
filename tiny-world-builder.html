@@ -1114,7 +1114,7 @@
             </label>
           </section>
 
-          <section class="settings-panel" id="settings-panel-materials" role="tabpanel" aria-labelledby="settings-tab-materials" data-settings-panel="materials" data-settings-keywords="materials material colors colours texture tint tone wear finish parts surface" hidden>
+          <section class="settings-panel" id="settings-panel-materials" role="tabpanel" aria-labelledby="settings-tab-materials" data-settings-panel="materials" data-settings-keywords="materials material colors colours texture tint tone wear finish parts surface window windows glass interior reflection" hidden>
             <div class="settings-section-title">Finish</div>
             <div class="range-row">
               <span>Wear and tear</span>
@@ -1177,6 +1177,28 @@
               <span>Light / dark</span>
               <input id="render-material-tone" type="range" min="-50" max="50" step="1" />
               <output id="render-material-tone-value"></output>
+            </div>
+            <div class="settings-section-title">Building windows</div>
+            <div class="range-row">
+              <span>Glass size</span>
+              <input id="render-window-glass" type="range" min="40" max="98" step="2" />
+            </div>
+            <div class="range-row">
+              <span>Glass tint</span>
+              <input id="render-window-tint" type="color" value="#d6e6ff" />
+              <button class="btn" id="render-window-reset" type="button">Reset</button>
+            </div>
+            <div class="range-row">
+              <span>Darkness</span>
+              <input id="render-window-darkness" type="range" min="0" max="100" step="5" />
+            </div>
+            <div class="range-row">
+              <span>Interior light</span>
+              <input id="render-window-interior" type="range" min="0" max="200" step="5" />
+            </div>
+            <div class="range-row">
+              <span>Reflection</span>
+              <input id="render-window-reflect" type="range" min="0" max="100" step="5" />
             </div>
           </section>
 
