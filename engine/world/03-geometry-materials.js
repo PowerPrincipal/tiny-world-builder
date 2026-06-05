@@ -509,15 +509,15 @@
       THREE.UniformsLib.fog,
       {
         uCamLocal: { value: new THREE.Vector3() },    // camera in pane-local space
-        uDepth:    { value: 1.4 },                     // room depth, in opening-widths
-        uWall:     { value: new THREE.Color(0x55504a) },
-        uFloor:    { value: new THREE.Color(0x4a3a2a) },
-        uCeil:     { value: new THREE.Color(0x39393f) },
-        uBack:     { value: new THREE.Color(0x2b2b36) },
-        uLightCol: { value: new THREE.Color(0xffd28a) },
+        uDepth:    { value: 1.7 },                     // room depth, in opening-widths
+        uWall:     { value: new THREE.Color(0x6e6456) },
+        uFloor:    { value: new THREE.Color(0x8a6a44) },
+        uCeil:     { value: new THREE.Color(0x514e57) },
+        uBack:     { value: new THREE.Color(0x615b54) },
+        uLightCol: { value: new THREE.Color(0xffd9a0) },
         uReflect:  { value: new THREE.Color(0x9fc2dd) },// sky tint for glass fresnel
-        uGlass:    { value: new THREE.Color(0.60, 0.66, 0.76) }, // dark cool glass tint (multiplier)
-        uLit:      { value: 0.0 },                     // interior light strength (per-mesh)
+        uGlass:    { value: new THREE.Color(0.80, 0.86, 0.96) }, // cool glass tint (multiplier)
+        uLit:      { value: 0.0 },                     // EXTRA interior light strength (per-mesh)
       },
     ]),
     vertexShader: [
@@ -556,10 +556,10 @@
       '  if (t == tBack)      { col = uBack; }',
       '  else if (t == tX)    { col = uWall; }',
       '  else                 { col = (hit.y < 0.0) ? uFloor : uCeil; }',
-      '  col *= mix(0.45, 1.0, depthN);',             // soft falloff toward the dark window mouth
-      '  float ld = length(hit.xy - vec2(0.0, 0.10));',           // warm glow lamp near back-centre
-      '  float glow = uLit * smoothstep(0.55, 0.0, ld) * smoothstep(0.0, 0.5, depthN);',
-      '  col += uLightCol * glow;',
+      '  col *= mix(0.7, 1.05, depthN);',             // gentle depth shading (keep the room readable)
+      '  float ld = length(hit.xy - vec2(0.0, 0.05));',           // warm interior light near back-centre
+      '  float glow = (0.22 + uLit) * smoothstep(0.75, 0.0, ld) * smoothstep(0.0, 0.4, depthN);',
+      '  col += uLightCol * glow;',                   // always-on fill so the room is visible, +extra when "lit"
       '  vec3 V = normalize(uCamLocal - vLocalPos);', // toward camera (V.z = 1 head-on)
       '  float fres = pow(1.0 - clamp(V.z, 0.0, 1.0), 3.0);',
       '  col = mix(col, uReflect, fres * 0.5);',      // glassy sky reflection at grazing angles
