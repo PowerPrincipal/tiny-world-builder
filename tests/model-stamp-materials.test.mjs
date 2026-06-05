@@ -85,6 +85,33 @@ test('MTL with a plain Kd colour (no texture) keeps that colour', () => {
   assert.equal(mats.red.userData.modelStampHydrated, 'mtl color');
 });
 
+test('dropped OBJ keeps its .mtl + texture sidecars (so it imports textured)', () => {
+  // The browser-only URL.createObjectURL is stubbed; we only assert the file
+  // categorisation that lets an OBJ resolve its map_Kd image.
+  let n = 0;
+  global.URL = { createObjectURL: () => 'blob:fake/' + (++n) };
+  const preamble = `
+    const MODEL_STAMP_DETECTED_FORMATS = new Set(['glb','gltf','obj','fbx','vox']);
+    const MODEL_STAMP_TEXTURE_FORMATS = new Set(['png','jpg','jpeg','webp','gif']);
+    const modelStampDroppedObjectUrls = new Map();
+  `;
+  const { modelStampBuildDroppedFileContext } = buildEngineFns(
+    LOADER,
+    ['modelStampFileExtension', 'modelStampFileBaseName', 'modelStampObjectUrlForFile', 'modelStampBuildDroppedFileContext'],
+    preamble
+  );
+  const ctx = modelStampBuildDroppedFileContext([
+    { name: 'Air_Balloon.obj', size: 10, lastModified: 1 },
+    { name: 'Air_Balloon.mtl', size: 10, lastModified: 2 },
+    { name: 'Air_Balloon.png', size: 10, lastModified: 3 },
+  ]);
+  assert.deepEqual(ctx.mains.map(m => m.format), ['obj']);
+  assert.deepEqual(ctx.sidecars.mtl.map(m => m.name), ['Air_Balloon.mtl']);
+  assert.deepEqual(ctx.sidecars.textures.map(t => t.name), ['Air_Balloon.png']);
+  // map_Kd references resolve case-insensitively by basename.
+  assert.ok(ctx.localFiles['air_balloon.png'], 'png available to the MTL by basename');
+});
+
 test('VOXMesh is not clone-safe; a plain Mesh wrapper clones cleanly', () => {
   // Minimal one-voxel .vox (version 150) coloured red via an RGBA palette.
   const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b; };
