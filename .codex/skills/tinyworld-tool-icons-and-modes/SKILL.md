@@ -51,6 +51,12 @@ when changing boot mode, launcher chrome, or mode persistence.
 - The palette is a self-contained module: `engine/world/35-tool-palette.js`.
   Blocks are built with `buildToolButton(t, { flyout: true })`, so they keep
   their colors and are highlighted by the same `updateToolActiveStates()` loop.
+- **Small screens force grouped mode.** `showGroupsEnabled()` returns true on
+  `<=700px` regardless of the stored pref (`isSmallScreenForGroups()`), the
+  checkbox is disabled there, and a `resize` listener re-applies across the
+  breakpoint. The floating palette is unusable on phones, so never let it open
+  there. The phone toolbar is also compacted to icon-only (labels/chevrons
+  hidden, smaller buttons) in the `@media (max-width: 700px)` block.
   The grid uses fixed 64px square cells (`repeat(auto-fill, 64px)`), so resizing
   the panel reflows blocks to the nearest square. `buildToolbar()` calls
   `rebuildToolPaletteIfActive()` so toolbar rebuilds refresh an open palette.

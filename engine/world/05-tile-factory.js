@@ -650,6 +650,17 @@
         } else {
           queue(getBoxGeometry(rimD, rimH, len), pickMat(dir, i), dir === 'w' ? -off : off, py, across);
         }
+        // Bright foam lip riding the water surface against the bank — only on
+        // edges that border land (this loop already runs land-bordering sides).
+        const fLen = step * (0.84 + r * 0.12);
+        const fW = 0.11;
+        const fOff = topSize * 0.5 - fW * 0.5 - 0.018;
+        const fY = visualTopY + 0.008;
+        if (alongX) {
+          queue(getBoxGeometry(fLen, 0.014, fW), M.waterFoam, across, fY, dir === 'n' ? -fOff : fOff);
+        } else {
+          queue(getBoxGeometry(fW, 0.014, fLen), M.waterFoam, dir === 'w' ? -fOff : fOff, fY, across);
+        }
       }
     }
 

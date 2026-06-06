@@ -22,6 +22,7 @@ Structure rules:
 - Keep settings grouped by user intent, not implementation variable names.
 - Current top-level tabs are Workspace, Rendering, World, Materials, Environment, Crowd, and AI.
 - Tabs should stay dense and scannable: desktop may show a short hint; mobile should keep a compact horizontal tab strip.
+- Mobile/short-screen scroll: `.settings-card` is height-capped (`max-height: calc(100vh - 100px)`, `dvh` on phones) and the panels scroll internally (`.settings-panels { overflow-y: auto }`, layout `flex:1 1 auto; min-height:0`). Never let the card grow unbounded again — on a phone that pushes lower controls off-screen and they become unreachable. On phones the layout is `grid-template-rows: auto minmax(0,1fr)` so the panels row is the scroller.
 - Add `data-settings-keywords` when a setting or panel should be discoverable by broader user language such as performance, mechanics, textures, weather, or model.
 - Preserve the existing `data-settings-tab` / `data-settings-panel` wiring, ARIA roles, keyboard tab navigation, and search-count chips.
 - Search should route broad category terms to the right panel without hiding the controls in that panel.

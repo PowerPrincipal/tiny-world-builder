@@ -58,6 +58,7 @@
     if (typeof tickVoxelShield === 'function') tickVoxelShield(dt, t);
     tickWaterTextureFlow(dt);
     updateWaterfallEffects(t);
+    if (typeof window.__tinyworldShaderFXTick === 'function') window.__tinyworldShaderFXTick(t, dt);
     repaintProfileEnd('tick.effects', tickStart);
 
     tickStart = repaintProfileBegin();

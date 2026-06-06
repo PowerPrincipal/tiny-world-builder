@@ -5829,13 +5829,18 @@
   }
   .settings-card {
     width: min(780px, calc(100vw - 32px));
-    min-height: 500px;
+    /* min never exceeds the viewport, so a short window can't push content
+       off-screen; the panels scroll internally instead. */
+    min-height: min(500px, calc(100vh - 100px));
+    max-height: calc(100vh - 100px);
   }
   .settings-layout {
     display: grid;
     grid-template-columns: 150px 1fr;
     gap: 14px;
-    min-height: 380px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
   .settings-searchbar {
     display: grid;
@@ -5874,6 +5879,8 @@
     gap: 6px;
     padding-right: 10px;
     border-right: 1px solid var(--line);
+    min-height: 0;
+    overflow-y: auto;
   }
   .settings-tab {
     border: 1px solid transparent;
@@ -5944,6 +5951,9 @@
   .settings-tab-count[hidden] { display: none; }
   .settings-panels {
     min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
   }
   .settings-panel {
     display: none;
@@ -7337,7 +7347,19 @@
       max-height: calc(100vh - 464px);
     }
     .stamp-model-range { grid-template-columns: 58px minmax(0, 1fr) 42px; }
-    .settings-layout { grid-template-columns: 1fr; }
+    /* Settings on phones: claim almost the whole screen and scroll the panels
+       internally so every control (incl. the water toggle) is reachable. */
+    #render-modal { padding: 12px; }
+    .settings-card {
+      min-height: 0;
+      max-height: calc(100vh - 24px);
+      max-height: calc(100dvh - 24px);
+    }
+    .settings-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+    }
     .settings-searchbar {
       grid-template-columns: 1fr;
       gap: 4px;
@@ -7357,6 +7379,33 @@
     }
     .settings-tab-copy { white-space: nowrap; }
     .settings-tab-hint { display: none; }
+    /* Compact, icon-only main toolbar on phones: drop the group labels and
+       chevrons and shrink the buttons so the bar takes far less screen. */
+    .toolbar {
+      bottom: 12px;
+      padding: 0 6px;
+      gap: 1px;
+      min-height: 46px;
+      border-radius: 14px;
+    }
+    .tool-group-btn {
+      width: 42px;
+      height: 40px;
+      padding: 2px;
+      gap: 0;
+    }
+    .tool-group-btn > span:not(.chev):not(.group-icon),
+    .tool-group-btn .chev {
+      display: none;
+    }
+    .toolbar .tool-group-btn .group-icon,
+    .toolbar .tool .tool-icon {
+      width: 26px;
+      height: 26px;
+    }
+    .toolbar .tool:not(.flyout-tool) {
+      padding: 2px 6px;
+    }
   }
   .welcome-card {
     width: min(600px, calc(100vw - 32px));

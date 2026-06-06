@@ -1040,19 +1040,40 @@
     return waterTextureFlowStates.get(key);
   }
 
+  // Shared clock + procedural noise for the enhanced water surface shader
+  // (animated reflections / sun glints / foam). Advanced by tickWaterTextureFlow
+  // and shared across every water material so one update drives them all.
+  const waterShaderTimeUniform = { value: 0 };
+  const WATER_SHADER_NOISE_GLSL = `
+    float twWaterHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float twWaterNoise(vec2 p){
+      vec2 i = floor(p); vec2 f = fract(p);
+      vec2 u = f*f*(3.0-2.0*f);
+      return mix(mix(twWaterHash(i), twWaterHash(i+vec2(1.0,0.0)), u.x),
+                 mix(twWaterHash(i+vec2(0.0,1.0)), twWaterHash(i+vec2(1.0,1.0)), u.x), u.y);
+    }
+  `;
+
   function applyFlowingWaterUVs(material, texture, textureScale = 1.0, flowState = waterTextureFlowState(1, 0)) {
     if (!material) return;
     material.map = texture;
     material.userData = material.userData || {};
     material.userData.worldTextureScale = textureScale;
     material.needsUpdate = true;
+    // The enhanced surface shimmer is injected via onBeforeCompile, whose output
+    // is NOT part of the default program cache key — so give each enhanced/plain
+    // state its own key. That lets the Settings toggle recompile water cleanly.
+    material.customProgramCacheKey = () =>
+      'tw-water-' + textureScale.toFixed(4) + '-' + (renderEnhancedWater ? 'fx' : 'plain');
     material.onBeforeCompile = (shader) => {
+      const enhanced = (typeof renderEnhancedWater === 'undefined') ? true : renderEnhancedWater;
       shader.uniforms.waterFlowOffset = { value: flowState.offset };
       shader.vertexShader = shader.vertexShader.replace(
         '#include <common>',
         `
         #include <common>
         uniform vec2 waterFlowOffset;
+        ${enhanced ? 'varying vec3 vTwWaterWorld; varying vec3 vTwWaterView; varying vec3 vTwWaterNrm;' : ''}
         `
       );
       shader.vertexShader = shader.vertexShader.replace(
@@ -1070,6 +1091,7 @@
           localNormal = instanceMatrix * localNormal;
         #endif
         vec3 worldNormal = normalize((modelMatrix * localNormal).xyz);
+        ${enhanced ? 'vTwWaterWorld = worldPos.xyz; vTwWaterView = cameraPosition - worldPos.xyz; vTwWaterNrm = worldNormal;' : ''}
 
         if (abs(worldNormal.y) > 0.5) {
           vUv = worldPos.xz * ${textureScale.toFixed(4)} + waterFlowOffset;
@@ -1080,7 +1102,72 @@
         }
         `
       );
+      if (!enhanced) return;
+      // --- enhanced water surface: animated ripple normal -> fresnel sky tint,
+      //     Blinn-Phong sun glint and foam, masked to upward-facing faces ---
+      shader.uniforms.uWaterTime = waterShaderTimeUniform;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+        uniform float uWaterTime;
+        varying vec3 vTwWaterWorld;
+        varying vec3 vTwWaterView;
+        varying vec3 vTwWaterNrm;
+        ${WATER_SHADER_NOISE_GLSL}
+        `
+      );
+      // Inject before <fog_fragment> (not <dithering_fragment>) so the shimmer
+      // gets fogged with distance instead of bypassing fog/tonemapping.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <fog_fragment>',
+        `
+        {
+          float twTop = smoothstep(0.45, 0.82, vTwWaterNrm.y);
+          if (twTop > 0.001) {
+            vec2 wp = vTwWaterWorld.xz;
+            float t = uWaterTime;
+            // Two scrolling noise fields -> a moving wave height h0. Everything
+            // below is VIEW-INDEPENDENT (depends only on world pos + time) so it
+            // reads clearly even from the default top-down-ish camera.
+            vec2 f1 = wp * 0.70 + vec2(t * 0.11, t * 0.07);
+            vec2 f2 = wp * 1.70 - vec2(t * 0.08, t * 0.12);
+            float h0 = twWaterNoise(f1) * 0.6 + twWaterNoise(f2) * 0.4;
+            float e = 0.30;
+            float hX = twWaterNoise(f1 + vec2(e, 0.0)) * 0.6 + twWaterNoise(f2 + vec2(e, 0.0)) * 0.4;
+            float hZ = twWaterNoise(f1 + vec2(0.0, e)) * 0.6 + twWaterNoise(f2 + vec2(0.0, e)) * 0.4;
+            vec3 rn = normalize(vec3(-(hX - h0) * 2.4, 1.0, -(hZ - h0) * 2.4));
+            vec3 vdir = normalize(vTwWaterView);
+            vec3 sdir = normalize(vec3(0.40, 0.72, 0.55));
+            vec3 hvec = normalize(sdir + vdir);
+            float glint = pow(max(dot(rn, hvec), 0.0), 60.0);
+            // bright thin caustic veins where the wave field crosses mid-height
+            float veins = pow(max(1.0 - abs(h0 - 0.5) * 2.0, 0.0), 4.0);
+            float foam = smoothstep(0.62, 0.84, h0);
+            // Visible moving light/dark wave bands (troughs darker, crests brighter).
+            gl_FragColor.rgb *= mix(0.82, 1.08, h0) * twTop + (1.0 - twTop);
+            // Cyan caustic veins + white sun sparkles + foam crests on top.
+            vec3 addCol = vec3(0.55, 0.86, 1.0) * veins * 0.22
+                        + vec3(1.0, 1.0, 0.98) * glint * 0.85
+                        + vec3(0.95, 0.99, 1.0) * foam * 0.32;
+            gl_FragColor.rgb += addCol * twTop;
+          }
+        }
+        #include <fog_fragment>
+        `
+      );
     };
+  }
+
+  // Rebuild water materials after the enhanced-water Settings toggle changes:
+  // drop cached flow clones and reset the base materials so they recompile with
+  // the new program cache key. Callers follow up with rebuildTerrainRender().
+  function refreshWaterShaderMaterials() {
+    waterFlowMaterialCache.clear();
+    const sW = (M.water.userData && M.water.userData.worldTextureScale) || 1;
+    const sD = (M.waterDk.userData && M.waterDk.userData.worldTextureScale) || 1;
+    applyFlowingWaterUVs(M.water, M.water.map || texRipples, sW);
+    applyFlowingWaterUVs(M.waterDk, M.waterDk.map || texRipples, sD);
   }
 
   function applyTerrainWorldUVs(name, material, texture, textureScale = 1.0) {
@@ -1090,6 +1177,7 @@
 
   function tickWaterTextureFlow(dt) {
     if (!dt) return;
+    waterShaderTimeUniform.value += dt;
     for (const state of waterTextureFlowStates.values()) {
       state.offset.x = (state.offset.x + state.direction.x * state.speed * dt) % 1;
       state.offset.y = (state.offset.y + state.direction.y * state.speed * dt) % 1;

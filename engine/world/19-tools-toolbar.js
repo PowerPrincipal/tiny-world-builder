@@ -1463,6 +1463,9 @@
       const posType = posTypeForToolGroup(group);
       if (posType) btn.dataset.posType = posType;
       btn.title = group.label;
+      // Keep an accessible name even when the label text is visually hidden on
+      // small screens (icon-only toolbar), so screen readers still announce it.
+      btn.setAttribute('aria-label', group.label);
       btn.setAttribute('data-tooltip', group.label);
       const icon = document.createElement('span');
       icon.className = 'group-icon';

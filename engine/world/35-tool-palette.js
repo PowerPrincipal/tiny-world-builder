@@ -14,7 +14,17 @@
     if (!palette || !grid) return;
 
     function showGroupsEnabled() {
+      // Never ungroup the toolbar on phones/small screens — the floating
+      // all-blocks palette is unusable there and eats the whole viewport.
+      if (isSmallScreenForGroups()) return true;
       try { return localStorage.getItem(SHOW_KEY) !== '0'; } catch (_) { return true; }
+    }
+
+    function isSmallScreenForGroups() {
+      try {
+        if (window.matchMedia && window.matchMedia('(max-width: 700px)').matches) return true;
+      } catch (_) {}
+      return (window.innerWidth || 0) <= 700;
     }
 
     function buildPalette() {
@@ -71,7 +81,12 @@
     function apply() {
       const show = showGroupsEnabled();
       document.body.classList.toggle('hide-groups', !show);
-      if (checkbox) checkbox.checked = show;
+      if (checkbox) {
+        checkbox.checked = show;
+        // Forced on (and disabled) on small screens, where the floating
+        // all-blocks palette is unusable.
+        checkbox.disabled = isSmallScreenForGroups();
+      }
       if (show) {
         palette.hidden = true;
       } else {
@@ -129,6 +144,14 @@
     window.rebuildToolPaletteIfActive = function () {
       if (!showGroupsEnabled() && palette && !palette.hidden) buildPalette();
     };
+
+    // Re-apply when crossing the small-screen breakpoint (rotate / resize) so
+    // the toolbar regroups on the way down and restores the user's choice up.
+    let _wasSmallGroups = isSmallScreenForGroups();
+    window.addEventListener('resize', () => {
+      const small = isSmallScreenForGroups();
+      if (small !== _wasSmallGroups) { _wasSmallGroups = small; apply(); }
+    });
 
     apply();
   })();

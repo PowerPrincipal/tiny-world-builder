@@ -148,30 +148,79 @@
     const spanOuter = span + sideFaceOutset * 2;
     const wallTopY = ISLAND_SIDE_STRATA_RENDER_TOP_Y;
     const wallH = ISLAND_SIDE_STRATA_RENDER_HEIGHT;
-    const y = wallTopY - wallH * 0.5;
+    const wallBottomY = wallTopY - wallH;
     const mat = islandShellMaterial(M.boardSideEdge || M.boardSide);
-    const north = vbox(parent, spanOuter, wallH, thickness, 0, y, -half + inset, mat, {
-      noGap: true, noShadow: true, skipTop: true, skipBottom: true,
-      skipPX: true, skipNX: true, skipPZ: true,
-    });
-    const south = vbox(parent, spanOuter, wallH, thickness, 0, y,  half - inset, mat, {
-      noGap: true, noShadow: true, skipTop: true, skipBottom: true,
-      skipPX: true, skipNX: true, skipNZ: true,
-    });
-    const west  = vbox(parent, thickness, wallH, spanOuter, -half + inset, y, 0, mat, {
-      noGap: true, noShadow: true, skipTop: true, skipBottom: true,
-      skipPX: true, skipPZ: true, skipNZ: true,
-    });
-    const east  = vbox(parent, thickness, wallH, spanOuter,  half - inset, y, 0, mat, {
-      noGap: true, noShadow: true, skipTop: true, skipBottom: true,
-      skipNX: true, skipPZ: true, skipNZ: true,
-    });
-    for (const mesh of [north, south, west, east]) {
+    // Where a perimeter cell is water, drop the green grass cap down to the
+    // water line so a river reaching the rim shows water instead of a green
+    // wall. The strata shader maps its texture by WORLD-Y, so a shorter cap
+    // segment stays perfectly aligned with the full-height land neighbours.
+    const capBaseY = ISLAND_SIDE_STRATA_TOP_Y - WATER_SURFACE_DROP + 0.012;
+
+    function tagSide(mesh) {
       mesh.name = 'island-side-backing';
       mesh.userData.islandSideBacking = true;
       mesh.userData.noBatch = true;
       mesh.userData.noStaticBaseMerge = true;
+      return mesh;
     }
+    function edgeCellIsWater(dir, idx) {
+      // Only the home island maps to the live `world` grid; editable islands
+      // share this builder but have their own data, so they keep full green caps.
+      if (parent !== homeBorderGroup) return false;
+      const cell = dir === 'n' ? getWorldCell(idx, 0)
+                 : dir === 's' ? getWorldCell(idx, GRID - 1)
+                 : dir === 'w' ? getWorldCell(0, idx)
+                 :               getWorldCell(GRID - 1, idx);
+      return !!cell && cell.terrain === 'water';
+    }
+
+    // 1) Continuous lower wall around the whole island, topped at the water
+    //    line so it can never occlude water. Same outer faces as before.
+    const lowerH = capBaseY - wallBottomY;
+    const lowerCy = capBaseY - lowerH * 0.5;
+    tagSide(vbox(parent, spanOuter, lowerH, thickness, 0, lowerCy, -half + inset, mat, {
+      noGap: true, noShadow: true, skipTop: true, skipBottom: true, skipPX: true, skipNX: true, skipPZ: true,
+    }));
+    tagSide(vbox(parent, spanOuter, lowerH, thickness, 0, lowerCy,  half - inset, mat, {
+      noGap: true, noShadow: true, skipTop: true, skipBottom: true, skipPX: true, skipNX: true, skipNZ: true,
+    }));
+    tagSide(vbox(parent, thickness, lowerH, spanOuter, -half + inset, lowerCy, 0, mat, {
+      noGap: true, noShadow: true, skipTop: true, skipBottom: true, skipPX: true, skipPZ: true, skipNZ: true,
+    }));
+    tagSide(vbox(parent, thickness, lowerH, spanOuter,  half - inset, lowerCy, 0, mat, {
+      noGap: true, noShadow: true, skipTop: true, skipBottom: true, skipNX: true, skipPZ: true, skipNZ: true,
+    }));
+
+    // 2) Green grass-cap band — only across runs of land perimeter cells, so
+    //    water cells leave the rim open for the river to reach the edge.
+    const capH = wallTopY - capBaseY;
+    const capCy = wallTopY - capH * 0.5;
+    function buildCapEdge(dir) {
+      const alongX = dir === 'n' || dir === 's';
+      const across = (dir === 'n' || dir === 'w') ? -half + inset : half - inset;
+      const innerSkip = dir === 'n' ? { skipPZ: true } : dir === 's' ? { skipNZ: true } : dir === 'w' ? { skipPX: true } : { skipNX: true };
+      let i = 0;
+      while (i < GRID) {
+        if (edgeCellIsWater(dir, i)) { i++; continue; }
+        let j = i;
+        while (j + 1 < GRID && !edgeCellIsWater(dir, j + 1)) j++;
+        let aMin = (i - GRID / 2) * TILE;
+        let aMax = (j + 1 - GRID / 2) * TILE;
+        if (i === 0) aMin -= sideFaceOutset;
+        if (j === GRID - 1) aMax += sideFaceOutset;
+        const len = aMax - aMin;
+        const center = (aMin + aMax) * 0.5;
+        const opts = Object.assign({ noGap: true, noShadow: true, skipTop: true, skipBottom: true }, innerSkip);
+        tagSide(alongX
+          ? vbox(parent, len, capH, thickness, center, capCy, across, mat, opts)
+          : vbox(parent, thickness, capH, len, across, capCy, center, mat, opts));
+        i = j + 1;
+      }
+    }
+    buildCapEdge('n');
+    buildCapEdge('s');
+    buildCapEdge('w');
+    buildCapEdge('e');
   }
 
   function addIslandEdgeDressing(parent) {
@@ -440,6 +489,19 @@
     if (typeof buildUnderIslandClouds === 'function') buildUnderIslandClouds();
   }
   enqueueDeferredVisualStartup('home-border-dressing', buildHomeBorder);
+
+  // The island side cap opens where a perimeter cell is water (addIslandSideBacking
+  // reads the live grid). buildHomeBorder only runs at startup/resize, so when a
+  // perimeter cell toggles water at runtime, rebuild it — debounced so a drag of
+  // edits coalesces into a single rebuild.
+  let homeBorderEdgeRefreshTimer = 0;
+  function scheduleHomeBorderEdgeRefresh() {
+    if (homeBorderEdgeRefreshTimer) return;
+    homeBorderEdgeRefreshTimer = setTimeout(() => {
+      homeBorderEdgeRefreshTimer = 0;
+      if (typeof buildHomeBorder === 'function') buildHomeBorder();
+    }, 80);
+  }
 
   // -------- ghost worlds --------
   // Non-editable neighbouring boards. They preview the multiplayer shape of

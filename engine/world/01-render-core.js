@@ -188,6 +188,7 @@
     materialParts: 'tinyworld:render:materialParts',
     materialTarget: 'tinyworld:render:materialTarget',
     materialWear: 'tinyworld:render:materialWear',
+    enhancedWater: 'tinyworld:render:enhancedWater',
     landscapeMeshMode: 'tinyworld:render:landscapeMeshMode',
     terrainVoxelResolution: 'tinyworld:render:terrainVoxelResolution',
     showCrowns: 'tinyworld:render:showCrowns',
@@ -263,6 +264,7 @@
     materialParts: '{}',
     materialTarget: 'walls',
     materialWear: '0',
+    enhancedWater: '1',
     landscapeMeshMode: '1',
     terrainVoxelResolution: 'mixed',
     autoExpand: '0',
@@ -428,6 +430,10 @@
   // denser parts of each cloud cast on the world below.
   let renderCloudShadow = storedNumber(RENDER_LS.cloudShadow, 0, 0, 1);
   let renderPlanesEnabled = localStorage.getItem(RENDER_LS.planesEnabled) === '1';
+  // Enhanced water shader: animated reflections, sun glints and foam on water
+  // surfaces (voxel water tiles + the LandscapeEngine ocean). On by default;
+  // toggling rebuilds water materials so it applies in every environment.
+  let renderEnhancedWater = localStorage.getItem(RENDER_LS.enhancedWater) !== '0';
   // Decorative background mini-worlds (distant-worlds group); on by default.
   let renderDistantWorlds = localStorage.getItem(RENDER_LS.distantWorlds) !== '0';
   // Soft sprite "cloud sea" below the islands; off by default (opt-in).

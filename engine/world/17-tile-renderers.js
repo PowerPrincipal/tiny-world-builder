@@ -610,6 +610,14 @@
       if (getWorldCell(x, z).kind === 'bridge') renderCellObject(x, z, { animate: false });
       repaintProfileEnd('setCell.neighbors', neighborStart);
     }
+    // A perimeter cell toggling water changes where the island's green edge cap
+    // opens, so rebuild the home border (debounced) to keep the rim in sync.
+    if (terrainChanged
+        && (x === 0 || z === 0 || x === GRID - 1 || z === GRID - 1)
+        && (prev.terrain === 'water') !== (nextTerrain === 'water')
+        && typeof scheduleHomeBorderEdgeRefresh === 'function') {
+      scheduleHomeBorderEdgeRefresh();
+    }
     if (!kindChanged && !floorsChanged && !terrainFloorsChanged && !bTypeChanged && !fenceSideChanged && !appearanceChanged && !transformChanged && !waterFlowChanged) {
       if (terrainChanged || tileHeightChanged || waterFlowChanged || forceTile) {
         const saveStart = repaintProfileBegin();

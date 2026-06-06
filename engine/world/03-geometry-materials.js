@@ -234,7 +234,7 @@
     wearMoss:  new THREE.MeshLambertMaterial({ color: 0x6f8732, side: THREE.FrontSide }),
     water:     new THREE.MeshLambertMaterial({ color: 0x3a8fcc, side: THREE.FrontSide }),
     waterDk:   new THREE.MeshLambertMaterial({ color: 0x2f77ad, side: THREE.FrontSide }),
-    waterFoam: new THREE.MeshLambertMaterial({ color: 0xbbe9ff, transparent: true, opacity: 0.74, side: THREE.FrontSide }),
+    waterFoam: new THREE.MeshLambertMaterial({ color: 0xeaf7ff, transparent: true, opacity: 0.86, side: THREE.FrontSide }),
     waterfall: new THREE.MeshBasicMaterial({ color: 0x28b5f0, transparent: true, opacity: 0.56, depthWrite: true, side: THREE.FrontSide }),
     waterfallHi: new THREE.MeshBasicMaterial({ color: 0x96e7ff, transparent: true, opacity: 0.68, depthWrite: true, side: THREE.FrontSide }),
     waterfallFoamPuff: new THREE.MeshBasicMaterial({ color: 0xf4fdff, transparent: true, opacity: 0.82, depthWrite: true }),
