@@ -1141,13 +1141,13 @@
             float glint = pow(max(dot(rn, hvec), 0.0), 60.0);
             // bright thin caustic veins where the wave field crosses mid-height
             float veins = pow(max(1.0 - abs(h0 - 0.5) * 2.0, 0.0), 4.0);
-            float foam = smoothstep(0.80, 0.96, h0);
+            float foam = smoothstep(0.62, 0.84, h0);
             // Visible moving light/dark wave bands (troughs darker, crests brighter).
             gl_FragColor.rgb *= mix(0.82, 1.08, h0) * twTop + (1.0 - twTop);
             // Cyan caustic veins + white sun sparkles + foam crests on top.
             vec3 addCol = vec3(0.55, 0.86, 1.0) * veins * 0.22
                         + vec3(1.0, 1.0, 0.98) * glint * 0.85
-                        + vec3(0.92, 0.98, 1.0) * foam * 0.22;
+                        + vec3(0.95, 0.99, 1.0) * foam * 0.32;
             gl_FragColor.rgb += addCol * twTop;
           }
         }
