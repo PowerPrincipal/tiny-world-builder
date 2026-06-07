@@ -1057,7 +1057,7 @@ export default class TinyWorldParty {
     const seq = p.busySeq;
     this.presence.set(id, this.presenceFor(id));
     this.broadcastToAdmitted({ type: 'presence', presence: this.presenceFor(id) }, id);
-    this.sendTo(id, { type: 'harvest.progress', action, node: nodeId, durationMs: dur });
+    this.sendTo(id, { type: 'harvest.progress', action, node: nodeId, durationMs: dur, hearts: p.hearts });
     if (typeof setTimeout === 'function') setTimeout(() => this.resolveHarvest(id, seq), dur);
     return seq;
   }
@@ -1113,7 +1113,7 @@ export default class TinyWorldParty {
     this.sendTo(id, {
       type: 'harvest.result', action, resource,
       grossMilli: GROSS_REWARD * 1000, harvesterMilli: split.harvester, ownerMilli: split.owner,
-      cooldownMs: ACTION_COOLDOWN_MS,
+      cooldownMs: ACTION_COOLDOWN_MS, hearts: p.hearts,
     });
     this.scheduleTick();
   }
