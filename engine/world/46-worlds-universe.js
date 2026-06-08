@@ -338,7 +338,7 @@
       WS.myProfileId = (full.me && full.me.id != null) ? full.me.id : (me && me.id != null ? me.id : null);
       rememberFreeform();
       closeOverlay();
-      if (typeof WS.enterRoom === 'function') WS.enterRoom(full.world, full.token || '', full.role || 'observe');
+      if (typeof WS.enterRoom === 'function') WS.enterRoom(full.world, full.token || '', 'play');
       else toast(T('worlds.error'));
     }
   

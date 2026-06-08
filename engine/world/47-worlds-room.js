@@ -23,10 +23,10 @@
     let socket = null;
     let world = null;
     let token = '';
-    let role = 'observe';
+    let role = 'play';
     let gridSize = 8;
     let taxPercent = null;
-    let you = { x: 0, z: 0, hearts: 10, role: 'observe' };
+    let you = { x: 0, z: 0, hearts: 10, role: 'play' };
     let myId = '';
     const peers = new Map();
     let nodes = {};
@@ -71,9 +71,9 @@
     }
 
     let stateTimer = null, sawWorldState = false;
-    function enterRoom(w, joinToken, joinRole) {
+    function enterRoom(w, joinToken) {
       leaveRoom();
-      world = w; token = joinToken || ''; role = joinRole || 'observe';
+      world = w; token = joinToken || ''; role = 'play';
       gridSize = w.gridSize || 8; taxPercent = w.taxPercent != null ? w.taxPercent : null;
       cells = w.data && Array.isArray(w.data.cells) ? w.data.cells : [];
       rebuildBlocked();
@@ -135,7 +135,7 @@
     function onMessage(d) {
       switch (d.type) {
         case 'welcome':
-          myId = d.id || myId; role = d.role || role; emit('status', { connected: true, role });
+          myId = d.id || myId; role = 'play'; emit('status', { connected: true, role });
           // An upgraded world server flags the welcome; an old collab server does
           // not — bail out so the minimap/HUD don't linger over the builder.
           if (d.world !== true) { sawWorldState = true; toast(T('worlds.serverOld')); WS.leaveRoom(); }
@@ -144,9 +144,10 @@
           sawWorldState = true;
           gridSize = d.gridSize || gridSize; taxPercent = d.taxPercent != null ? d.taxPercent : taxPercent;
           you = Object.assign(you, d.you || {});
+          you.role = 'play';
           nodes = d.nodes || {}; animals = d.animals || [];
           peers.clear(); (d.peers || []).forEach(p => { if (p.id && p.id !== myId) peers.set(p.id, p); });
-          role = (d.you && d.you.role) || role;
+          role = 'play';
           emit('state', snapshot()); drawMinimap(); updateSelfAvatar(); updatePeerAvatars(); break;
         case 'presence': {
           const p = d.presence; if (!p || !p.id) break;
@@ -297,6 +298,8 @@
       else if (k === 'arrowright' || k === 'd') { cancelWalk(); const [x, z] = worldStepFromScreen(1, 0); step(x, z); }
       else if (k === ' ' || k === 'spacebar') startJump();
       else if (k === ATTACK_KEY) startAttack();
+      else if (e.code === 'BracketLeft' || k === '[') cycleAvatarClass(-1);
+      else if (e.code === 'BracketRight' || k === ']') cycleAvatarClass(1);
       else handled = false;
       if (handled) e.preventDefault();
     }
@@ -401,10 +404,11 @@
     // the movement direction (8-way); state is idle vs walk. No fallback — if a sheet
     // fails to load we surface an error.
     const SHEET = {
-      idle: { url: 'models/people/25D/idle/Sprite Sheet/idle full sprite sheet (transparent BG).png', sw: 768, sh: 512, frame: 64, cols: 12, fps: 8 },
-      walk: { url: 'models/people/25D/walk/Sprite Sheet/walk complete sprite sheet (transparent BG).png', sw: 512, sh: 512, frame: 64, cols: 8, fps: 12 },
-      attack: { url: 'models/people/25D/attack/Sprite Sheet/attack full sprite sheet (transparent BG).png', sw: 672, sh: 768, frame: 96, cols: 7, fps: 16 },
+      idle: { baseUrl: 'models/people/25D/idle/Sprite Sheet/idle full sprite sheet (transparent BG).png', sw: 768, sh: 512, frame: 64, cols: 12, fps: 8 },
+      walk: { baseUrl: 'models/people/25D/walk/Sprite Sheet/walk complete sprite sheet (transparent BG).png', sw: 512, sh: 512, frame: 64, cols: 8, fps: 12 },
+      attack: { baseUrl: 'models/people/25D/attack/Sprite Sheet/attack full sprite sheet (transparent BG).png', sw: 672, sh: 768, frame: 96, cols: 7, fps: 16 },
     };
+    const AVATAR_CLASSES = ['knight', 'baird', 'wizard', 'knave', 'template'];
     const JUMP_MS = 460, ATTACK_KEY = 'f';
     // Sheet row (top->bottom) for each movement sector. Sectors: 0=S 1=SE 2=E 3=NE
     // 4=N 5=NW 6=W 7=SW. If a character faces the wrong way, reorder this array.
@@ -413,6 +417,7 @@
     const peerEnts = new Map();
     let avatarRaf = null;
     let avatarErrored = false;
+    let avatarClassName = 'knight';
     let _texLoader = null;
 
     function avatarParent() {
@@ -446,6 +451,11 @@
       try { console.error('[worlds] avatar sprite failed:', msg); } catch (_) {}
       toast('Avatar sprites failed to load');
     }
+    function avatarSheetUrl(action, className) {
+      const s = SHEET[action];
+      if (className && className !== 'template') return 'models/people/25D/classes/' + encodeURIComponent(className) + '/' + action + '.png';
+      return s.baseUrl;
+    }
     function loadSheetTexture(url) {
       _texLoader = _texLoader || new THREE.TextureLoader();
       const t = _texLoader.load(url, undefined, undefined, () => avatarError(url));
@@ -454,17 +464,43 @@
       else if ('encoding' in t && THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
       return t;
     }
-    // A fresh texture per avatar+sheet so each can hold its own frame/row offset.
-    function createAvatar() {
-      const ent = { x: 0, z: 0, sector: 0, lastMove: 0, state: 'idle', frame: 0, frameTime: 0, tex: {}, sprite: null, disposed: false };
-      if (typeof THREE === 'undefined') { avatarError('THREE unavailable'); return ent; }
+    function disposeAvatarTextures(ent) {
+      if (!ent || !ent.tex) return;
+      Object.keys(ent.tex).forEach(k => { if (ent.tex[k] && typeof ent.tex[k].dispose === 'function') ent.tex[k].dispose(); });
+      ent.tex = {};
+    }
+    function loadAvatarTextures(ent, className) {
+      if (!ent) return;
+      disposeAvatarTextures(ent);
+      ent.avatarClassName = className;
       for (const k of Object.keys(SHEET)) {
         const s = SHEET[k];
-        const t = loadSheetTexture(s.url);
+        const t = loadSheetTexture(avatarSheetUrl(k, className));
         t.repeat.set(s.frame / s.sw, s.frame / s.sh);
         t.offset.set(0, 1 - s.frame / s.sh);
         ent.tex[k] = t;
       }
+      if (ent.sprite && ent.sprite.material) ent.sprite.material.map = ent.tex[ent.state] || ent.tex.idle;
+    }
+    function setAvatarClass(name) {
+      const next = AVATAR_CLASSES.includes(name) ? name : 'knight';
+      avatarClassName = next;
+      if (selfEnt) loadAvatarTextures(selfEnt, avatarClassName);
+      return avatarClassName;
+    }
+    function cycleAvatarClass(delta) {
+      const current = Math.max(0, AVATAR_CLASSES.indexOf(avatarClassName));
+      return setAvatarClass(AVATAR_CLASSES[(current + delta + AVATAR_CLASSES.length) % AVATAR_CLASSES.length]);
+    }
+    WS.setAvatarClass = setAvatarClass;
+    WS.cycleAvatarClass = cycleAvatarClass;
+    WS.avatarClasses = () => AVATAR_CLASSES.slice();
+    WS.avatarClass = () => avatarClassName;
+    // A fresh texture per avatar+sheet so each can hold its own frame/row offset.
+    function createAvatar() {
+      const ent = { x: 0, z: 0, sector: 0, lastMove: 0, lastDx: 0, lastDz: 0, state: 'idle', frame: 0, frameTime: 0, tex: {}, sprite: null, disposed: false, avatarClassName };
+      if (typeof THREE === 'undefined') { avatarError('THREE unavailable'); return ent; }
+      loadAvatarTextures(ent, avatarClassName);
       const mat = new THREE.SpriteMaterial({ map: ent.tex.idle, transparent: true, depthWrite: false, alphaTest: 0.2 });
       ent.sprite = new THREE.Sprite(mat);
       ent.sprite.center.set(0.5, 0.12);  // anchor near the feet (cells have transparent padding below)
@@ -480,13 +516,19 @@
     }
     function moveEntity(ent, x, z) {
       if (!ent) return;
-      const s = screenSector(x - ent.x, z - ent.z); if (s != null) ent.sector = s;
-      if (x !== ent.x || z !== ent.z) ent.lastMove = Date.now();
+      const dx = x - ent.x, dz = z - ent.z;
+      const s = screenSector(dx, dz); if (s != null) ent.sector = s;
+      if (dx || dz) {
+        ent.lastMove = Date.now();
+        ent.lastDx = dx;
+        ent.lastDz = dz;
+      }
       ent.x = x; ent.z = z; placeEntity(ent);
     }
     function disposeEntity(ent) {
       if (!ent) return; ent.disposed = true;
       if (ent.sprite && ent.sprite.parent) ent.sprite.parent.remove(ent.sprite);
+      disposeAvatarTextures(ent);
     }
     function animEntity(ent, dt) {
       if (!ent.sprite) return;
@@ -499,11 +541,26 @@
         ent.frameTime -= fdur; ent.frame += 1;
         if (ent.frame >= sh.cols) { ent.frame = 0; if (ent.attacking) ent.attacking = false; }   // attack plays once
       }
-      const row = SECTOR_TO_ROW[ent.sector] || 0;
+      const row = ent === selfEnt ? 0 : (SECTOR_TO_ROW[ent.sector] || 0);
       ent.tex[ent.state].offset.set(ent.frame * (sh.frame / sh.sw), 1 - (row + 1) * (sh.frame / sh.sh));
       let y = 0.02;
       if (ent.jumpStart) { const jt = (Date.now() - ent.jumpStart) / JUMP_MS; if (jt >= 1) ent.jumpStart = 0; else y += Math.sin(jt * Math.PI) * 0.8; }
       ent.sprite.position.y = y;
+    }
+    function avatarAngleLerp(a, b, t) {
+      const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+      return a + d * t;
+    }
+    function updateAvatarCameraOrbit(dt) {
+      if (!selfEnt || !selfEnt.sprite || typeof tilePos !== 'function' || typeof updateCamera !== 'function' || typeof target === 'undefined' || !target) return;
+      const p = tilePos(selfEnt.x, selfEnt.z);
+      target.x += (p.x - target.x) * 0.15;
+      target.z += (p.z - target.z) * 0.15;
+      if (typeof azimuth === 'number' && (selfEnt.lastDx || selfEnt.lastDz) && Date.now() - selfEnt.lastMove < 900) {
+        const desired = Math.atan2(-selfEnt.lastDz, -selfEnt.lastDx);
+        azimuth = avatarAngleLerp(azimuth, desired, Math.min(0.18, Math.max(0.04, dt * 5)));
+      }
+      updateCamera();
     }
 
     function updateSelfAvatar() {
@@ -530,13 +587,8 @@
         const dt = Math.min(0.05, (now - prev) / 1000); prev = now;
         if (selfEnt) animEntity(selfEnt, dt);
         peerEnts.forEach((e) => animEntity(e, dt));
-        // Follow camera: ease the orbit target onto the player so he stays centered.
-        if (selfEnt && selfEnt.sprite && typeof tilePos === 'function' && typeof updateCamera === 'function' && typeof target !== 'undefined' && target) {
-          const p = tilePos(selfEnt.x, selfEnt.z);
-          target.x += (p.x - target.x) * 0.15;
-          target.z += (p.z - target.z) * 0.15;
-          updateCamera();
-        }
+        // Follow camera: keep the player centered and orbit behind recent movement.
+        updateAvatarCameraOrbit(dt);
         avatarRaf = requestAnimationFrame(tick);
       };
       avatarRaf = requestAnimationFrame(tick);
