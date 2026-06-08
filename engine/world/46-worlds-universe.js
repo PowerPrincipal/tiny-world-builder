@@ -89,16 +89,16 @@
   .tw-worlds-overlay{position:fixed;inset:0;z-index:80;display:none;background:rgba(8,12,22,.86);
     backdrop-filter:blur(6px);overflow:auto;color:#eef3ff;font-family:system-ui,sans-serif}
   .tw-worlds-overlay.open{display:block}
-  .tw-worlds-wrap{max-width:1100px;margin:0 auto;padding:24px 20px 60px}
+  .tw-worlds-wrap{max-width:1320px;margin:0 auto;padding:24px 20px 60px}
   .tw-worlds-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
   .tw-worlds-head h2{margin:0;font-size:26px}
   .tw-worlds-head p{margin:4px 0 0;opacity:.7;font-size:13px}
   .tw-worlds-x{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;
     border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px}
-  .tw-worlds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .tw-worlds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
   .tw-worlds-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;
     padding:14px;display:flex;flex-direction:column;gap:8px}
-  .tw-worlds-prev{width:100%;aspect-ratio:1/1;border-radius:10px;background:#13243f;image-rendering:pixelated;display:block}
+  .tw-worlds-prev{width:100%;aspect-ratio:16/10;border-radius:10px;background:#070b13;image-rendering:pixelated;display:block}
   .tw-worlds-card h3{margin:0;font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
   .tw-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 7px;border-radius:999px}
   .tw-badge.unclaimed{background:#2b6cff33;color:#9cc0ff}
@@ -188,13 +188,16 @@
         actions.appendChild(el('button', { class: 'tw-btn alt', text: T('worlds.manage'), onclick: () => manageFlow(w) }));
       }
       const title = w.name || (w.kind === 'starter' ? w.slug : T('worlds.statusUnclaimed'));
-      const prev = el('canvas', { class: 'tw-worlds-prev', width: '220', height: '220' });
+      const prev = el('canvas', { class: 'tw-worlds-prev', width: '320', height: '200' });
       const card = el('div', { class: 'tw-worlds-card' }, [
         prev,
         el('h3', {}, [document.createTextNode(title), statusBadge(w.status)]), meta, actions,
       ]);
-      // Top-down minimap-style preview of the world's tiles.
-      if (typeof WS.renderPreview === 'function') WS.renderPreview(prev, w.preview || { gridSize: w.gridSize, cells: [] });
+      // Isometric 2D preview of the world's tiles.
+      if (typeof WS.renderPreview === 'function') {
+        const preview = Object.assign({ gridSize: w.gridSize, cells: [], slug: w.slug, name: w.name, id: w.id }, w.preview || {});
+        WS.renderPreview(prev, preview);
+      }
       return card;
     }
   

@@ -375,26 +375,146 @@
         : t === 'dirt' ? '#7a5a3a' : t === 'path' ? '#b9a06a' : t === 'lava' ? '#c0431f' : t === 'snow' ? '#e6eef6' : '#3f8f53';
     }
 
-    // Shared top-down tile preview (used by the universe cards in 46). Draws the
-    // grass base, terrain tiles, and a small marker for harvestable objects.
+    // Shared isometric 2D tile preview (used by the universe cards in 46). This
+    // intentionally avoids Three.js so the Worlds screen can show many islands
+    // as cheap pixel-style atlas thumbnails.
     const PREVIEW_PLANTS = new Set(['crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower']);
+    const PREVIEW_ISO_KIND_COLORS = {
+      tree: '#1f6f3a',
+      bush: '#2f8b49',
+      rock: '#9ba8ae',
+      house: '#c76e46',
+      fence: '#7a4b2c',
+      cow: '#f0d8b8',
+      sheep: '#f7f1dc',
+    };
+    function previewShade(hex, amt) {
+      const h = String(hex || '#000000').replace('#', '');
+      const n = parseInt(h.length === 3 ? h.replace(/(.)/g, '$1$1') : h, 16);
+      const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + amt));
+      const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+      const b = Math.max(0, Math.min(255, (n & 255) + amt));
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    function previewCellTuple(c) {
+      if (!c) return null;
+      if (Array.isArray(c)) return { x: c[0], z: c[1], terrain: c[2] || 'grass', kind: c[3] || '' };
+      return { x: c.x, z: c.z, terrain: c.terrain || 'grass', kind: c.kind || '' };
+    }
+    function drawPreviewDiamond(ctx, cx, cy, hw, hh, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - hh);
+      ctx.lineTo(cx + hw, cy);
+      ctx.lineTo(cx, cy + hh);
+      ctx.lineTo(cx - hw, cy);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+    function drawPreviewSide(ctx, cx, cy, hw, hh, depth, side, fill) {
+      ctx.beginPath();
+      if (side === 'right') {
+        ctx.moveTo(cx + hw, cy);
+        ctx.lineTo(cx, cy + hh);
+        ctx.lineTo(cx, cy + hh + depth);
+        ctx.lineTo(cx + hw, cy + depth);
+      } else {
+        ctx.moveTo(cx - hw, cy);
+        ctx.lineTo(cx, cy + hh);
+        ctx.lineTo(cx, cy + hh + depth);
+        ctx.lineTo(cx - hw, cy + depth);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    function drawPreviewObject(ctx, cx, cy, s, kind) {
+      const k = PREVIEW_PLANTS.has(kind) ? 'plant' : kind;
+      if (k === 'tree' || k === 'bush' || k === 'plant') {
+        ctx.fillStyle = k === 'plant' ? '#d5df57' : PREVIEW_ISO_KIND_COLORS[k];
+        ctx.beginPath();
+        ctx.arc(cx, cy - s * 0.34, s * (k === 'tree' ? 0.22 : 0.16), 0, Math.PI * 2);
+        ctx.fill();
+        if (k === 'tree') {
+          ctx.fillStyle = '#7b5434';
+          ctx.fillRect(cx - s * 0.035, cy - s * 0.28, s * 0.07, s * 0.28);
+        }
+      } else if (k === 'rock') {
+        ctx.fillStyle = PREVIEW_ISO_KIND_COLORS.rock;
+        drawPreviewDiamond(ctx, cx, cy - s * 0.18, s * 0.16, s * 0.09, '#9ba8ae', '#65737b');
+      } else if (k === 'house') {
+        ctx.fillStyle = '#c76e46';
+        ctx.fillRect(cx - s * 0.18, cy - s * 0.34, s * 0.36, s * 0.26);
+        ctx.fillStyle = '#7b3340';
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.22, cy - s * 0.34);
+        ctx.lineTo(cx, cy - s * 0.56);
+        ctx.lineTo(cx + s * 0.22, cy - s * 0.34);
+        ctx.closePath();
+        ctx.fill();
+      } else if (PREVIEW_ISO_KIND_COLORS[k]) {
+        ctx.fillStyle = PREVIEW_ISO_KIND_COLORS[k];
+        ctx.fillRect(cx - s * 0.08, cy - s * 0.28, s * 0.16, s * 0.16);
+      }
+    }
     function renderPreview(cnv, preview) {
       if (!cnv || !preview) return;
       const g = Math.max(1, preview.gridSize || 8);
-      const list = Array.isArray(preview.cells) ? preview.cells : [];
-      const px = cnv.width || 200;
-      const cell = Math.max(2, Math.floor(px / g));
-      cnv.width = cell * g; cnv.height = cell * g;
+      const suppliedList = Array.isArray(preview.cells) ? preview.cells : [];
+      const list = suppliedList.map(previewCellTuple).filter(Boolean);
+      const cssW = cnv.clientWidth || cnv.width || 320;
+      const cssH = cnv.clientHeight || cnv.height || 200;
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      cnv.width = Math.round(cssW * dpr); cnv.height = Math.round(cssH * dpr);
       const c2 = cnv.getContext('2d');
-      c2.fillStyle = '#3f8f53'; c2.fillRect(0, 0, cnv.width, cnv.height);
-      const dot = (x, z, color) => { c2.fillStyle = color; c2.beginPath(); c2.arc(x * cell + cell / 2, z * cell + cell / 2, Math.max(1, cell * 0.26), 0, 7); c2.fill(); };
-      for (const c of list) {
-        const x = c[0], z = c[1], ter = c[2], kind = c[3];
-        if (x == null || z == null || x < 0 || z < 0 || x >= g || z >= g) continue;
-        c2.fillStyle = terrainColor(ter); c2.fillRect(x * cell, z * cell, cell, cell);
-        if (kind === 'tree' || kind === 'bush') dot(x, z, '#1f6f3a');
-        else if (PREVIEW_PLANTS.has(kind)) dot(x, z, '#d8e85a');
-        else if (kind === 'cow' || kind === 'sheep') dot(x, z, '#f0c8a8');
+      c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c2.clearRect(0, 0, cssW, cssH);
+      const bg = c2.createLinearGradient(0, 0, 0, cssH);
+      bg.addColorStop(0, '#070911');
+      bg.addColorStop(1, '#030509');
+      c2.fillStyle = bg;
+      c2.fillRect(0, 0, cssW, cssH);
+      c2.fillStyle = 'rgba(169,199,255,.22)';
+      for (let i = 0; i < 26; i++) {
+        const sx = (i * 47 + g * 13) % Math.max(1, cssW);
+        const sy = (i * 31 + g * 7) % Math.max(1, cssH);
+        c2.fillRect(sx, sy, 1, 1);
+      }
+      const map = new Map();
+      for (let z = 0; z < g; z++) for (let x = 0; x < g; x++) map.set(x + ',' + z, { x, z, terrain: 'grass', kind: '' });
+      for (const cell of list) {
+        const x = Number(cell.x), z = Number(cell.z);
+        if (!Number.isFinite(x) || !Number.isFinite(z) || x < 0 || z < 0 || x >= g || z >= g) continue;
+        map.set(x + ',' + z, cell);
+      }
+      const tileW = Math.max(14, Math.min(30, cssW / (g + 2.4)));
+      const tileH = tileW * 0.5;
+      const depth = Math.max(8, tileH * 0.9);
+      const originX = cssW * 0.5;
+      const originY = Math.max(18, (cssH - (g * tileH + depth)) * 0.38);
+      const sorted = Array.from(map.values()).sort((a, b) => ((Number(a.x) + Number(a.z)) - (Number(b.x) + Number(b.z))) || (Number(a.z) - Number(b.z)));
+      for (const cell of sorted) {
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        const top = terrainColor(cell.terrain);
+        if (!map.has((x + 1) + ',' + z)) drawPreviewSide(c2, cx, cy, tileW * 0.5, tileH * 0.5, depth, 'right', previewShade(top, -62));
+        if (!map.has(x + ',' + (z + 1))) drawPreviewSide(c2, cx, cy, tileW * 0.5, tileH * 0.5, depth, 'left', previewShade(top, -42));
+      }
+      for (const cell of sorted) {
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        const top = terrainColor(cell.terrain);
+        drawPreviewDiamond(c2, cx, cy, tileW * 0.5, tileH * 0.5, top, 'rgba(3,5,9,.36)');
+      }
+      for (const cell of sorted) {
+        if (!cell.kind) continue;
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        drawPreviewObject(c2, cx, cy, tileW, cell.kind);
       }
     }
     WS.renderPreview = renderPreview;

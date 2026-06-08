@@ -1295,6 +1295,7 @@
   const texAtlasTileSet = createMaterialImageTexture('textures/HJCliEjbEAA9Ah2.jpeg');
   const texAtlasRoofStrips = createMaterialImageTexture('textures/HJCliEqagAAE8e4.jpeg');
   const texAtlasReference = createMaterialImageTexture('textures/reference.jpeg');
+  const texIslandUndersideVoxel = createMaterialImageTexture('textures/island-underside-voxel.png');
   const proceduralPixelTextures = {
     checkered: texCheckered,
     noise: texNoise,
@@ -1510,8 +1511,8 @@
   applyWorldUVs(M.roofBlueD, texRoofShingles, 0.34);
   M.islandUnder.color.set(0xffffff);
   M.islandUnderD.color.set(0xffffff);
-  applyWorldUVs(M.islandUnder, texRockFace, 1.25, { voxelSeams: true });
-  applyWorldUVs(M.islandUnderD, texRockFace, 1.25, { voxelSeams: true });
+  applyWorldUVs(M.islandUnder, texIslandUndersideVoxel, 0.58, { voxelSeams: true });
+  applyWorldUVs(M.islandUnderD, texIslandUndersideVoxel, 0.58, { voxelSeams: true });
   M.utilityPipe.color.set(0x55616a);
   M.utilityPipeD.color.set(0x2f373e);
   M.utilityClamp.color.set(0x66717a);
