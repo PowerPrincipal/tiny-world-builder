@@ -146,21 +146,12 @@
     const half = span * 0.5;
     const thickness = 0.16;
     const sideFaceOutset = TILE * 0.055;
-    const inset = thickness * 0.5 - sideFaceOutset;
-     const wallTopY = ISLAND_SIDE_STRATA_RENDER_TOP_Y;
-    const wallH = ISLAND_SIDE_STRATA_RENDER_HEIGHT;
-    const wallBottomY = wallTopY - wallH;
-    const mat = islandShellMaterial(M.boardSideEdge || M.boardSide);
+    const inset = thickness - sideFaceOutset-.043;
     const spanOuter = span + sideFaceOutset * 2;
     const wallTopY = ISLAND_SIDE_STRATA_RENDER_TOP_Y;
     const wallH = ISLAND_SIDE_STRATA_RENDER_HEIGHT;
     const wallBottomY = wallTopY - wallH;
-    // Flat untextured backing — NOT the strata shader, NOT a world-mapped
-    // texture. Any texture here crawls in one axis through the moving voxel-
-    // greeble gaps and aliases into diagonal stripes (badly under pixelation).
-    // A solid colour just fills the gaps so the island reads solid; the voxel
-    // greebles are the visible, camera-stable side surface.
-    const mat = islandShellMaterial(M.boardSideFlat);
+    const mat = islandShellMaterial(M.boardSideEdge || M.boardSide);
     // Where a perimeter cell is water, drop the green grass cap down to the
     // water line so a river reaching the rim shows water instead of a green
     // wall. The strata shader maps its texture by WORLD-Y, so a shorter cap

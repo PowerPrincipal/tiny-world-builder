@@ -182,6 +182,7 @@
   function makeEditableIslandBase(island) {
     const g = new THREE.Group();
     vbox(g, GRID * TILE, 0.10, GRID * TILE, 0, -DIRT_H - 0.055, 0, M.islandUnderD, { noGap: true, skipTop: true });
+    addIslandSideBacking(g);                // strata side panels (restored)
     addEditableIslandPyramids(g, island);  // editable underside pyramid(s) — fixed minimum platform is the slab above
     addIslandUtilityUnderside(g);
     addEditableIslandLiftEngines(g, island);
