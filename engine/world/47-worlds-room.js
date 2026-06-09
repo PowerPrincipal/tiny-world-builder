@@ -23,10 +23,11 @@
     let socket = null;
     let world = null;
     let token = '';
-    let role = 'observe';
+    let role = 'play';
     let gridSize = 8;
     let taxPercent = null;
-    let you = { x: 0, z: 0, hearts: 10, role: 'observe' };
+    let restoreAmbientCrowdVisible = null;
+    let you = { x: 0, z: 0, hearts: 10, role: 'play' };
     let myId = '';
     const peers = new Map();
     let nodes = {};
@@ -71,15 +72,16 @@
     }
 
     let stateTimer = null, sawWorldState = false;
-    function enterRoom(w, joinToken, joinRole) {
+    function enterRoom(w, joinToken) {
       leaveRoom();
-      world = w; token = joinToken || ''; role = joinRole || 'observe';
+      world = w; token = joinToken || ''; role = 'play';
       gridSize = w.gridSize || 8; taxPercent = w.taxPercent != null ? w.taxPercent : null;
       cells = w.data && Array.isArray(w.data.cells) ? w.data.cells : [];
       rebuildBlocked();
       if (w.data && typeof applyState === 'function') { try { applyState(w.data); } catch (_) {} }
       // One map: hide the builder's own minimap, and lock out builder tools.
       hideBaseMinimap(true);
+      setAmbientCrowdVisibleForRoom(false);
       if (typeof WS.setPlayChrome === 'function') WS.setPlayChrome(true);
       emit('enter', { world: w, role });
       const roomId = 'world-' + w.slug;
@@ -112,6 +114,7 @@
       if (socket) { try { socket.close(); } catch (_) {} socket = null; }
       connected = false; peers.clear(); nodes = {}; animals = [];
       unbindInput(); hideMinimap();
+      setAmbientCrowdVisibleForRoom(true);
       hideBaseMinimap(false);
       if (typeof WS.setPlayChrome === 'function') WS.setPlayChrome(false);
       emit('leave', {});
@@ -125,6 +128,22 @@
       if (hide) { baseMapPrevDisplay = baseMapEl.style.display; baseMapEl.style.display = 'none'; }
       else { baseMapEl.style.display = baseMapPrevDisplay || ''; }
     }
+
+    function setAmbientCrowdVisibleForRoom(visible) {
+      const api = window.__tinyworldCrowd;
+      if (!api || typeof api.setRuntimeVisible !== 'function') return;
+      if (!visible) {
+        if (restoreAmbientCrowdVisible === null) {
+          restoreAmbientCrowdVisible = typeof api.runtimeVisible === 'function' ? api.runtimeVisible() : true;
+        }
+        api.setRuntimeVisible(false);
+        return;
+      }
+      if (restoreAmbientCrowdVisible !== null) {
+        api.setRuntimeVisible(restoreAmbientCrowdVisible);
+        restoreAmbientCrowdVisible = null;
+      }
+    }
     WS.leaveRoom = function () {
       leaveRoom();
       if (typeof WS.restoreFreeform === 'function') WS.restoreFreeform();
@@ -135,7 +154,7 @@
     function onMessage(d) {
       switch (d.type) {
         case 'welcome':
-          myId = d.id || myId; role = d.role || role; emit('status', { connected: true, role });
+          myId = d.id || myId; role = 'play'; emit('status', { connected: true, role });
           // An upgraded world server flags the welcome; an old collab server does
           // not — bail out so the minimap/HUD don't linger over the builder.
           if (d.world !== true) { sawWorldState = true; toast(T('worlds.serverOld')); WS.leaveRoom(); }
@@ -144,9 +163,10 @@
           sawWorldState = true;
           gridSize = d.gridSize || gridSize; taxPercent = d.taxPercent != null ? d.taxPercent : taxPercent;
           you = Object.assign(you, d.you || {});
+          you.role = 'play';
           nodes = d.nodes || {}; animals = d.animals || [];
-          peers.clear(); (d.peers || []).forEach(p => { if (p.id && p.id !== myId) peers.set(p.id, p); });
-          role = (d.you && d.you.role) || role;
+          peers.clear(); (d.peers || []).forEach(p => { if (p.id && p.id !== myId) { p._t = Date.now(); peers.set(p.id, p); } });
+          role = 'play';
           emit('state', snapshot()); drawMinimap(); updateSelfAvatar(); updatePeerAvatars(); break;
         case 'presence': {
           const p = d.presence; if (!p || !p.id) break;
@@ -156,7 +176,7 @@
             if (p.hearts != null) you.hearts = p.hearts;
             emit('you', you); updateSelfAvatar();
           } else {
-            peers.set(p.id, p);
+            p._t = Date.now(); peers.set(p.id, p);
             emit('peers', Array.from(peers.values())); updatePeerAvatars();
           }
           drawMinimap(); break;
@@ -297,6 +317,8 @@
       else if (k === 'arrowright' || k === 'd') { cancelWalk(); const [x, z] = worldStepFromScreen(1, 0); step(x, z); }
       else if (k === ' ' || k === 'spacebar') startJump();
       else if (k === ATTACK_KEY) startAttack();
+      else if (e.code === 'BracketLeft' || k === '[') cycleAvatarClass(-1);
+      else if (e.code === 'BracketRight' || k === ']') cycleAvatarClass(1);
       else handled = false;
       if (handled) e.preventDefault();
     }
@@ -372,26 +394,146 @@
         : t === 'dirt' ? '#7a5a3a' : t === 'path' ? '#b9a06a' : t === 'lava' ? '#c0431f' : t === 'snow' ? '#e6eef6' : '#3f8f53';
     }
 
-    // Shared top-down tile preview (used by the universe cards in 46). Draws the
-    // grass base, terrain tiles, and a small marker for harvestable objects.
+    // Shared isometric 2D tile preview (used by the universe cards in 46). This
+    // intentionally avoids Three.js so the Worlds screen can show many islands
+    // as cheap pixel-style atlas thumbnails.
     const PREVIEW_PLANTS = new Set(['crop', 'corn', 'wheat', 'pumpkin', 'carrot', 'sunflower']);
+    const PREVIEW_ISO_KIND_COLORS = {
+      tree: '#1f6f3a',
+      bush: '#2f8b49',
+      rock: '#9ba8ae',
+      house: '#c76e46',
+      fence: '#7a4b2c',
+      cow: '#f0d8b8',
+      sheep: '#f7f1dc',
+    };
+    function previewShade(hex, amt) {
+      const h = String(hex || '#000000').replace('#', '');
+      const n = parseInt(h.length === 3 ? h.replace(/(.)/g, '$1$1') : h, 16);
+      const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + amt));
+      const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+      const b = Math.max(0, Math.min(255, (n & 255) + amt));
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    function previewCellTuple(c) {
+      if (!c) return null;
+      if (Array.isArray(c)) return { x: c[0], z: c[1], terrain: c[2] || 'grass', kind: c[3] || '' };
+      return { x: c.x, z: c.z, terrain: c.terrain || 'grass', kind: c.kind || '' };
+    }
+    function drawPreviewDiamond(ctx, cx, cy, hw, hh, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - hh);
+      ctx.lineTo(cx + hw, cy);
+      ctx.lineTo(cx, cy + hh);
+      ctx.lineTo(cx - hw, cy);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+    function drawPreviewSide(ctx, cx, cy, hw, hh, depth, side, fill) {
+      ctx.beginPath();
+      if (side === 'right') {
+        ctx.moveTo(cx + hw, cy);
+        ctx.lineTo(cx, cy + hh);
+        ctx.lineTo(cx, cy + hh + depth);
+        ctx.lineTo(cx + hw, cy + depth);
+      } else {
+        ctx.moveTo(cx - hw, cy);
+        ctx.lineTo(cx, cy + hh);
+        ctx.lineTo(cx, cy + hh + depth);
+        ctx.lineTo(cx - hw, cy + depth);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    function drawPreviewObject(ctx, cx, cy, s, kind) {
+      const k = PREVIEW_PLANTS.has(kind) ? 'plant' : kind;
+      if (k === 'tree' || k === 'bush' || k === 'plant') {
+        ctx.fillStyle = k === 'plant' ? '#d5df57' : PREVIEW_ISO_KIND_COLORS[k];
+        ctx.beginPath();
+        ctx.arc(cx, cy - s * 0.34, s * (k === 'tree' ? 0.22 : 0.16), 0, Math.PI * 2);
+        ctx.fill();
+        if (k === 'tree') {
+          ctx.fillStyle = '#7b5434';
+          ctx.fillRect(cx - s * 0.035, cy - s * 0.28, s * 0.07, s * 0.28);
+        }
+      } else if (k === 'rock') {
+        ctx.fillStyle = PREVIEW_ISO_KIND_COLORS.rock;
+        drawPreviewDiamond(ctx, cx, cy - s * 0.18, s * 0.16, s * 0.09, '#9ba8ae', '#65737b');
+      } else if (k === 'house') {
+        ctx.fillStyle = '#c76e46';
+        ctx.fillRect(cx - s * 0.18, cy - s * 0.34, s * 0.36, s * 0.26);
+        ctx.fillStyle = '#7b3340';
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.22, cy - s * 0.34);
+        ctx.lineTo(cx, cy - s * 0.56);
+        ctx.lineTo(cx + s * 0.22, cy - s * 0.34);
+        ctx.closePath();
+        ctx.fill();
+      } else if (PREVIEW_ISO_KIND_COLORS[k]) {
+        ctx.fillStyle = PREVIEW_ISO_KIND_COLORS[k];
+        ctx.fillRect(cx - s * 0.08, cy - s * 0.28, s * 0.16, s * 0.16);
+      }
+    }
     function renderPreview(cnv, preview) {
       if (!cnv || !preview) return;
       const g = Math.max(1, preview.gridSize || 8);
-      const list = Array.isArray(preview.cells) ? preview.cells : [];
-      const px = cnv.width || 200;
-      const cell = Math.max(2, Math.floor(px / g));
-      cnv.width = cell * g; cnv.height = cell * g;
+      const suppliedList = Array.isArray(preview.cells) ? preview.cells : [];
+      const list = suppliedList.map(previewCellTuple).filter(Boolean);
+      const cssW = cnv.clientWidth || cnv.width || 320;
+      const cssH = cnv.clientHeight || cnv.height || 200;
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      cnv.width = Math.round(cssW * dpr); cnv.height = Math.round(cssH * dpr);
       const c2 = cnv.getContext('2d');
-      c2.fillStyle = '#3f8f53'; c2.fillRect(0, 0, cnv.width, cnv.height);
-      const dot = (x, z, color) => { c2.fillStyle = color; c2.beginPath(); c2.arc(x * cell + cell / 2, z * cell + cell / 2, Math.max(1, cell * 0.26), 0, 7); c2.fill(); };
-      for (const c of list) {
-        const x = c[0], z = c[1], ter = c[2], kind = c[3];
-        if (x == null || z == null || x < 0 || z < 0 || x >= g || z >= g) continue;
-        c2.fillStyle = terrainColor(ter); c2.fillRect(x * cell, z * cell, cell, cell);
-        if (kind === 'tree' || kind === 'bush') dot(x, z, '#1f6f3a');
-        else if (PREVIEW_PLANTS.has(kind)) dot(x, z, '#d8e85a');
-        else if (kind === 'cow' || kind === 'sheep') dot(x, z, '#f0c8a8');
+      c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c2.clearRect(0, 0, cssW, cssH);
+      const bg = c2.createLinearGradient(0, 0, 0, cssH);
+      bg.addColorStop(0, '#070911');
+      bg.addColorStop(1, '#030509');
+      c2.fillStyle = bg;
+      c2.fillRect(0, 0, cssW, cssH);
+      c2.fillStyle = 'rgba(169,199,255,.22)';
+      for (let i = 0; i < 26; i++) {
+        const sx = (i * 47 + g * 13) % Math.max(1, cssW);
+        const sy = (i * 31 + g * 7) % Math.max(1, cssH);
+        c2.fillRect(sx, sy, 1, 1);
+      }
+      const map = new Map();
+      for (let z = 0; z < g; z++) for (let x = 0; x < g; x++) map.set(x + ',' + z, { x, z, terrain: 'grass', kind: '' });
+      for (const cell of list) {
+        const x = Number(cell.x), z = Number(cell.z);
+        if (!Number.isFinite(x) || !Number.isFinite(z) || x < 0 || z < 0 || x >= g || z >= g) continue;
+        map.set(x + ',' + z, cell);
+      }
+      const tileW = Math.max(14, Math.min(30, cssW / (g + 2.4)));
+      const tileH = tileW * 0.5;
+      const depth = Math.max(8, tileH * 0.9);
+      const originX = cssW * 0.5;
+      const originY = Math.max(18, (cssH - (g * tileH + depth)) * 0.38);
+      const sorted = Array.from(map.values()).sort((a, b) => ((Number(a.x) + Number(a.z)) - (Number(b.x) + Number(b.z))) || (Number(a.z) - Number(b.z)));
+      for (const cell of sorted) {
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        const top = terrainColor(cell.terrain);
+        if (!map.has((x + 1) + ',' + z)) drawPreviewSide(c2, cx, cy, tileW * 0.5, tileH * 0.5, depth, 'right', previewShade(top, -62));
+        if (!map.has(x + ',' + (z + 1))) drawPreviewSide(c2, cx, cy, tileW * 0.5, tileH * 0.5, depth, 'left', previewShade(top, -42));
+      }
+      for (const cell of sorted) {
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        const top = terrainColor(cell.terrain);
+        drawPreviewDiamond(c2, cx, cy, tileW * 0.5, tileH * 0.5, top, 'rgba(3,5,9,.36)');
+      }
+      for (const cell of sorted) {
+        if (!cell.kind) continue;
+        const x = Number(cell.x), z = Number(cell.z);
+        const cx = originX + (x - z) * tileW * 0.5;
+        const cy = originY + (x + z) * tileH * 0.5;
+        drawPreviewObject(c2, cx, cy, tileW, cell.kind);
       }
     }
     WS.renderPreview = renderPreview;
@@ -401,18 +543,76 @@
     // the movement direction (8-way); state is idle vs walk. No fallback — if a sheet
     // fails to load we surface an error.
     const SHEET = {
-      idle: { url: 'models/people/25D/idle/Sprite Sheet/idle full sprite sheet (transparent BG).png', sw: 768, sh: 512, frame: 64, cols: 12, fps: 8 },
-      walk: { url: 'models/people/25D/walk/Sprite Sheet/walk complete sprite sheet (transparent BG).png', sw: 512, sh: 512, frame: 64, cols: 8, fps: 12 },
-      attack: { url: 'models/people/25D/attack/Sprite Sheet/attack full sprite sheet (transparent BG).png', sw: 672, sh: 768, frame: 96, cols: 7, fps: 16 },
+      idle: { baseUrl: 'models/people/25D/idle/Sprite Sheet/idle full sprite sheet (transparent BG).png', sw: 768, sh: 512, frame: 64, cols: 12, fps: 8 },
+      walk: { baseUrl: 'models/people/25D/walk/Sprite Sheet/walk complete sprite sheet (transparent BG).png', sw: 512, sh: 512, frame: 64, cols: 8, fps: 12 },
+      attack: { baseUrl: 'models/people/25D/attack/Sprite Sheet/attack full sprite sheet (transparent BG).png', sw: 672, sh: 768, frame: 96, cols: 7, fps: 16 },
     };
+    const AVATAR_CLASSES = ['knight', 'baird', 'wizard', 'knave', 'template'];
+    // open-pets pets (vendored under models/pets/<id>/, @open-pets/pet-format atlas).
+    // Mutually exclusive with classes: a selected pet renders as a billboard using its
+    // idle / left / right animation frame ranges (not 8-directional). frame index ->
+    // col = f % cols, row = floor(f / cols) within a cols x rows atlas.
+    const PETS = {
+      boba: {
+        id: 'boba', sheet: 'models/pets/boba/spritesheet.webp', cols: 8, rows: 9, aspect: 192 / 208,
+        anims: {
+          idle: { f: [0, 1, 2, 3, 4, 5], fps: 5 },
+          left: { f: [8, 9, 10, 11, 12, 13, 14, 15], fps: 10 },
+          right: { f: [16, 17, 18, 19, 20, 21, 22, 23], fps: 10 },
+        },
+      },
+    };
+    // ---- side-view STRIP avatars (hybrid) ----
+    // Texture storage like the class path (ent.tex = {idle,walk,run,attack}, swap
+    // material.map per state); animation like the pet path (named anim, single facing,
+    // flip L/R via scale.x sign). Sheets are 64px grids with animation frames in
+    // columns and direction rows stacked vertically; sample one row, never the full
+    // 256px column, or the avatar renders as four stacked bodies.
+    const STRIPS = (function buildStrips() {
+      const out = {};
+      // Swordsman levels 1-6 (provider 'warriors'). lv1-3 use the long 'Swordsman_lvlN_'
+      // prefix; lv4-6 use the short 'lvlN_' prefix. attack frames: lv1-3 = 8, lv4-6 = 7.
+      const swDir = function (n) { return 'models/people/swordsman/PNG/Swordsman_lvl' + n + '/Without_shadow/'; };
+      for (let n = 1; n <= 6; n++) {
+        const pre = n <= 3 ? ('Swordsman_lvl' + n + '_') : ('lvl' + n + '_');
+        const atkF = n <= 3 ? 8 : 7;
+        out['swordsman-l' + n] = {
+          id: 'swordsman-l' + n, aspect: 1, facing: 'right',
+          anims: {
+            idle: { sheet: swDir(n) + pre + 'Idle_without_shadow.png', fw: 64, fh: 64, frames: 12, rows: 4, row: 0, fps: 7 },
+            walk: { sheet: swDir(n) + pre + 'Walk_without_shadow.png', fw: 64, fh: 64, frames: 6, rows: 4, row: 0, fps: 10 },
+            run: { sheet: swDir(n) + pre + 'Run_without_shadow.png', fw: 64, fh: 64, frames: 8, rows: 4, row: 0, fps: 12 },
+            attack: { sheet: swDir(n) + pre + 'attack_without_shadow.png', fw: 64, fh: 64, frames: atkF, rows: 4, row: 0, fps: 14 },
+          },
+        };
+      }
+      // Orcs 1-3 (provider 'orcs'). No 'run'. attack = 8 frames.
+      for (let n = 1; n <= 3; n++) {
+        const oDir = 'models/people/orcs/PNG/Orc' + n + '/Without_shadow/';
+        out['orc-' + n] = {
+          id: 'orc-' + n, aspect: 1, facing: 'right',
+          anims: {
+            idle: { sheet: oDir + 'orc' + n + '_idle_without_shadow.png', fw: 64, fh: 64, frames: 4, rows: 4, row: 0, fps: 7 },
+            walk: { sheet: oDir + 'orc' + n + '_walk_without_shadow.png', fw: 64, fh: 64, frames: 6, rows: 4, row: 0, fps: 10 },
+            attack: { sheet: oDir + 'orc' + n + '_attack_without_shadow.png', fw: 64, fh: 64, frames: 8, rows: 4, row: 0, fps: 12 },
+          },
+        };
+      }
+      return out;
+    })();
     const JUMP_MS = 460, ATTACK_KEY = 'f';
     // Sheet row (top->bottom) for each movement sector. Sectors: 0=S 1=SE 2=E 3=NE
     // 4=N 5=NW 6=W 7=SW. If a character faces the wrong way, reorder this array.
     const SECTOR_TO_ROW = [0, 1, 2, 3, 4, 5, 6, 7];
+    // 4-row side-view sheets use the common down/left/right/up order.
+    const STRIP_SECTOR_TO_ROW = [0, 0, 2, 3, 3, 3, 1, 0];
     let selfEnt = null;
     const peerEnts = new Map();
     let avatarRaf = null;
     let avatarErrored = false;
+    let avatarClassName = 'knight';
+    let avatarPetId = null; // non-null => pet mode (overrides class)
+    let avatarStripId = null; // non-null => strip mode (overrides class). Mutually exclusive with avatarPetId.
     let _texLoader = null;
 
     function avatarParent() {
@@ -446,6 +646,11 @@
       try { console.error('[worlds] avatar sprite failed:', msg); } catch (_) {}
       toast('Avatar sprites failed to load');
     }
+    function avatarSheetUrl(action, className) {
+      const s = SHEET[action];
+      if (className && className !== 'template') return 'models/people/25D/classes/' + encodeURIComponent(className) + '/' + action + '.png';
+      return s.baseUrl;
+    }
     function loadSheetTexture(url) {
       _texLoader = _texLoader || new THREE.TextureLoader();
       const t = _texLoader.load(url, undefined, undefined, () => avatarError(url));
@@ -454,17 +659,116 @@
       else if ('encoding' in t && THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
       return t;
     }
-    // A fresh texture per avatar+sheet so each can hold its own frame/row offset.
-    function createAvatar() {
-      const ent = { x: 0, z: 0, sector: 0, lastMove: 0, state: 'idle', frame: 0, frameTime: 0, tex: {}, sprite: null, disposed: false };
-      if (typeof THREE === 'undefined') { avatarError('THREE unavailable'); return ent; }
+    function disposeAvatarTextures(ent) {
+      if (!ent || !ent.tex) return;
+      Object.keys(ent.tex).forEach(k => { if (ent.tex[k] && typeof ent.tex[k].dispose === 'function') ent.tex[k].dispose(); });
+      ent.tex = {};
+    }
+    function loadAvatarTextures(ent, className) {
+      if (!ent) return;
+      disposeAvatarTextures(ent);
+      ent.pet = null; // leaving pet mode
+      ent.strip = null; // leaving strip mode
+      ent.avatarClassName = className;
       for (const k of Object.keys(SHEET)) {
         const s = SHEET[k];
-        const t = loadSheetTexture(s.url);
+        const t = loadSheetTexture(avatarSheetUrl(k, className));
         t.repeat.set(s.frame / s.sw, s.frame / s.sh);
         t.offset.set(0, 1 - s.frame / s.sh);
         ent.tex[k] = t;
       }
+      if (ent.sprite && ent.sprite.material) {
+        ent.sprite.material.map = ent.tex[ent.state] || ent.tex.idle;
+        ent.sprite.scale.set(1.7, 1.7, 1); // restore class sprite size (pet mode rescales)
+      }
+    }
+    function setAvatarClass(name) {
+      const next = AVATAR_CLASSES.includes(name) ? name : 'knight';
+      avatarClassName = next;
+      avatarPetId = null; // class, pet and strip avatars are mutually exclusive
+      avatarStripId = null;
+      if (selfEnt) loadAvatarTextures(selfEnt, avatarClassName);
+      return avatarClassName;
+    }
+    function cycleAvatarClass(delta) {
+      const current = Math.max(0, AVATAR_CLASSES.indexOf(avatarClassName));
+      return setAvatarClass(AVATAR_CLASSES[(current + delta + AVATAR_CLASSES.length) % AVATAR_CLASSES.length]);
+    }
+    // ---- pet avatars (open-pets billboards) ----
+    function loadPetTextures(ent, pet) {
+      if (!ent || !pet) return;
+      disposeAvatarTextures(ent);
+      ent.pet = pet; ent.strip = null; ent.avatarClassName = null; ent._petAnim = null; ent.frame = 0; ent.frameTime = 0;
+      const t = loadSheetTexture(pet.sheet);
+      t.repeat.set(1 / pet.cols, 1 / pet.rows);
+      t.offset.set(0, 1 - 1 / pet.rows); // frame 0 (top-left)
+      ent.tex = { pet: t };
+      if (ent.sprite && ent.sprite.material) {
+        ent.sprite.material.map = t; ent.sprite.material.needsUpdate = true;
+        const s = 1.9; ent.sprite.scale.set(s * pet.aspect, s, 1);
+      }
+    }
+    function setAvatarPet(petId) {
+      const pet = PETS[petId];
+      if (!pet) return null;
+      avatarPetId = petId;
+      avatarStripId = null; // pet and strip avatars are mutually exclusive
+      if (selfEnt) loadPetTextures(selfEnt, pet);
+      return avatarPetId;
+    }
+    // ---- strip avatars (side-view hybrid: class-style tex storage, pet-style anim) ----
+    function loadStripTextures(ent, strip) {
+      if (!ent || !strip) return;
+      disposeAvatarTextures(ent);
+      ent.strip = strip; ent.pet = null; ent.avatarClassName = null;
+      ent.state = 'idle'; ent.frame = 0; ent.frameTime = 0;
+      ent.tex = {};
+      for (const k of Object.keys(strip.anims)) {
+        const anim = strip.anims[k];
+        const t = loadSheetTexture(anim.sheet);
+        t.repeat.set(1 / anim.frames, 1 / (anim.rows || 1));
+        setStripTextureFrame(t, anim, 0);
+        ent.tex[k] = t;
+      }
+      if (ent.sprite && ent.sprite.material) {
+        ent.sprite.material.map = ent.tex[ent.state] || ent.tex.idle;
+        ent.sprite.material.needsUpdate = true;
+        const s = 2.0; ent.sprite.scale.set(s * strip.aspect, s, 1);
+      }
+    }
+    function setAvatarStrip(id) {
+      const strip = STRIPS[id];
+      if (!strip) return null;
+      avatarStripId = id;
+      avatarPetId = null; // strip and pet avatars are mutually exclusive
+      if (selfEnt) loadStripTextures(selfEnt, strip);
+      return avatarStripId;
+    }
+    function stripRowForSector(sector) {
+      const idx = Number.isFinite(sector) ? Math.max(0, Math.min(7, sector | 0)) : 0;
+      return STRIP_SECTOR_TO_ROW[idx] || 0;
+    }
+    function setStripTextureFrame(tex, anim, frame, sector) {
+      if (!tex || !anim) return;
+      const rows = Math.max(1, anim.rows || 1);
+      const row = Math.max(0, Math.min(rows - 1, sector == null ? (anim.row || 0) : stripRowForSector(sector)));
+      tex.offset.set((frame || 0) / anim.frames, 1 - (row + 1) / rows);
+    }
+    WS.setAvatarClass = setAvatarClass;
+    WS.cycleAvatarClass = cycleAvatarClass;
+    WS.avatarClasses = () => AVATAR_CLASSES.slice();
+    WS.avatarClass = () => ((avatarPetId || avatarStripId) ? null : avatarClassName);
+    WS.setAvatarPet = setAvatarPet;
+    WS.avatarPet = () => avatarPetId;
+    WS.pets = () => Object.keys(PETS);
+    WS.setAvatarStrip = setAvatarStrip;
+    WS.avatarStrip = () => avatarStripId;
+    WS.strips = () => Object.keys(STRIPS);
+    // A fresh texture per avatar+sheet so each can hold its own frame/row offset.
+    function createAvatar() {
+      const ent = { x: 0, z: 0, sector: 0, lastMove: 0, lastDx: 0, lastDz: 0, state: 'idle', frame: 0, frameTime: 0, tex: {}, sprite: null, disposed: false, avatarClassName };
+      if (typeof THREE === 'undefined') { avatarError('THREE unavailable'); return ent; }
+      loadAvatarTextures(ent, avatarClassName);
       const mat = new THREE.SpriteMaterial({ map: ent.tex.idle, transparent: true, depthWrite: false, alphaTest: 0.2 });
       ent.sprite = new THREE.Sprite(mat);
       ent.sprite.center.set(0.5, 0.12);  // anchor near the feet (cells have transparent padding below)
@@ -480,17 +784,72 @@
     }
     function moveEntity(ent, x, z) {
       if (!ent) return;
-      const s = screenSector(x - ent.x, z - ent.z); if (s != null) ent.sector = s;
-      if (x !== ent.x || z !== ent.z) ent.lastMove = Date.now();
+      const dx = x - ent.x, dz = z - ent.z;
+      const s = screenSector(dx, dz); if (s != null) ent.sector = s;
+      if (dx || dz) {
+        ent.lastMove = Date.now();
+        ent.lastDx = dx;
+        ent.lastDz = dz;
+      }
       ent.x = x; ent.z = z; placeEntity(ent);
     }
     function disposeEntity(ent) {
       if (!ent) return; ent.disposed = true;
       removeBubble(ent);
       if (ent.sprite && ent.sprite.parent) ent.sprite.parent.remove(ent.sprite);
+      disposeAvatarTextures(ent);
+    }
+    // Pet billboards animate via named anims (idle / left / right), not 8-way sheets.
+    function animPet(ent, dt) {
+      const pet = ent.pet, tex = ent.tex && ent.tex.pet;
+      if (!pet || !tex) return;
+      const moving = (Date.now() - ent.lastMove) < 200;
+      const name = moving ? (ent.lastDx < 0 ? 'left' : 'right') : 'idle';
+      const anim = pet.anims[name] || pet.anims.idle;
+      if (ent._petAnim !== name) { ent._petAnim = name; ent.frame = 0; ent.frameTime = 0; }
+      ent.frameTime += dt;
+      const fdur = 1 / (anim.fps || 6);
+      while (ent.frameTime >= fdur) { ent.frameTime -= fdur; ent.frame = (ent.frame + 1) % anim.f.length; }
+      const f = anim.f[ent.frame] | 0;
+      const col = f % pet.cols, rw = (f / pet.cols) | 0;
+      tex.offset.set(col / pet.cols, 1 - (rw + 1) / pet.rows);
+      let py = 0.02;
+      if (ent.jumpStart) { const jt = (Date.now() - ent.jumpStart) / JUMP_MS; if (jt >= 1) ent.jumpStart = 0; else py += Math.sin(jt * Math.PI) * 0.8; }
+      ent.sprite.position.y = py;
+    }
+    // Strip billboards: hybrid. State (attack/walk/idle) drives which tex.map is bound
+    // (class-style); a single horizontal row of frames is advanced (pet-style) and the
+    // sprite is flipped L/R via scale.x SIGN (never negative repeat).
+    function animStrip(ent, dt) {
+      const strip = ent.strip;
+      const s = 2.0;
+      if (!strip || !ent.tex) return;
+      const moving = (Date.now() - ent.lastMove) < 200;
+      let state = ent.attacking ? 'attack' : (moving ? 'walk' : 'idle');
+      if (state === 'walk' && !strip.anims.walk) state = 'idle';
+      const anim = strip.anims[state] || strip.anims.idle;
+      if (state !== ent.state) {
+        ent.state = state; ent.frame = 0; ent.frameTime = 0;
+        ent.sprite.material.map = ent.tex[state] || ent.tex.idle;
+        ent.sprite.material.needsUpdate = true;
+      }
+      ent.frameTime += dt;
+      const fdur = 1 / (anim.fps || 6);
+      while (ent.frameTime >= fdur) {
+        ent.frameTime -= fdur; ent.frame += 1;
+        if (ent.frame >= anim.frames) { ent.frame = 0; if (ent.attacking) ent.attacking = false; } // attack plays once
+      }
+      const tex = ent.tex[ent.state] || ent.tex.idle;
+      setStripTextureFrame(tex, anim, ent.frame, ent.sector);
+      ent.sprite.scale.x = Math.abs(s * strip.aspect);
+      let py = 0.02;
+      if (ent.jumpStart) { const jt = (Date.now() - ent.jumpStart) / JUMP_MS; if (jt >= 1) ent.jumpStart = 0; else py += Math.sin(jt * Math.PI) * 0.8; }
+      ent.sprite.position.y = py;
     }
     function animEntity(ent, dt) {
       if (!ent.sprite) return;
+      if (ent.strip) { animStrip(ent, dt); return; }
+      if (ent.pet) { animPet(ent, dt); return; }
       const state = ent.attacking ? 'attack' : ((Date.now() - ent.lastMove) < 200 ? 'walk' : 'idle');
       if (state !== ent.state) { ent.state = state; ent.frame = 0; ent.frameTime = 0; ent.sprite.material.map = ent.tex[state]; }
       const sh = SHEET[state];
@@ -506,6 +865,19 @@
       if (ent.jumpStart) { const jt = (Date.now() - ent.jumpStart) / JUMP_MS; if (jt >= 1) ent.jumpStart = 0; else y += Math.sin(jt * Math.PI) * 0.8; }
       ent.sprite.position.y = y;
       updateBubble(ent);
+    }
+    function avatarAngleLerp(a, b, t) {
+      const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
+      return a + d * t;
+    }
+    function updateAvatarCameraOrbit(dt) {
+      if (!selfEnt || !selfEnt.sprite || typeof tilePos !== 'function' || typeof updateCamera !== 'function' || typeof target === 'undefined' || !target) return;
+      const p = tilePos(selfEnt.x, selfEnt.z);
+      // Smoothly follow the avatar's POSITION only. Do NOT auto-rotate the camera to
+      // face movement direction — the player controls the orbit (azimuth) themselves.
+      target.x += (p.x - target.x) * 0.15;
+      target.z += (p.z - target.z) * 0.15;
+      updateCamera();
     }
 
     // ---- speech bubbles: a chat line shown above an avatar in an 8-bit pixel
@@ -636,9 +1008,18 @@
 
     function updateSelfAvatar() {
       if (!selfEnt) selfEnt = createAvatar();
+      // Pet choice is SELF-ONLY and local (peers keep their class avatars; createAvatar
+      // is shared with the peer path, so the pet must never be applied there).
+      if (avatarPetId && PETS[avatarPetId] && (!selfEnt.pet || selfEnt.pet.id !== avatarPetId)) loadPetTextures(selfEnt, PETS[avatarPetId]);
+      if (avatarStripId && STRIPS[avatarStripId] && (!selfEnt.strip || selfEnt.strip.id !== avatarStripId)) loadStripTextures(selfEnt, STRIPS[avatarStripId]);
       moveEntity(selfEnt, you.x, you.z);
     }
+    const STALE_PEER_MS = 9000; // ~3 missed presence heartbeats => treat as gone
     function updatePeerAvatars() {
+      // Drop ghost peers that stopped heartbeating (missed 'leave', hard refresh, or a
+      // stale server session) so the player never sees phantom duplicate avatars.
+      const nowMs = Date.now();
+      peers.forEach((p, id) => { if (p && p._t && nowMs - p._t > STALE_PEER_MS) peers.delete(id); });
       const seen = new Set();
       peers.forEach((p) => {
         if (!p || p.id == null || p.id === myId) return;   // never draw yourself as a peer
@@ -653,18 +1034,17 @@
     function startAvatars() {
       if (avatarRaf || typeof requestAnimationFrame !== 'function') return;
       let prev = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      let prunePrev = prev;
       const tick = () => {
         const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const dt = Math.min(0.05, (now - prev) / 1000); prev = now;
         if (selfEnt) animEntity(selfEnt, dt);
         peerEnts.forEach((e) => animEntity(e, dt));
-        // Follow camera: ease the orbit target onto the player so he stays centered.
-        if (selfEnt && selfEnt.sprite && typeof tilePos === 'function' && typeof updateCamera === 'function' && typeof target !== 'undefined' && target) {
-          const p = tilePos(selfEnt.x, selfEnt.z);
-          target.x += (p.x - target.x) * 0.15;
-          target.z += (p.z - target.z) * 0.15;
-          updateCamera();
-        }
+        // Sweep stale/ghost peers ~every 1.5s even when no messages arrive, so a peer
+        // that hard-disconnected (missed 'leave') stops rendering as a phantom avatar.
+        if (now - prunePrev > 1500) { prunePrev = now; if (peerEnts.size) updatePeerAvatars(); }
+        // Follow camera: keep the player centered (player controls the orbit).
+        updateAvatarCameraOrbit(dt);
         avatarRaf = requestAnimationFrame(tick);
       };
       avatarRaf = requestAnimationFrame(tick);

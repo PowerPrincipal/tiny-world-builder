@@ -11,7 +11,7 @@
   const HOME_GRID_DEFAULT = 8;
   const HOME_GRID_MIN = 8;
   const HOME_GRID_MAX = 20;
-  const HOME_GRID_OPTIONS = [8, 12, 16, 20];
+  const HOME_GRID_OPTIONS = [8, 10, 12, 16, 20];
   const HOME_GRID_OPTION_SET = new Set(HOME_GRID_OPTIONS);
   let GRID = HOME_GRID_DEFAULT;
 

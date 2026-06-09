@@ -51,6 +51,7 @@ Guidance for AI coding agents working in this repo. Read this before touching
   - `.codex/skills/tinyworld-island-and-planes` — home island layout, sponsor banner drape, plane/crop-duster flight curves, "front" side conventions.
   - `.codex/skills/tinyworld-tool-icons-and-modes` — mode indicator, boot-to-Select, Esc-to-Select.
   - `.codex/skills/tinyworld-block-button-style` — locked-in "block" button aesthetic: raised square, dark category-colored outline + inner white line, white-bodied outlined glyph. Use for any new icon button/tile.
+  - `.codex/skills/tinyworld-mesh-terrain` — opt-in voxel-block landscape sculptor (paint per-voxel materials + pull/push-sculpt flat-topped blocks). Keeps the block mesh as a separate overlay persisted under `tinyworld:meshTerrain:*` (no `setCell` bake) and hides the flat home tiles. Module `engine/world/46-mesh-terrain.js`.
   - `.codex/skills/tinyworld-flight-sim` — flyable plane. The plane is the existing **`stunt-plane` model-stamp** (`models/stunt_plane.glb`) placed via the **Stamps** system (NOT a bespoke tool/kind). A plain click on the placed stamp opens an Enter/Fly menu; flight uses a rear chase-cam + the ported ships physics (sim-space → scene similarity transform); Escape exits.
 
 ## House style

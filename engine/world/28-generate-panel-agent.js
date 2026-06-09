@@ -564,11 +564,14 @@
         if (style === 'landscape') {
           disposePlanetLandscape();
           renderVoxelTerrain = false;
-          landscapeMeshMode = true;
-          // Store biome/render choices for initLandscapeMesh
+          // Realistic renders as voxel blocks (mesh terrain), not the continuous
+          // LandscapeEngine mesh — so it is a normal-tile world plus an overlay
+          // (landscapeMeshMode stays false). Low-poly keeps the continuous mesh.
+          landscapeMeshMode = (planetStyleMode !== 'realistic');
+          // Store biome/render choices for the landscape build below
           landscapeMeshBiome = planetBiome;
           landscapeMeshStyle = planetStyleMode;
-          // landscapeMeshMode is activated after applyState creates the engine instance
+          // The overlay is built after applyState creates the engine instance
         } else if (style === 'planet-underlay') {
           disposeLandscapeMesh({ rebuild: true });
           useLandscapeEngine = false;
@@ -618,10 +621,17 @@
           if (typeof applyState === 'function' && !applyState(data, { sliced: true })) {
             throw new Error('renderer rejected the procedural scene');
           }
-          // Activate landscape mesh after applyState created the engine
+          // Build the landscape overlay after applyState created the engine.
+          // Realistic -> voxel blocks; low-poly -> continuous LandscapeEngine mesh.
           if (landscapeStyleEl && landscapeStyleEl.value === 'landscape' && landscapeEngineInstance) {
-            initLandscapeMesh();
-            rebuildTerrainRender();
+            if (landscapeMeshStyle === 'realistic' && typeof applyRealisticVoxelLandscape === 'function') {
+              // Voxel overlay hides the (already-painted) tiles; no tile rebuild
+              // after, or it would re-show them.
+              applyRealisticVoxelLandscape();
+            } else {
+              initLandscapeMesh();
+              rebuildTerrainRender();
+            }
           }
           if (wantsPlanetLandscape && typeof setCameraMode === 'function') setCameraMode('perspective');
           setStatus('done · seed: ' + effectiveSeed + (wantsPlanetLandscape ? ' · planet ' + planetDrop + 'm below' : ''), '');
@@ -758,16 +768,18 @@
     const send = document.getElementById('agent-send');
     const panel = document.getElementById('agent-panel');
     const toggle = document.getElementById('agent-panel-toggle');
+    const resizer = document.getElementById('agent-panel-resizer');
     const messages = document.getElementById('agent-messages');
     if (!form || !grip || !input || !send || !panel || !toggle || !messages) return;
 
-    const POS_KEY = 'tinyworld:agent:input-pos';
-    const AUTO_COLLAPSE_MS = 4500;   // expanded → toast
-    const AUTO_HIDE_MS    = 3500;    // toast → hidden after idle (no activity)
-    let collapseTimer = null;
-    let hideTimer = null;
-    let pinnedOpen = false;
-    let hasAgentActivity = false;   // only show handle when there's been at least one message or selection
+    const PANEL_POS_KEY = 'tinyworld:agent:panel-pos';
+    const PANEL_DEFAULT_WIDTH = 388;
+    const PANEL_MIN_WIDTH = 320;
+    const PANEL_MAX_WIDTH = 560;
+    const AUTO_HIDE_MS = 3500; // retained for placeholder decay timing only
+    let pinnedOpen = true;
+    let hasAgentActivity = false;
+    let panelWidth = PANEL_DEFAULT_WIDTH;
 
     function markAgentActivity() {
       if (!hasAgentActivity) {
@@ -783,55 +795,53 @@
       handle.hidden = true;
     }
 
+    function maxPanelWidth() {
+      return Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, window.innerWidth - 36));
+    }
+
+    function clampPanelWidth(width) {
+      const n = Number(width);
+      if (!Number.isFinite(n)) return PANEL_DEFAULT_WIDTH;
+      return Math.max(PANEL_MIN_WIDTH, Math.min(maxPanelWidth(), Math.round(n)));
+    }
+
+    function savePanelState() {
+      try {
+        localStorage.setItem(PANEL_POS_KEY, JSON.stringify({
+          width: panelWidth,
+          collapsed: panel.classList.contains('collapsed'),
+        }));
+      } catch (_) {}
+    }
+
+    function applyPanelWidth(width) {
+      panelWidth = clampPanelWidth(width);
+      panel.style.setProperty('--agent-panel-width', panelWidth + 'px');
+    }
+
+    function updateCollapseButton() {
+      const collapsed = panel.classList.contains('collapsed');
+      toggle.textContent = collapsed ? 'AI' : '×';
+      toggle.setAttribute('aria-label', collapsed ? 'Expand AI chat' : 'Collapse AI chat');
+      toggle.title = collapsed ? 'Expand AI chat' : 'Collapse AI chat';
+      form.classList.toggle('conversation-open', !collapsed);
+      document.body.classList.toggle('agent-conversation-open', !collapsed);
+      updatePanelHandleVisibility();
+    }
+
     function syncAgentPanelPosition() {
-      const r = form.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      const maxPanelHeight = Math.min(window.innerHeight * 0.42, 340);
-      const availableHeight = Math.max(48, r.top - 8);
-      const panelHeight = Math.min(
-        maxPanelHeight,
-        Math.max(96, panel.scrollHeight || panel.offsetHeight || maxPanelHeight),
-        availableHeight
-      );
-      const top = Math.max(8, Math.min(window.innerHeight - panelHeight - 8, r.top - panelHeight - 1));
-      panel.style.left = Math.round(r.left + r.width / 2) + 'px';
-      panel.style.right = 'auto';
-      panel.style.top = Math.round(top) + 'px';
-      panel.style.bottom = 'auto';
-      panel.style.width = Math.round(r.width) + 'px';
-      panel.style.height = Math.round(panelHeight) + 'px';
-      panel.style.transform = 'translateX(-50%)';
+      applyPanelWidth(panelWidth);
+      updateCollapseButton();
     }
 
     function syncAgentStackState() {
-      const open = !panel.classList.contains('hidden');
-      form.classList.toggle('conversation-open', open);
-      document.body.classList.toggle('agent-conversation-open', open);
-      updatePanelHandleVisibility();
-      if (open) requestAnimationFrame(syncAgentPanelPosition);
+      syncAgentPanelPosition();
     }
 
-    function hidePanel() {
-      panel.classList.add('hidden');
-      panel.classList.remove('collapsed');
-      pinnedOpen = false;
-      clearTimers();
-      syncAgentStackState();
-    }
-
-    function clearTimers() {
-      if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-    }
+    function clearTimers() {}
 
     function scheduleAutoFlow() {
-      // After activity (when not pinned), briefly show the panel, then fold it
-      // back into the prompt bar.
-      clearTimers();
-      if (pinnedOpen) return;
-      collapseTimer = setTimeout(() => {
-        if (hasAgentActivity) hidePanel();
-      }, AUTO_HIDE_MS);
+      // The AI panel is now a persistent chat surface; do not auto-hide it.
     }
 
     function showPanel() {
@@ -840,31 +850,16 @@
     }
 
     function setPanelCollapsed(collapsed, opts) {
-      showPanel();
-      panel.classList.toggle('collapsed', collapsed);
+      panel.classList.remove('hidden');
+      panel.classList.toggle('collapsed', !!collapsed);
+      pinnedOpen = !collapsed;
       syncAgentStackState();
-      if (!collapsed) {
-        messages.scrollTop = messages.scrollHeight;
-        if (opts && opts.pin) {
-          pinnedOpen = true;
-          clearTimers();
-        }
-        if (opts && opts.auto) {
-          pinnedOpen = false;
-          scheduleAutoFlow();
-        }
-      } else {
-        if (opts && opts.auto) {
-          pinnedOpen = false;
-          clearTimers();
-          hideTimer = setTimeout(() => {
-            if (hasAgentActivity) hidePanel();
-          }, AUTO_HIDE_MS);
-        } else {
-          pinnedOpen = false;
-          clearTimers();
-        }
-      }
+      if (!collapsed) messages.scrollTop = messages.scrollHeight;
+      if (!(opts && opts.noSave)) savePanelState();
+    }
+
+    function hidePanel() {
+      setPanelCollapsed(true);
     }
 
     // Progress placeholder helpers — during work, the chat input's
@@ -942,16 +937,13 @@
     }
 
     function fireToast() {
-      // After a result, briefly show the open panel, then fold the conversation
-      // back into the prompt bar.
+      // The right-side chat stays open/pinned like a normal chat transcript.
       showPanel();
       panel.classList.remove('collapsed');
-      pinnedOpen = false;
+      pinnedOpen = true;
       syncAgentStackState();
-      clearTimers();
-      hideTimer = setTimeout(() => {
-        if (hasAgentActivity) hidePanel();
-      }, AUTO_HIDE_MS);
+      savePanelState();
+      messages.scrollTop = messages.scrollHeight;
     }
 
     window.__tinyworldAgent = {
@@ -991,27 +983,24 @@
       },
     };
 
-    function applyStoredPosition() {
+    function applyStoredPanelState() {
+      let collapsed = false;
       try {
-        const raw = localStorage.getItem(POS_KEY);
-        if (!raw) return;
-        const p = JSON.parse(raw);
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-        form.style.left = Math.max(14, Math.min(window.innerWidth - 80, p.x)) + 'px';
-        form.style.top = Math.max(14, Math.min(window.innerHeight - 54, p.y)) + 'px';
-        form.style.bottom = 'auto';
-        form.style.transform = 'none';
-        syncAgentPanelPosition();
+        const raw = localStorage.getItem(PANEL_POS_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (Number.isFinite(p.width)) applyPanelWidth(p.width);
+          collapsed = !!p.collapsed;
+        }
       } catch (_) {}
+      setPanelCollapsed(collapsed, { noSave: true });
     }
 
-    // X button in the panel header: clear the active selection and slide the
-    // panel off-screen.
+    // Collapse button in the panel header: keep conversation state intact.
     toggle.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
-      if (window.__tinyworldSelection) window.__tinyworldSelection.clear();
-      hidePanel();
+      setPanelCollapsed(!panel.classList.contains('collapsed'));
     });
 
     // Clear conversation button: empties messages, resets activity flag so handle hides.
@@ -1027,50 +1016,28 @@
       });
     }
 
-    // Clicking the panel (when collapsed or when the hidden grip is conceptually active)
-    // expands it. The real re-open affordance is now the separate right-edge handle.
+    // Clicking the collapsed rail expands the panel.
     let suppressNextClick = false;
     panel.addEventListener('click', e => {
       if (suppressNextClick) { suppressNextClick = false; e.stopPropagation(); return; }
       if (e.target.closest('.agent-panel-toggle')) return;
-
-      if (panel.classList.contains('hidden')) {
-        if (!hasAgentActivity) return;
-        setPanelCollapsed(false, { pin: true });
-        return;
-      }
-      if (panel.classList.contains('collapsed')) {
-        setPanelCollapsed(false, { pin: true });
-      }
+      if (panel.classList.contains('collapsed')) setPanelCollapsed(false, { pin: true });
     });
 
-    // Legacy right-edge grip handle. The conversation now expands from the
-    // prompt itself, so the handle stays hidden.
     const panelHandle = document.getElementById('agent-panel-handle');
     if (panelHandle) {
       panelHandle.addEventListener('click', () => {
-        if (!hasAgentActivity) return;
         setPanelCollapsed(false, { pin: true });
       });
     }
 
-    // The panel derives its position from the prompt bar. Keep the old storage
-    // key ignored for backward compatibility with browsers that saved it.
-    const PANEL_POS_KEY = 'tinyworld:agent:panel-pos';
-    void PANEL_POS_KEY;
-
-    function applyStoredPanelPosition() {
-      syncAgentPanelPosition();
-    }
-
-    // Start fully hidden with no handle until the agent actually does something.
-    panel.classList.add('collapsed');
-    panel.classList.add('hidden');
-    
-    applyStoredPosition();
-    applyStoredPanelPosition();
+    applyStoredPanelState();
     syncAgentStackState();
-    window.addEventListener('resize', syncAgentPanelPosition);
+    window.addEventListener('resize', () => {
+      applyPanelWidth(panelWidth);
+      savePanelState();
+      syncAgentStackState();
+    });
 
     // Up arrow in the chat input slides the panel in and expands it to
     // show the full conversation (pinned open).
@@ -2402,7 +2369,7 @@
           renderEditableIslandEngineProperties(engineTarget);
           updateSelectionPreview(null);
           updateTransformGizmo(null);
-          if (panelTitle) panelTitle.textContent = 'Agent conversation';
+          if (panelTitle) panelTitle.textContent = 'AI chat';
           openSelectionPropertiesInLayers();
           return;
         }
@@ -2416,7 +2383,7 @@
           notifySelectionPropertiesRendered();
         }
         updateTransformGizmo(null);
-        if (panelTitle) panelTitle.textContent = 'Agent conversation';
+        if (panelTitle) panelTitle.textContent = 'AI chat';
         return;
       }
       panel.classList.remove('has-selection');
@@ -2443,7 +2410,7 @@
       if (document.documentElement.classList.contains('ai-disabled')) openSelectionPropertiesInLayers();
       updateSelectionPreview(null);
       updateTransformGizmo(selectedObject);
-      if (panelTitle) panelTitle.textContent = 'Agent conversation';
+      if (panelTitle) panelTitle.textContent = 'AI chat';
       // Properties now live in Layers / Properties. A single pick keeps the
       // canvas-first flow; multi-cell edits open the durable property surface.
       if (summary.cellCount > 1) openSelectionPropertiesInLayers();
@@ -2545,34 +2512,57 @@
     }
     window.__tinyworldCoerceAttachedModelStampsForGeneratedWorld = coerceAttachedModelStampsForGeneratedWorld;
 
-    let drag = null;
-    grip.addEventListener('pointerdown', e => {
+    // Attachment button mirrors the existing drag/drop bridge used by model/image drops.
+    const attachInput = document.createElement('input');
+    attachInput.type = 'file';
+    attachInput.multiple = true;
+    attachInput.accept = '.glb,.gltf,.obj,.fbx,.vox,.vdb,.mtl,.png,.jpg,.jpeg,.webp,.gif,image/*';
+    attachInput.hidden = true;
+    form.appendChild(attachInput);
+    grip.addEventListener('click', e => {
       e.preventDefault();
-      const r = form.getBoundingClientRect();
-      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
-      form.classList.add('dragging');
-      try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+      e.stopPropagation();
+      attachInput.click();
     });
-    grip.addEventListener('pointermove', e => {
-      if (!drag) return;
-      const x = Math.max(14, Math.min(window.innerWidth - form.offsetWidth - 14, e.clientX - drag.dx));
-      const y = Math.max(14, Math.min(window.innerHeight - form.offsetHeight - 14, e.clientY - drag.dy));
-      form.style.left = x + 'px';
-      form.style.top = y + 'px';
-      form.style.bottom = 'auto';
-      form.style.transform = 'none';
-      syncAgentPanelPosition();
+    attachInput.addEventListener('change', () => {
+      const files = Array.from(attachInput.files || []);
+      attachInput.value = '';
+      if (!files.length) return;
+      const bridge = window.__tinyworldAgentDropAttachments;
+      if (bridge && typeof bridge.addFiles === 'function') bridge.addFiles(files);
     });
-    function endDrag() {
-      if (!drag) return;
-      drag = null;
-      form.classList.remove('dragging');
-      const r = form.getBoundingClientRect();
-      try { localStorage.setItem(POS_KEY, JSON.stringify({ x: r.left, y: r.top })); } catch (_) {}
-      syncAgentPanelPosition();
+
+    let panelResize = null;
+    function beginPanelResize(e) {
+      if (!resizer || panel.classList.contains('collapsed')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const r = panel.getBoundingClientRect();
+      panelResize = { startX: e.clientX, startWidth: r.width };
+      panel.classList.add('resizing');
+      try { resizer.setPointerCapture && resizer.setPointerCapture(e.pointerId); } catch (_) {}
     }
-    grip.addEventListener('pointerup', endDrag);
-    grip.addEventListener('pointercancel', endDrag);
+    function movePanelResize(e) {
+      if (!panelResize) return;
+      e.preventDefault();
+      const nextWidth = panelResize.startWidth + (panelResize.startX - e.clientX);
+      applyPanelWidth(nextWidth);
+    }
+    function endPanelResize() {
+      if (!panelResize) return;
+      panelResize = null;
+      panel.classList.remove('resizing');
+      savePanelState();
+    }
+    if (resizer) {
+      resizer.addEventListener('pointerdown', beginPanelResize);
+      window.addEventListener('pointermove', movePanelResize);
+      window.addEventListener('pointerup', endPanelResize);
+      window.addEventListener('pointercancel', endPanelResize);
+      resizer.addEventListener('mousedown', beginPanelResize);
+      window.addEventListener('mousemove', movePanelResize);
+      window.addEventListener('mouseup', endPanelResize);
+    }
 
     form.addEventListener('submit', async e => {
       e.preventDefault();

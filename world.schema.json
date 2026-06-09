@@ -14,7 +14,7 @@
     },
     "gridSize": {
       "type": "integer",
-      "enum": [8, 12, 16, 20],
+      "enum": [8, 10, 12, 16, 20],
       "description": "Optional home board edge length. Defaults to the current app grid when omitted."
     },
     "cells": {

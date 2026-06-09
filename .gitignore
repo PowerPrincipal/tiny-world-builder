@@ -7,10 +7,8 @@ models/stamp-defaults.local.json
 node_modules/
 *.log
 /.playwright-mcp
-
 dist/
 *.zip
-
 # Local Netlify folder
 .netlify
 .partykit/
@@ -21,3 +19,7 @@ dist/
 .gstack/
 /.gstack
 /.contex
+/.codesurf
+/models/3d
+.mcp.json
+.codesurf/mcp-server.json

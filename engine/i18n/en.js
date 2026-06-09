@@ -63,6 +63,14 @@
     'worlds.roleObserver': 'Observer',
     'worlds.help': 'How to play',
     'worlds.helpBody': 'Walk with WASD/arrows or click a tile to move there. Stand next to a node and pick an action — Fish water (3s), Mine ore (5s), Gather plants (3s), Hunt animals (1s). Each harvest costs 1 heart (max 10, +1 per minute) and gives 3 resources. Visitors split the reward with the world owner by the tax rate; owners keep everything. Nodes have limited charges and refill over time.',
+    'worlds.avatarTitle': 'Choose your avatar',
+    'worlds.avatarOpen': 'Avatar',
+    'worlds.avatarSelect': 'Select',
+    'worlds.avatarSelected': 'Selected',
+    'worlds.avatarClasses': 'Classes',
+    'worlds.avatarPets': 'Pets',
+    'worlds.avatarWarriors': 'Warriors',
+    'worlds.avatarOrcs': 'Orcs',
 
     // ---- brand / chrome ----
     'brand.sub': 'Tap to place · drag to orbit · pinch or scroll to zoom',

@@ -964,21 +964,16 @@
           float twSideCoord = abs(twVoxelNormal.x) > abs(twVoxelNormal.z) ? vWorldVoxelPos.z : vWorldVoxelPos.x;
           ${opts.voxelSeams ? `
           float sideY = vWorldVoxelPos.y + 0.08;
-          float sideGridX = 1.45;
-          float sideGridY = 1.30;
-          vec2 sideCell = floor(vec2(twSideCoord * sideGridX, sideY * sideGridY));
-          float yBand = twVoxelSeamLine(sideY, sideGridY, 0.010);
-          float vBlock = twVoxelSeamLine(twSideCoord, sideGridX, 0.010);
-          float vBlockFine = twVoxelSeamLine(twSideCoord + sideY * 0.08, sideGridX * 1.08, 0.0025);
-          float blockShade = twVoxelBlockHash(sideCell) - 0.5;
+          float sideNoiseA = twVoxelBlockHash(floor(vec2(twSideCoord * 7.3, sideY * 5.1)));
+          float sideNoiseB = twVoxelBlockHash(floor(vec2(twSideCoord * 15.7 + sideY * 0.9, sideY * 11.3)));
           float underFace = smoothstep(0.62, 0.86, -twVoxelNormal.y);
-          float underX = twVoxelSeamLine(vWorldVoxelPos.x, 3.20, 0.012);
-          float underZ = twVoxelSeamLine(vWorldVoxelPos.z, 3.20, 0.012);
-          float underCellShade = twVoxelBlockHash(floor(vWorldVoxelPos.xz * 3.20)) - 0.5;
-          float sideSeam = twSideFace * clamp(yBand * 0.42 + vBlock * 0.42 + vBlockFine * 0.04, 0.0, 1.0);
-          float seam = clamp(sideSeam + underFace * max(underX, underZ) * 0.42, 0.0, 1.0);
-          diffuseColor.rgb *= 1.0 + twSideFace * blockShade * 0.035 + underFace * underCellShade * 0.045;
-          diffuseColor.rgb *= mix(1.0, 0.70, seam);
+          float underNoiseA = twVoxelBlockHash(floor(vWorldVoxelPos.xz * 5.6));
+          float underNoiseB = twVoxelBlockHash(floor(vWorldVoxelPos.xz * 13.2 + vec2(17.0, 41.0)));
+          float rockNoise = (sideNoiseA - 0.5) * 0.10 + (sideNoiseB - 0.5) * 0.045;
+          float underNoise = (underNoiseA - 0.5) * 0.12 + (underNoiseB - 0.5) * 0.050;
+          float faintCrack = step(0.965, sideNoiseB) * twSideFace * 0.10;
+          diffuseColor.rgb *= 1.0 + twSideFace * rockNoise + underFace * underNoise;
+          diffuseColor.rgb *= mix(1.0, 0.88, faintCrack);
           ` : ''}
           ${opts.edgeStrata ? `
           float edgeTopY = ${edgeStrataTopY.toFixed(4)};
@@ -1262,7 +1257,6 @@
   const texSand = createPixelTexture('sand', 16);
   const texRockFace = createPixelTexture('rock-face', 32);
   const texIslandSideBlocks = createPixelTexture('island-side-blocks', 128);
-  const texIslandSideStrataReference = createIslandSideStrataImageTexture('textures/island-side-strata-gpt.png');
   const texPipeMetal = createPixelTexture('pipe-metal', 64);
   const texWaterFroth = createPixelTexture('water-froth', 64);
   const texPathPavers = createPixelTexture('path-pavers', 128);
@@ -1301,7 +1295,6 @@
   const texAtlasTileSet = createMaterialImageTexture('textures/HJCliEjbEAA9Ah2.jpeg');
   const texAtlasRoofStrips = createMaterialImageTexture('textures/HJCliEqagAAE8e4.jpeg');
   const texAtlasReference = createMaterialImageTexture('textures/reference.jpeg');
-  const texIslandSideVoxel = createMaterialImageTexture('textures/island-side-stone-voxel.png');
   const texIslandUndersideVoxel = createMaterialImageTexture('textures/island-underside-voxel.png');
   const proceduralPixelTextures = {
     checkered: texCheckered,
@@ -1389,17 +1382,14 @@
   const ISLAND_SIDE_STRATA_HEIGHT = TOP_H + DIRT_H + 0.035;
   const ISLAND_SIDE_STRATA_RENDER_TOP_Y = ISLAND_SIDE_STRATA_TOP_Y + ISLAND_SIDE_STRATA_TOP_OVERLAP;
   const ISLAND_SIDE_STRATA_RENDER_HEIGHT = ISLAND_SIDE_STRATA_HEIGHT + ISLAND_SIDE_STRATA_TOP_OVERLAP;
-  const ISLAND_SIDE_STRATA_TEXTURE_ASPECT = 1024 / 192;
 
   function makeIslandSideStrataMaterial() {
     return new THREE.ShaderMaterial({
       name: 'island-side-strata-shader',
       side: THREE.FrontSide,
       uniforms: {
-        uMap: { value: texIslandSideStrataReference },
         uTopY: { value: ISLAND_SIDE_STRATA_RENDER_TOP_Y },
         uHeight: { value: ISLAND_SIDE_STRATA_RENDER_HEIGHT },
-        uRepeatWidth: { value: ISLAND_SIDE_STRATA_RENDER_HEIGHT * ISLAND_SIDE_STRATA_TEXTURE_ASPECT },
       },
       vertexShader: `
         varying vec3 vTwWorldPos;
@@ -1421,21 +1411,35 @@
       `,
       fragmentShader: `
         precision highp float;
-        uniform sampler2D uMap;
         uniform float uTopY;
         uniform float uHeight;
-        uniform float uRepeatWidth;
         varying vec3 vTwWorldPos;
         varying vec3 vTwWorldNormal;
+
+        float twStrataHash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
 
         void main() {
           vec3 n = normalize(vTwWorldNormal);
           float coord = abs(n.x) > abs(n.z) ? vTwWorldPos.z : vTwWorldPos.x;
           float down = clamp(uTopY - vTwWorldPos.y, 0.0, uHeight);
           float v = clamp(down / max(uHeight, 0.0001), 0.0, 1.0);
-          float u = fract(coord / max(uRepeatWidth, 0.0001) + 0.5);
-          vec3 col = texture2D(uMap, vec2(u, v)).rgb;
-          col = max(col, vec3(0.18, 0.16, 0.12));
+          float seed = twStrataHash(vec2(floor(coord * 4.0), 19.0));
+          float grassDrop = 0.18 + seed * 0.10;
+          float dirtToRock = 0.62 + twStrataHash(vec2(floor(coord * 2.1), 31.0)) * 0.12;
+          float grassMask = 1.0 - smoothstep(grassDrop, grassDrop + 0.055, v);
+          float rockMask = smoothstep(dirtToRock, dirtToRock + 0.11, v);
+          float dirtMask = (1.0 - grassMask) * (1.0 - rockMask);
+          float coarse = twStrataHash(floor(vec2(coord * 6.2, v * 9.4))) - 0.5;
+          float fine = twStrataHash(floor(vec2(coord * 18.0 + v * 1.7, v * 23.0))) - 0.5;
+          vec3 grass = vec3(0.40, 0.62, 0.17) + vec3(coarse * 0.08, coarse * 0.10, fine * 0.035);
+          vec3 dirt = vec3(0.43, 0.27, 0.12) + vec3(coarse * 0.07, fine * 0.035, fine * 0.015);
+          vec3 rock = vec3(0.28, 0.29, 0.27) + vec3(coarse * 0.10 + fine * 0.04);
+          float root = step(0.78, twStrataHash(vec2(floor(coord * 13.0), 7.0))) * smoothstep(0.12, 0.22, v) * (1.0 - smoothstep(0.54, 0.70, v));
+          vec3 col = grass * grassMask + dirt * dirtMask + rock * rockMask;
+          col = mix(col, vec3(0.12, 0.07, 0.035), root * 0.45);
+          col = max(col, vec3(0.14, 0.13, 0.11));
           float light = 0.82 + 0.18 * clamp(dot(normalize(vec3(-0.45, 0.35, 0.75)), n) * 0.5 + 0.5, 0.0, 1.0);
           gl_FragColor = vec4(col * light, 1.0);
         }
@@ -1466,9 +1470,9 @@
     return materialTextureMap[normalizeMaterialTextureKey(key)] || null;
   }
 
-  M.grass.color.set(0x75b84b);
-  M.grassEdge.color.set(0x5da23d);
-  M.grassHi.color.set(0x8ccc5d);
+  M.grass.color.set(0x57842b);
+  M.grassEdge.color.set(0x46701f);
+  M.grassHi.color.set(0x6a9632);
   M.door.color.set(0x7b4b2a);
   M.woodTrim.color.set(0x5c361d);
   M.bridgeWood.color.set(0x7b4b2a);
@@ -1480,16 +1484,16 @@
   applyWorldUVs(M.grass, initialGrassTex, 1.0);
   applyWorldUVs(M.grassEdge, initialGrassTex, 1.0);
   applyWorldUVs(M.grassHi, initialGrassTex, 1.0);
-  M.boardSide.color.set(0xc4bdb2);
-  applyWorldUVs(M.boardSide, texIslandSideBlocks, 0.22, { voxelSeams: true });
+  M.boardSide.color.set(0xffffff);
+  applyWorldUVs(M.boardSide, texSoilSide, 0.22, { voxelSeams: true });
   M.boardSideEdge = makeIslandSideStrataMaterial();
 
   M.path.color.set(0xf2d29c);
   M.pathTrim.color.set(0xd9b780);
   M.pathScuff.color.set(0xc9aa70);
-  applyWorldUVs(M.path, texNoise, 1.0);
-  applyWorldUVs(M.pathTrim, texNoise, 1.0);
-  applyWorldUVs(M.pathScuff, texNoise, 1.0);
+  applyWorldUVs(M.path, texPathPavers, 0.22);
+  applyWorldUVs(M.pathTrim, texPathPavers, 0.22);
+  applyWorldUVs(M.pathScuff, texPathPavers, 0.22);
 
   M.dirt.color.set(0xffffff);
   M.dirtRich.color.set(0xffffff);
@@ -1529,14 +1533,14 @@
   applyWorldUVs(M.castleStoneD, texCastleBlock, 0.86);
   M.stone.color.set(0x8b8d88);
   M.stoneDk.color.set(0x5f6668);
-  applyWorldUVs(M.stone, texCottageStone, 2.0);
-  applyWorldUVs(M.stoneDk, texCottageStone, 2.0);
+  applyWorldUVs(M.stone, texRockFace, 2.8);
+  applyWorldUVs(M.stoneDk, texRockFace, 2.8);
   M.stoneSide = M.stone.clone();
-  M.stoneSide.color.set(0xc8c0b5);
-  applyWorldUVs(M.stoneSide, texIslandSideBlocks, 0.24, { voxelSeams: true });
-  applyWorldUVs(M.rock, texStone, 4.0);
-  applyWorldUVs(M.rockDk, texStone, 4.0);
-  applyWorldUVs(M.rockHi, texStone, 4.0);
+  M.stoneSide.color.set(0x8c8980);
+  applyWorldUVs(M.stoneSide, texRockFace, 1.9, { voxelSeams: true });
+  applyWorldUVs(M.rock, texRockFace, 3.8);
+  applyWorldUVs(M.rockDk, texRockFace, 3.8);
+  applyWorldUVs(M.rockHi, texRockFace, 3.8);
 
   M.manorBrick.color.set(0xffffff);
   M.manorBrickD.color.set(0xd0a096);
@@ -1756,7 +1760,7 @@
     grass: { texture: 'cottage-grass', fallbackTexture: 'checkered', scale: 1.0, materials: ['grass', 'grassEdge', 'grassHi'] },
     dirt: { texture: 'soil-side', scale: 0.22, materials: ['dirt', 'dirtRich'] },
     sand: { texture: 'sand', scale: 1.8, materials: ['sand', 'sandDk'] },
-    stone: { texture: 'cottage-stone', scale: 2.6, materials: ['stone', 'stoneDk'] },
+    stone: { texture: 'rock-face', scale: 2.8, materials: ['stone', 'stoneDk'] },
   };
   const SURFACE_LINKED_MODEL_DEFAULT_TEXTURES = {
     stone: 'castle-block',

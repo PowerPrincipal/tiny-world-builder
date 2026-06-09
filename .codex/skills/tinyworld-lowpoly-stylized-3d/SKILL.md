@@ -73,10 +73,12 @@ Use this together with:
   `corn-cob`, sunflower maps, and `island-side-blocks`.
   Keep them intentionally large and calm from the default/top-down camera; if
   the whole island reads noisy, lower world-UV repeat before adding detail.
-  Ground path, ground grass, and ground stone default back to the older calm
-  `noise`/`cottage-grass`/`cottage-stone` maps; use the newer coarse maps on
-  object materials, side panels, or explicit user-selected terrain texture
-  overrides instead. Stone riser/side faces use a
+  Ground path is brick/paver blockwork, not rock chips or gravel: keep path
+  terrain on `path-pavers` and avoid loose pebble overlays that make it read as
+  stone rubble. Ground grass and ground stone default back to the older calm
+  `cottage-grass`/`cottage-stone` maps; use the newer coarse maps on object
+  materials, side panels, or explicit user-selected terrain texture overrides
+  instead. Stone riser/side faces use a
   separate large-block material (`M.stoneSide`) so cliffs can scale up without
   changing the stone ground cap.
   Home island edge grass/soil/rock strata is not a texture-map option: it is

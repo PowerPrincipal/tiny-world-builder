@@ -98,7 +98,7 @@
     <img class="brand-logo" src="assets/twlogo-wordmark.png" alt="Tiny World Builder" width="1064" height="403">
   </div>
 
-  <a class="brand-banner" id="brand-banner" href="https://x.com/Autoincentiv3" target="_blank" rel="noopener noreferrer" aria-label="Autoincentive on X">
+  <a class="brand-banner" id="brand-banner" style="display:none !important" href="https://x.com/Autoincentiv3" target="_blank" rel="noopener noreferrer" aria-label="Autoincentive on X">
     <img id="brand-banner-img" alt="Autoincentive" />
   </a>
 
@@ -436,6 +436,14 @@
   </div>
 
   <div class="xr-panel" id="xr-panel" aria-label="XR modes" hidden>
+    <button class="btn icon xr-btn" id="xr-quicklook" type="button" title="View in AR (iOS / iPadOS) – Place the world on a real surface with Apple AR Quick Look" aria-label="View in AR (Apple)" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2 3 7v10l9 5 9-5V7z"/>
+        <path d="M3 7l9 5 9-5"/>
+        <path d="M12 12v10"/>
+      </svg>
+    </button>
+
     <button class="btn icon xr-btn" id="xr-surface" type="button" title="AR Desk – Pin the board to a real-world surface (TableTop AR)" aria-label="AR Desk">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -462,6 +470,8 @@
       </svg>
     </button>
   </div>
+
+  <p class="xr-status" id="xr-status" role="status" aria-live="polite" hidden></p>
 
   <section id="layers-panel" class="layers-panel" role="dialog" aria-modal="false" hidden>
     <div class="layers-panel-head" id="layers-panel-head" aria-label="Drag to move layers panel">
@@ -752,8 +762,10 @@
       <h1 class="sr-only" id="welcome-title">Tiny World Builder</h1>
       <img class="welcome-logo" src="assets/twlogo.png" alt="Tiny World Builder" width="1254" height="1254">
       <div class="welcome-actions" aria-label="Choose mode">
-        <button class="welcome-mode-btn welcome-build" id="welcome-build" type="button" data-pos-type="primary">BUILD</button>
-        <button class="welcome-mode-btn welcome-play" id="welcome-play" type="button" data-pos-type="terrain">PLAY</button>
+        <button class="welcome-mode-btn welcome-tinyverse" id="welcome-tinyverse" type="button" data-pos-type="primary">Tinyverse</button>
+        <button class="welcome-mode-btn welcome-battleworlds" id="welcome-battleworlds" type="button" data-pos-type="shield">Battleworlds</button>
+        <button class="welcome-mode-btn welcome-build" id="welcome-build" type="button" data-pos-type="tertiary">Build</button>
+        <button class="welcome-mode-btn welcome-play" id="welcome-play" type="button" data-pos-type="terrain">Play</button>
       </div>
       <p class="welcome-credit">
         <span>Created by Jason Kneen</span>
@@ -782,6 +794,7 @@
         <label>Home board
           <select id="gen-grid-size">
             <option value="8">8 × 8</option>
+            <option value="10">10 × 10</option>
             <option value="12">12 × 12</option>
             <option value="16">16 × 16</option>
           </select>
@@ -903,7 +916,7 @@
             <span style="font-size: 13px; font-weight: 500; color: var(--muted);">Render:</span>
             <select id="gen-landscape-render" style="padding: 4px 8px; border-radius: 8px; font-size: 12px; min-width: 130px;">
               <option value="lowpoly">Low-poly (Cel)</option>
-              <option value="realistic">Realistic</option>
+              <option value="realistic">Realistic (voxel blocks)</option>
             </select>
           </div>
           <div id="gen-planet-drop-control" style="display: none; align-items: center; gap: 8px; flex: 1 1 310px; min-width: 280px;">
@@ -1435,10 +1448,13 @@
   </section>
 
   <div id="agent-panel" class="agent-panel" data-ai-interface aria-live="polite">
+    <div class="agent-panel-resizer" id="agent-panel-resizer" role="separator" aria-orientation="vertical" aria-label="Resize AI chat"></div>
     <div class="agent-panel-head">
-      <span id="agent-panel-title">Agent conversation</span>
-      <button type="button" class="agent-panel-clear" id="agent-panel-clear" aria-label="Clear conversation">⌫</button>
-      <button type="button" class="agent-panel-toggle" id="agent-panel-toggle" aria-label="Close conversation">×</button>
+      <span id="agent-panel-title">AI chat</span>
+      <div class="agent-panel-actions">
+        <button type="button" class="agent-panel-clear" id="agent-panel-clear" aria-label="Clear conversation">⌫</button>
+        <button type="button" class="agent-panel-toggle" id="agent-panel-toggle" aria-label="Collapse AI chat">×</button>
+      </div>
     </div>
     <div class="agent-selection-preview selection-staging" id="agent-selection-preview" hidden aria-hidden="true">
       <div class="selection-preview-pane" hidden>
@@ -1450,24 +1466,22 @@
       <div class="agent-selection-properties" id="agent-selection-properties" hidden></div>
     </div>
     <div class="agent-messages" id="agent-messages"></div>
+    <form id="agent-input" class="agent-input" data-ai-interface autocomplete="off">
+      <button type="button" class="agent-grip" id="agent-grip" title="Attach files" aria-label="Attach files">+</button>
+      <button type="button" class="agent-target-chip" id="agent-target-chip" title="Selected object target" aria-label="Clear selected object target" hidden></button>
+      <input id="agent-prompt" type="text" placeholder="Ask the agent to change this world…" aria-label="Ask the agent" />
+      <button type="submit" class="agent-send" id="agent-send" aria-label="Send to agent">↑</button>
+      <div id="agent-suggestions" class="agent-suggestions" role="listbox" aria-label="Suggested prompts" hidden></div>
+    </form>
   </div>
 
-  <!-- Persistent right-edge grip handle. Only visible when the agent panel has
-       real history and is currently slid off-screen. Exact same glassmorphism
-       and ⋮⋮ drag cue as the bottom input bar. -->
+  <!-- Persistent right-edge grip handle retained for older code paths; the
+       right-side chat now collapses into its own rail. -->
   <button id="agent-panel-handle" class="agent-panel-handle" title="Show agent conversation" aria-label="Show agent conversation" hidden>⋮⋮</button>
 
   <div id="generation-plan-overlay" class="generation-plan-overlay" hidden aria-hidden="true">
     <img id="generation-plan-image" alt="" />
   </div>
-
-  <form id="agent-input" class="agent-input" data-ai-interface autocomplete="off">
-    <button type="button" class="agent-grip" id="agent-grip" title="Drag agent input" aria-label="Drag agent input">⋮⋮</button>
-    <button type="button" class="agent-target-chip" id="agent-target-chip" title="Selected object target" aria-label="Clear selected object target" hidden></button>
-    <input id="agent-prompt" type="text" placeholder="Ask the agent to change this world…" aria-label="Ask the agent" />
-    <button type="submit" class="agent-send" id="agent-send" aria-label="Send to agent">↑</button>
-    <div id="agent-suggestions" class="agent-suggestions" role="listbox" aria-label="Suggested prompts" hidden></div>
-  </form>
 
   <div class="toolbar" id="toolbar"></div>
   <div class="flyout" id="flyout" hidden></div>
@@ -1502,6 +1516,7 @@
   <script src="vendor/three/meshopt_decoder.r128.js"></script>
   <script src="vendor/three/GLTFLoader.r128.js"></script>
   <script src="vendor/three/libs/fflate.min.js"></script>
+  <script src="vendor/three/USDZExporter.r128.js"></script>
   <script src="vendor/three/curves/NURBSUtils.r128.js"></script>
   <script src="vendor/three/curves/NURBSCurve.r128.js"></script>
   <script src="vendor/three/FBXLoader.r128.js"></script>
@@ -1635,9 +1650,11 @@
   <script src="engine/world/43-drag-drop-import.js"></script>
   <script src="engine/world/44-sub-object-edit.js"></script>
   <script src="engine/world/45-shader-fx.js"></script>
+  <script src="engine/world/46-mesh-terrain.js"></script>
   <script src="engine/world/46-worlds-universe.js"></script>
   <script src="engine/world/47-worlds-room.js"></script>
   <script src="engine/world/48-worlds-harvest-hud.js"></script>
+  <script src="engine/world/49-worlds-avatar-picker.js"></script>
   <script src="engine/world/99-late-boot.js"></script>
 </body>
 </html>

@@ -6,6 +6,18 @@ description: Use when visually testing Tiny World Builder UI, camera, ghost opac
 # Tiny World Visual QA
 
 Use the browser route `http://localhost:3000/tiny-world-builder` when available.
+For Worlds screen/API QA, run the local build first and launch through Netlify on
+`8888`:
+
+```sh
+./publish.sh
+npx --yes netlify dev --dir dist --functions netlify/functions --port 8888 --staticServerPort 3998
+```
+
+Worlds cards should use real `/api/worlds` preview data. Do not invent seeded or
+hardcoded island layouts in the client; the 2D isometric renderer may draw the
+default grass base for the world grid, then overlay only API-provided terrain /
+object tuples.
 
 Checks:
 

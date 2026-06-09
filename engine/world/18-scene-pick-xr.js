@@ -853,6 +853,9 @@
 
   // -------- WebXR modes --------
   const xrStatusEl = document.getElementById('xr-status');
+  const xrQuickLookBtn = document.getElementById('xr-quicklook');
+  let xrStatusHideTimer = null;
+  let xrQuickLookBusy = false;
   const xrButtons = {
     surface: document.getElementById('xr-surface'),
     float: document.getElementById('xr-float'),
@@ -890,7 +893,25 @@
   scene.add(xrReticle);
 
   function setXRStatus(message) {
-    if (xrStatusEl) xrStatusEl.textContent = message;
+    if (!xrStatusEl) return;
+    if (xrStatusHideTimer) { clearTimeout(xrStatusHideTimer); xrStatusHideTimer = null; }
+    if (!message) {
+      xrStatusEl.textContent = '';
+      xrStatusEl.hidden = true;
+      return;
+    }
+    xrStatusEl.textContent = message;
+    xrStatusEl.hidden = false;
+    // While an immersive session is live, status doubles as in-headset
+    // guidance and must stay put. Outside a session (desktop hint, iOS AR
+    // Quick Look progress, errors) auto-dismiss so it doesn't linger.
+    if (!xrSession) {
+      xrStatusHideTimer = setTimeout(() => {
+        xrStatusEl.hidden = true;
+        xrStatusEl.textContent = '';
+        xrStatusHideTimer = null;
+      }, 7000);
+    }
   }
 
   function setXRButtonsDisabled(disabled) {
@@ -1165,35 +1186,230 @@
     updateXRControllerHover();
   }
 
+  // -------- Apple AR Quick Look (iOS / iPadOS) --------
+  // iOS Safari has no WebXR, so the WebXR surface/float/inside flow above never
+  // runs on iPhone/iPad. Apple's only on-device web AR is AR Quick Look: open a
+  // .usdz through an <a rel="ar"> and the system viewer finds a real surface,
+  // drops the model on it, and lets the user walk around while it stays put —
+  // exactly the "place the world on a surface and move around it" behaviour the
+  // WebXR path gives Android/Quest. We build the USDZ from the live world on tap.
+  const QUICKLOOK_TARGET_SIZE = 0.5; // metres for the longest horizontal edge at first placement
+
+  function supportsARQuickLook() {
+    // relList.supports('ar') is Safari's capability signal for AR Quick Look
+    // (true on iOS/iPadOS, and on macOS Safari which previews the model).
+    try {
+      const a = document.createElement('a');
+      return !!(a.relList && a.relList.supports && a.relList.supports('ar'));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // USDZExporter only understands MeshStandardMaterial, and UsdPreviewSurface
+  // connects diffuseColor *directly* to any texture (ignoring the base color it
+  // is meant to multiply). TinyWorld paints flat-coloured Lambert materials and
+  // then layers a grayscale detail/noise map on top, so exporting the maps would
+  // wash every tinted surface (grass, paths, walls) to white. We therefore drop
+  // maps and export the flat base colour, which also matches the low-poly look.
+  // Colours are read once and cached so identical surfaces share one USD material.
+  function averageVertexColor(geom) {
+    const attr = geom && geom.attributes && geom.attributes.color;
+    if (!attr || !attr.array || !attr.count) return null;
+    const arr = attr.array, items = attr.itemSize || 3;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < attr.count; i++) {
+      r += arr[i * items]; g += arr[i * items + 1]; b += arr[i * items + 2];
+    }
+    return new THREE.Color(r / attr.count, g / attr.count, b / attr.count);
+  }
+
+  function quickLookResolveColors(src, geom) {
+    const base = Array.isArray(src) ? src[0] : src;
+    let color = 0xffffff, emissive = 0x000000, opacity = 1, transparent = false;
+    if (base) {
+      if (base.vertexColors && geom) {
+        // Vertex-coloured meshes (model stamps, some voxel builds) carry colour
+        // in the geometry, not the material — average it so they aren't white.
+        const avg = averageVertexColor(geom);
+        if (avg) color = avg.getHex();
+        else if (base.color && base.color.getHex) color = base.color.getHex();
+      } else if (base.color && base.color.getHex) {
+        color = base.color.getHex();
+      } else if (base.uniforms) {
+        // ShaderMaterials (water, sky): pull the first colour-valued uniform.
+        const u = base.uniforms;
+        const pick = (u.uColor && u.uColor.value) || (u.diffuse && u.diffuse.value) || (u.color && u.color.value);
+        if (pick && pick.isColor) color = pick.getHex();
+        else for (const k in u) { const v = u[k] && u[k].value; if (v && v.isColor) { color = v.getHex(); break; } }
+      }
+      if (base.emissive && base.emissive.getHex) emissive = base.emissive.getHex();
+      if (typeof base.opacity === 'number') opacity = base.opacity;
+      transparent = !!base.transparent;
+    }
+    return { color, emissive, opacity, transparent };
+  }
+
+  function quickLookStandardMaterial(src, geom, cache) {
+    const { color, emissive, opacity, transparent } = quickLookResolveColors(src, geom);
+    const key = color + '|' + emissive + '|' + opacity + '|' + (transparent ? 1 : 0);
+    if (cache.has(key)) return cache.get(key);
+    const mat = new THREE.MeshStandardMaterial({
+      color: color,
+      emissive: emissive,
+      roughness: 0.9,
+      metalness: 0.0,
+      transparent: transparent,
+      opacity: opacity,
+      // Double-sided so single-sided board/wall faces don't read as holes when
+      // AR Quick Look's camera sees their back.
+      side: THREE.DoubleSide,
+    });
+    cache.set(key, mat);
+    return mat;
+  }
+
+  // Snapshot worldGroup into a fresh, self-contained group with USD-friendly
+  // materials, expanding InstancedMeshes (batched voxel builds / crops / fences,
+  // which the r128 exporter can't read) into individual meshes so nothing goes
+  // missing. Then recentre on the origin (base at y=0) and scale to a tabletop
+  // size. Source geometry is shared (not cloned) and never disposed; only the
+  // temporary Standard materials are ours to free afterwards.
+  const QUICKLOOK_MAX_MESHES = 24000; // safety cap so a huge world can't hang the export
+  function buildQuickLookExportRoot() {
+    if (typeof worldGroup === 'undefined' || !worldGroup) return null;
+    const root = new THREE.Group();
+    const matCache = new Map();
+    const instMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    let truncated = false;
+    worldGroup.updateMatrixWorld(true);
+    const addClone = (geom, mat, matrix) => {
+      const m = new THREE.Mesh(geom, mat);
+      matrix.decompose(m.position, m.quaternion, m.scale);
+      m.matrixAutoUpdate = false;
+      m.updateMatrix();
+      root.add(m);
+    };
+    worldGroup.traverse(obj => {
+      if (truncated || !obj.visible || !obj.isMesh) return;
+      const geom = obj.geometry;
+      if (!geom || !geom.attributes || !geom.attributes.position) return;
+      if (geom.attributes.position.isInterleavedBufferAttribute) return;
+      if (obj.userData && (obj.userData.ghostPreview || obj.userData.noPointerPick)) return;
+      const src = obj.material;
+      const baseForAlpha = Array.isArray(src) ? src[0] : src;
+      // Drop near-invisible helper overlays (selection hulls, faint holos, glow cones).
+      if (baseForAlpha && baseForAlpha.transparent && typeof baseForAlpha.opacity === 'number' && baseForAlpha.opacity < 0.2) return;
+      const mat = quickLookStandardMaterial(src, geom, matCache);
+      if (obj.isInstancedMesh) {
+        for (let i = 0; i < obj.count; i++) {
+          if (root.children.length >= QUICKLOOK_MAX_MESHES) { truncated = true; break; }
+          obj.getMatrixAt(i, instMatrix);
+          worldMatrix.multiplyMatrices(obj.matrixWorld, instMatrix);
+          addClone(geom, mat, worldMatrix);
+        }
+      } else {
+        if (root.children.length >= QUICKLOOK_MAX_MESHES) { truncated = true; return; }
+        addClone(geom, mat, obj.matrixWorld);
+      }
+    });
+    if (!root.children.length) return null;
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    if (box.isEmpty()) return null;
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    const span = Math.max(size.x, size.z) || 1;
+    const wrapper = new THREE.Group();
+    root.position.set(-center.x, -box.min.y, -center.z);          // centre horizontally, base on the surface
+    wrapper.add(root);
+    wrapper.scale.setScalar(QUICKLOOK_TARGET_SIZE / span);
+    wrapper.updateMatrixWorld(true);
+    wrapper.userData.__matCache = matCache;
+    wrapper.userData.__truncated = truncated;
+    return wrapper;
+  }
+
+  // Safari only treats <a rel="ar"> as an AR launcher when it wraps a single
+  // child (an <img>). A programmatic click then opens AR Quick Look in place.
+  function openARQuickLookAnchor(url) {
+    const anchor = document.createElement('a');
+    anchor.setAttribute('rel', 'ar');
+    anchor.href = url;
+    anchor.style.display = 'none';
+    const img = document.createElement('img');
+    img.decoding = 'async';
+    img.alt = '';
+    // 1x1 transparent gif so the anchor is a valid AR launcher without any flash.
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    anchor.appendChild(img);
+    document.body.appendChild(anchor);
+    anchor.click();
+    setTimeout(() => { try { document.body.removeChild(anchor); } catch (_) {} }, 1500);
+  }
+
+  async function launchARQuickLook() {
+    if (xrQuickLookBusy) return;
+    if (!THREE.USDZExporter) {
+      setXRStatus('AR export is unavailable (USDZ exporter failed to load).');
+      return;
+    }
+    xrQuickLookBusy = true;
+    if (xrQuickLookBtn) xrQuickLookBtn.disabled = true;
+    setXRStatus('Preparing your world for AR…');
+    let wrapper = null;
+    try {
+      wrapper = buildQuickLookExportRoot();
+      if (!wrapper) { setXRStatus('Nothing to place in AR yet — build some world first.'); return; }
+      const exporter = new THREE.USDZExporter();
+      const usdz = await exporter.parse(wrapper);
+      const blob = new Blob([usdz], { type: 'model/vnd.usdz+zip' });
+      const url = URL.createObjectURL(blob);
+      openARQuickLookAnchor(url);
+      setXRStatus(wrapper.userData.__truncated
+        ? 'Opening AR (large world — showing the first part). Point at a floor or table, tap to place, then walk around it.'
+        : 'Opening AR — point your device at a floor or table, tap to place, then walk around your world.');
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 60000);
+    } catch (err) {
+      console.error('AR Quick Look export failed:', err);
+      setXRStatus('Could not build the AR model: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    } finally {
+      if (wrapper && wrapper.userData.__matCache) {
+        wrapper.userData.__matCache.forEach(m => { try { m.dispose(); } catch (_) {} });
+      }
+      xrQuickLookBusy = false;
+      if (xrQuickLookBtn) xrQuickLookBtn.disabled = false;
+    }
+  }
+
   async function refreshXRSupportUI() {
     const xrPanel = document.getElementById('xr-panel');
     if (xrPanel) xrPanel.hidden = true;
 
+    // Apple AR Quick Look (iOS/iPadOS) is independent of WebXR — surface it
+    // even when navigator.xr is absent, which is the normal case on iOS.
+    const quickLook = supportsARQuickLook();
+    if (xrQuickLookBtn) xrQuickLookBtn.hidden = !quickLook;
+
     const hasXR = !!(navigator.xr && navigator.xr.isSessionSupported);
-    if (!hasXR) {
-      setXRStatus('WebXR unavailable: open over HTTPS in a compatible headset browser.');
-      setXRButtonsDisabled(true);
-      return;
-    }
+    const ar = hasXR && await isXRSupported('immersive-ar');
+    const vr = hasXR && await isXRSupported('immersive-vr');
 
-    const ar = await isXRSupported('immersive-ar');
-    const vr = await isXRSupported('immersive-vr');
+    // WebXR buttons only make sense with a WebXR runtime (Android Chrome,
+    // Quest, etc.). Hide them entirely where there is none so iOS users just
+    // see the single Apple AR button.
+    if (xrButtons.surface) { xrButtons.surface.hidden = !hasXR; xrButtons.surface.disabled = !ar; }
+    if (xrButtons.float) { xrButtons.float.hidden = !hasXR; xrButtons.float.disabled = !(ar || vr); }
+    if (xrButtons.inside) { xrButtons.inside.hidden = !hasXR; xrButtons.inside.disabled = !vr; }
 
-    const supported = ar || vr;
-
-    if (xrPanel) {
-      xrPanel.hidden = !supported;
-    }
-
-    if (xrButtons.surface) xrButtons.surface.disabled = !ar;
-    if (xrButtons.float) xrButtons.float.disabled = !(ar || vr);
-    if (xrButtons.inside) xrButtons.inside.disabled = !vr;
-
-    setXRStatus(supported
-      ? 'XR ready: AR desk pins the board to a surface; Float suspends it; Enter world scales it 1:1.'
-      : 'No immersive WebXR session is supported on this device.');
+    const anySupported = ar || vr || quickLook;
+    if (xrPanel) xrPanel.hidden = !anySupported;
+    // No persistent status on load — the buttons carry tooltips, and
+    // setXRStatus is reserved for active AR flows and errors.
   }
 
+  if (xrQuickLookBtn) xrQuickLookBtn.addEventListener('click', () => launchARQuickLook());
   if (xrButtons.surface) xrButtons.surface.addEventListener('click', () => startXRMode('surface'));
   if (xrButtons.float) xrButtons.float.addEventListener('click', () => startXRMode('float'));
   if (xrButtons.inside) xrButtons.inside.addEventListener('click', () => startXRMode('inside'));

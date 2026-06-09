@@ -627,6 +627,7 @@
   let crowdMode = localStorage.getItem(RENDER_LS.crowdMode) || 'wander';
   let crowdShowArrows = localStorage.getItem(RENDER_LS.crowdShowArrows) !== '0';
   let crowdEnabled = localStorage.getItem(RENDER_LS.crowdEnabled) !== '0';
+  let crowdRuntimeVisible = true;
   const crowdModelActorGroup = new THREE.Group();
   crowdModelActorGroup.name = 'crowd-model-actors';
   worldGroup.add(crowdModelActorGroup);
@@ -854,6 +855,18 @@
     setCrowdSpritesVisible(true);
   }
 
+  function setCrowdRuntimeVisible(visible) {
+    crowdRuntimeVisible = !!visible;
+    if (crowdLayer && crowdLayer.group) crowdLayer.group.visible = crowdRuntimeVisible;
+    crowdModelActorGroup.visible = crowdRuntimeVisible;
+    if (!crowdRuntimeVisible) {
+      clearCrowdModelActors();
+      setCrowdSpritesVisible(false);
+    } else {
+      setCrowdSpritesVisible(true);
+    }
+  }
+
   function makeCrowdModelActor(asset) {
     const cache = asset && modelStampAssetCache.get(asset.id);
     if (!cache || cache.state !== 'ready' || !cache.scene) return null;
@@ -897,6 +910,11 @@
   }
 
   function updateCrowdModelActors(dt) {
+    if (!crowdRuntimeVisible) {
+      clearCrowdModelActors();
+      setCrowdSpritesVisible(false);
+      return;
+    }
     ensureCrowdModelCharacterAssetsLoading();
     const asset = selectCrowdModelCharacterAsset();
     if (!crowdEnabled || !crowdLayer || !asset) {
@@ -1154,9 +1172,14 @@
       config: crowdConfigOverride(),
       worldConfig: crowdWorldConfigOverride(),
     });
+    if (crowdLayer.group) crowdLayer.group.visible = crowdRuntimeVisible;
     ensureCrowdModelCharacterAssetsLoading();
     crowdLayer.load().then(seedCrowdPeople).catch(err => {
       console.warn('[crowd] failed to load sprites', err);
     });
   }
 
+  window.__tinyworldCrowd = Object.assign(window.__tinyworldCrowd || {}, {
+    setRuntimeVisible: setCrowdRuntimeVisible,
+    runtimeVisible: () => crowdRuntimeVisible,
+  });

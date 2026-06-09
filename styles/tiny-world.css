@@ -9,6 +9,22 @@
   }
   .tw-pixel-font { font-family: 'Press Start 2P', 'Courier New', monospace; }
 
+  /* Self-hosted pixel display fonts (OFL) for the retro game UI. latin subset. */
+  @font-face {
+    font-family: 'Pixelify Sans';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('fonts/PixelifySans-latin.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Bitcount Single';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/BitcountSingle-latin.woff') format('woff');
+  }
+
   :root {
     --bg: #f4ede0;
     --panel: #ffffff;
@@ -458,7 +474,7 @@
     right: auto;
     bottom: auto;
     z-index: 12;
-    display: block;
+    display: none; /* hidden from main view (was: block) */
     line-height: 0;
     border-radius: 8px;
     overflow: hidden;
@@ -1196,6 +1212,30 @@
   }
 
   .xr-panel[hidden] {
+    display: none !important;
+  }
+
+  .xr-status {
+    position: fixed;
+    left: 74px;
+    bottom: 58px;
+    z-index: 16;
+    max-width: min(340px, calc(100vw - 90px));
+    margin: 0;
+    padding: 6px 11px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px -4px rgba(40, 50, 80, 0.18);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    pointer-events: none;
+  }
+
+  .xr-status[hidden] {
     display: none !important;
   }
 
@@ -2173,13 +2213,18 @@
     align-items: center;
     justify-content: center;
     gap: 1px;
-    font-family: inherit;
-    font-size: 10.5px;
+    font-family: 'Pixelify Sans', ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.02em;
     color: #8d887d;
     font-weight: 700;
     transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.08s;
     flex-shrink: 0;
     padding: 3px 3px 2px;
+  }
+  /* Pixel font across the toolbar chrome (group buttons, shortcut keys, brand title). */
+  .tool-group-btn, .tool kbd, .tool-group-btn > span, .toolbar .brand-title-btn {
+    font-family: 'Pixelify Sans', ui-monospace, 'SF Mono', Menlo, monospace !important;
   }
   .tool:hover {
     background: rgba(255, 255, 255, 0.55);
@@ -3818,6 +3863,7 @@
     justify-content: center;
     padding: 24px;
     background: rgba(20, 24, 40, 0.22);
+    overflow: auto;
   }
 
   :root {
@@ -7439,7 +7485,7 @@
   .welcome-logo {
     display: block;
     width: 100%;
-    max-height: min(62vh, 560px);
+    max-height: min(54vh, 500px);
     aspect-ratio: 1 / 1;
     object-fit: contain;
     border-radius: 20px;
@@ -7457,14 +7503,16 @@
     --welcome-outline: #2f3b57;
     --welcome-fill: rgba(255, 255, 255, 0.7);
     --welcome-bevel: rgba(47, 59, 87, 0.22);
-    min-height: 54px;
+    min-height: 52px;
     border: 1.5px solid var(--welcome-outline);
     border-radius: 16px;
     background: var(--welcome-fill);
     color: var(--welcome-outline);
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 900;
     letter-spacing: 0;
+    line-height: 1;
+    white-space: nowrap;
     cursor: pointer;
     outline: none;
     box-shadow:
@@ -7490,10 +7538,20 @@
       0 0 0 3px rgba(255, 255, 255, 0.86),
       0 0 0 6px rgba(23, 107, 235, 0.28);
   }
-  .welcome-build {
+  .welcome-tinyverse {
     --welcome-outline: #1e428a;
     --welcome-fill: rgba(23, 107, 235, 0.13);
     --welcome-bevel: rgba(30, 66, 138, 0.22);
+  }
+  .welcome-battleworlds {
+    --welcome-outline: #0e5f7e;
+    --welcome-fill: rgba(45, 215, 255, 0.15);
+    --welcome-bevel: rgba(14, 95, 126, 0.24);
+  }
+  .welcome-build {
+    --welcome-outline: #a05600;
+    --welcome-fill: rgba(254, 146, 14, 0.18);
+    --welcome-bevel: rgba(160, 86, 0, 0.24);
   }
   .welcome-play {
     --welcome-outline: #3a6511;
@@ -7550,14 +7608,14 @@
       border-radius: 22px;
     }
     .welcome-logo {
-      max-height: min(58vh, 420px);
+      max-height: min(46vh, 360px);
       border-radius: 16px;
     }
     .welcome-actions { gap: 10px; }
     .welcome-mode-btn {
       min-height: 48px;
       border-radius: 14px;
-      font-size: 16px;
+      font-size: 14px;
     }
     .welcome-credit {
       gap: 4px 8px;
@@ -8292,5 +8350,264 @@ body.flight-active { cursor: none; }
   font: 600 13px/1 system-ui, sans-serif;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* -------- right-side AI chat panel --------
+   This overrides the old floating bottom prompt/toast layout. The AI surface is
+   now a fixed right rail: transcript above, composer below, drop/attachment
+   chips inside the composer, with a left-edge resize grip and a compact rail
+   collapse state. */
+.agent-panel {
+  --agent-panel-width: 388px;
+  position: fixed;
+  top: 84px;
+  right: 18px;
+  bottom: 22px;
+  left: auto !important;
+  width: min(var(--agent-panel-width), calc(100vw - 36px));
+  min-width: 320px;
+  max-width: min(560px, calc(100vw - 36px));
+  height: auto;
+  max-height: none;
+  transform: none !important;
+  transform-origin: center right;
+  z-index: 32;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    width 0.18s ease,
+    min-width 0.18s ease,
+    border-radius 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.agent-panel-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.agent-panel-resizer::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  border-radius: 999px;
+  background: rgba(112, 130, 170, 0.18);
+  transition: background 0.12s;
+}
+.agent-panel-resizer::before {
+  content: '⋮';
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(84, 96, 122, 0.52);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -3px;
+  line-height: 1;
+  pointer-events: none;
+}
+.agent-panel-resizer:hover::after,
+.agent-panel.resizing .agent-panel-resizer::after {
+  background: rgba(112, 130, 170, 0.62);
+}
+.agent-panel-resizer:hover::before,
+.agent-panel.resizing .agent-panel-resizer::before {
+  color: rgba(55, 68, 95, 0.78);
+}
+.agent-panel-head {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 10px 12px 10px 16px;
+}
+.agent-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-panel-clear,
+.agent-panel-toggle {
+  flex: 0 0 auto;
+}
+.agent-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px;
+  gap: 10px;
+}
+.agent-msg {
+  max-width: 92%;
+  font-size: 12.75px;
+}
+.agent-msg.user {
+  align-self: flex-end;
+  margin-left: 34px;
+}
+.agent-msg.assistant,
+.agent-msg.error {
+  align-self: flex-start;
+  margin-right: 34px;
+}
+.agent-input {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: auto;
+  width: auto !important;
+  margin: 0 10px 10px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  grid-template-columns: 34px minmax(0, 1fr) 40px;
+  align-items: end;
+}
+.agent-input.conversation-open {
+  border-radius: 18px;
+}
+.agent-input.has-target {
+  width: auto !important;
+  grid-template-columns: 34px minmax(86px, 128px) minmax(0, 1fr) 40px;
+}
+.agent-grip {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+.agent-grip:hover {
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+}
+.agent-input input {
+  min-height: 34px;
+}
+.agent-suggestions {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  justify-content: flex-start;
+  grid-column: 1 / -1;
+  padding: 0 4px 2px;
+}
+.agent-attachments {
+  grid-column: 1 / -1;
+  padding: 0 4px 2px;
+}
+.agent-panel.drop-hot,
+.agent-input.drop-hot {
+  outline-offset: -4px;
+}
+body.tool-flyout-open .agent-input {
+  transform: none !important;
+}
+.agent-panel.collapsed {
+  top: 96px;
+  bottom: auto;
+  right: 14px;
+  width: 52px !important;
+  min-width: 52px;
+  max-width: 52px;
+  height: 152px;
+  max-height: 152px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.agent-panel.collapsed .agent-panel-resizer,
+.agent-panel.collapsed .agent-selection-preview,
+.agent-panel.collapsed .agent-messages,
+.agent-panel.collapsed .agent-input,
+.agent-panel.collapsed .agent-panel-clear,
+.agent-panel.collapsed #agent-panel-title {
+  display: none !important;
+}
+.agent-panel.collapsed .agent-panel-head {
+  display: flex !important;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  border-bottom: 0;
+  align-items: center;
+  justify-content: center;
+}
+.agent-panel.collapsed .agent-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.agent-panel.collapsed .agent-panel-toggle {
+  width: 36px;
+  height: 120px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+body.ui-theme-dark .agent-panel {
+  background: rgba(17, 20, 30, 0.74) !important;
+  border-color: rgba(235, 241, 250, 0.18) !important;
+}
+body.ui-theme-dark .agent-input,
+body.ui-theme-dark .agent-grip,
+body.ui-theme-dark .agent-panel-toggle,
+body.ui-theme-dark .agent-panel-clear {
+  color: #f4f7ff !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+body.ui-theme-dark .agent-grip:hover,
+body.ui-theme-dark .agent-panel-toggle:hover,
+body.ui-theme-dark .agent-panel-clear:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+@media (max-width: 900px) {
+  .agent-panel {
+    left: 12px !important;
+    right: 12px;
+    top: auto;
+    bottom: 82px;
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    height: min(56vh, 520px);
+  }
+  .agent-panel-resizer { display: none; }
+  .agent-panel.collapsed {
+    left: auto !important;
+    right: 12px;
+    top: auto;
+    bottom: 94px;
+    width: 132px !important;
+    min-width: 132px;
+    max-width: 132px;
+    height: 52px;
+    max-height: 52px;
+  }
+  .agent-panel.collapsed .agent-panel-toggle {
+    width: 110px;
+    height: 34px;
+    writing-mode: horizontal-tb;
+  }
+  .agent-input.has-target {
+    grid-template-columns: 34px minmax(82px, 112px) minmax(0, 1fr) 40px;
+  }
 }
 .flight-menu-btn:hover { background: #d96148; }

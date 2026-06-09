@@ -1,12 +1,12 @@
 # CodeSurf Workspace Memory — tinyworld
 
-Generated: 2026-06-06
+Generated: 2026-06-09
 
 ---
 
 ## Overview
 
-Tiny World Builder is a vanilla ES6, no-bundler 3D world editor built on Three.js r128. The app shell lives in `tiny-world-builder.html` (~1.4k lines); business logic is split across 48 ordered modules under `engine/world/` (00–44 + 09b + 99-late-boot.js + `flight-combat-math.mjs` as an ES module), plus `engine/landscape/`. Total JS is approximately 40k+ lines. Deployed via Vercel and Netlify from `dist/` produced by `publish.sh`.
+Tiny World Builder is a vanilla ES6, no-bundler 3D world editor built on Three.js r128. The app shell lives in `tiny-world-builder.html` (~1.4k lines); business logic is split across 53+ `.js` modules under `engine/world/` plus `flight-combat-math.mjs` (ES module companion). Styles in `styles/tiny-world.css` (~5.2k lines). Deployed via Vercel and Netlify from `dist/` produced by `publish.sh`.
 
 ---
 
@@ -14,130 +14,71 @@ Tiny World Builder is a vanilla ES6, no-bundler 3D world editor built on Three.j
 
 **Architecture**
 - Primary file: `tiny-world-builder.html` — HTML shell, boot config, ordered `<script src>` tags only
-- Engine modules: 48 JS files total — numbered 00–44 + 09b + 99-late-boot.js + `flight-combat-math.mjs` (ES module, not a classic script); all classic scripts share one global scope
+- Engine modules: 53 numbered `.js` files sharing one global scope + `flight-combat-math.mjs` (ES module, not a classic script)
+- Two modules share the `46-` prefix: `46-mesh-terrain.js` and `46-worlds-universe.js` — load order between them not yet formally documented
 - Duplicate top-level identifiers silently kill the declaring module without affecting others; prefix module-local scratch globals (e.g. `_fl…` for flight)
-- Skills on disk: 20 `.codex/skills/` directories — 19 `tinyworld-*` plus `threejs-primitive-reconstructor`; both `threejs-primitive-reconstructor` and `tinyworld-ghost-world-gen` are on disk but absent from AGENTS.md routing
-- Three.js pinned to r128; materials in `M.*` are shared — clone before mutating color
+- Three.js pinned to r128; `MeshLambertMaterial`, `ExtrudeGeometry`, shadows assume r128 semantics
+- Materials in `M.*` are shared across meshes — clone before mutating color; `disposeGroup` disposes geometries but not materials
+- `setCell(x, z, opts)` is the only sanctioned way to mutate world state; never write `world[x][z]` directly outside init
+- No bundler, no npm runtime dependencies; `npm test` for static checks, `npm run build` (`./publish.sh`) for dist
+- Netlify dev runs on port 8888; `NETLIFY_DATABASE_URL` must point to local `tinyworld` Postgres database
 
-**Module reference (key additions as of 2026-06-05)**
+**Module reference — modules 34 and above**
+- `34-flight-sim.js` — flyable plane via existing `stunt-plane` model-stamp; click-to-Enter/Fly, rear chase-cam, Escape exits; `flight-combat-math.mjs` is its companion
 - `38-multiplayer-partykit.js` — multiplayer via PartyKit
-- `39-atmosphere-effects.js` — atmosphere/day-night effects (time-progression not yet wired)
-- `40-shield-system.js` — shield system
-- `41-flight-combat.js` — flight combat; `flight-combat-math.mjs` is the companion ES module
-- `42-account-wallet-players.js` — account/JWT/cloud-save (subscription system removed 2026-05-31)
-- `43-drag-drop-import.js` — GLB/model drag-drop import pipeline
-- `44-sub-object-edit.js` — part-level selection, hover hulls, transform delegation for voxel objects
+- `39-atmosphere-effects.js` — atmosphere/day-night effects; time-progression not yet wired to any UI
+- `40-shield-system.js` / `41-flight-combat.js` — shield and combat systems
+- `42-account-wallet-players.js` — JWT/cloud-save; subscription system fully removed 2026-05-31
+- `43-drag-drop-import.js` — GLB/FBX/OBJ/VOX/VDB drag-drop pipeline
+- `44-sub-object-edit.js` — part-level selection, hover hulls, transform delegation
+- `45-shader-fx.js` — `window.TinyShaderFX`; GLSL effects (water, waterfalls, foam, smoke, explosions, wear overlay via `onBeforeCompile`)
+- `46-mesh-terrain.js` — opt-in voxel-block landscape sculptor; persists under `tinyworld:meshTerrain:*`; no `setCell` bake
+- `46-worlds-universe.js` — Worlds MMO universe map, world buying (USDC), world management/publish; hands off to 47/48
+- `47-worlds-room.js` — Worlds MMO room client (PartyKit `world-<slug>`); sprite system uses `Without_shadow` sheets; movement sectors → front/right/back/left facing rows (no fake mirroring); exposes `WS.enterRoom/leaveRoom/harvest/setAvatarClass`
+- `48-worlds-harvest-hud.js` — Worlds MMO in-world HUD (hearts, resources, harvest actions, cooldowns, reward popups); SVG glyphs only; chat reuses existing mp-chat panel
+- `49-worlds-avatar-picker.js` — avatar picker gallery; drives `WS.setAvatarClass`; extensible via `WS.registerAvatarProvider` for future `@open-pets/client` pets
 
-**Wallet / cloud-save (subscription system removed 2026-05-31)**
-- Subscription tiers, upgrade prompts, paywall gate, premium flags, and `SUBSCRIPTION_TIER` global removed from engine and prelude
-- Only neutral JWT save/load and anonymous fallback remain; wallet status text is "Account cloud unavailable"
-
-**Island side faces / strata**
-- `13-distant-dressing-ghost.js` — `M.boardSideEdge` applied directly on all four full-height side faces
-- `textures/island-side-strata-gpt.png` (1024×192) loaded as `CanvasTexture` with shadow-lift processing and shader clamp; stone/castle masonry block sizing, colors, UV scale refined
-
-**Island warp-in arrival (shipped 2026-06-05, ccf8a49)**
-- `startEditableIslandWarpArrival` / `tickEditableIslandWarpArrivals` in `14-editable-islands-moorings.js`
-- Blue/white streak → ring/flash → overshoot → settle; runs after LOD updates; skipped when `skipSave` set
-- Tests in `tools/check.js`; documented in `tinyworld-island-and-planes` SKILL.md
-
-**Default world (a8ce7f9)**
-- `default_island.json` is the default world on fresh session and Reset; procedural fallback if file is missing
-
-**Cloud sea render order (verified 2026-06-02)**
-- `31-cloud-sea.js` — `renderOrder = 18`, depth test on; enforced by `tools/check.js` guard; do not revert
-
-**Terrain adjacency**
-- Stone and path are one `sameTerrainEdgeFamily`; no border bricks/risers between adjacent stone/path cells
+**Worlds MMO namespace**
+- `window.__tinyworldWorlds` (alias `WS`) shared across all four Worlds modules (46-universe, 47-room, 48-hud, 49-picker); all four are IIFE-wrapped — no top-level globals leak
 
 ---
 
-## Shipped Features (2026-06-04/05)
+## Shipped Features
 
-**Sub-object editing (module 44)**
-- Part overrides support `rx/ry/rz` rotations; gizmo delegates to `window.__tinyworldSubEdit` when active
-- Layers panel shows part rows; radial secondary menu: Explode / Move / Scale / Recolor
-- Gated off in Play mode; voxel-builds only
-- Trees are editable via generic `part:N` keying; un-batches when editing, re-batches on exit
+**Welcome dialog 4-mode rewrite (2026-06-09)**
+- `tiny-world-builder.html` line 765: four mode buttons added in order — Tinyverse, Battleworlds, Build, Play
+- `engine/world/30-ui-boot-wiring.js` line 5: wiring — Tinyverse opens the Worlds overlay; Build/Play use existing mode API; Battleworlds calls `window.__tinyworldBattleworlds.open()` if it exists
+- `window.__tinyworldBattleworlds` namespace referenced but no dedicated module confirmed yet; guard on `.open()` existence suggests it may be a future or optional module
 
-**Build / Play mode toggle**
-- `window.__tinyworldIsPlayMode()` / `window.__tinyworldMode`; persisted under `BUILD_PLAY_LS`
-- Play mode gates: place/erase, shortcuts, `mpEditAllowed`, hover-terrain, sub-edit
-- `document.body.classList` gains `tw-play-mode`; implemented in `30-ui-boot-wiring.js`
+**Voxel window interior-mapping glass (2026-06-06, PRs #24–#29)**
+- `M.windowInterior` — `ShaderMaterial` parallax interior; per-pane uniforms `uTint/uDark/uBright/uReflect/uInteriorBright/uLit`
+- Global config `window.__tinyworldWindow`; `setActiveWindowOverride` / `_activeWindowOverride`; `windowGlassRatio(override)`
+- Settings → Materials → "Building windows"; per-object inspector controls; interior panes excluded from batcher
+- Window frame occlusion and steep-angle ortho interior fix landed (f307e05)
 
-**Model stamp persistence (IndexedDB)**
-- User-dropped GLBs persist via `persistDroppedModelStampAssets` in `09-model-stamp-loader.js`; restored on boot
-- `applyPersistedMaterialSettingsOnBoot()` in `04-textures.js` wired into `99-late-boot.js`
-
-**PBR → Lambert material adaptation**
-- `MeshStandardMaterial`/`MeshPhysicalMaterial` GLBs converted to `MeshLambertMaterial` with TinyWorld lighting
-- Samples texture encoding, drops broken AO/normal maps, preserves base maps/vertex colors/emissive/skinning
-- Import safety lights added to `02-cameras-lighting.js`
-
-**UI polish**
-- `assets/twlogo-wordmark.png` / `assets/twlogo.png` replace textual brand
-- Showcase exit: icon-only circular X button (ARIA-labeled, Escape shortcut)
-- Escape sequence: exit sub-edit → clear selection → disarm hot tool
+**Model stamp import formats**
+- `glb/gltf` (primary), `fbx` (`FBXLoader.r128.js`), `vox` (MagicaVoxel), `obj` (rainbow fallback), `vdb` (`VDBLoader.r128.js`; `vdbGridSpec()` + `vdbToMesh()`; frame sequence auto-detection via `vdbSequenceKey()`)
 
 ---
 
-## Object Palette
+## Active Workflows
 
-**Terrain (10):** grass, sand, water, snow, lava, stone, dark stone, dirt, wood, ice
+**Boot sequence pattern (CodeSurf sessions)**
+- `mcp__contex__peer_set_state` then `mcp__contex__peer_get_state` must be called before any work; Contex MCP tools may be absent in Codex sub-sessions (gracefully skip)
+- Edits auto-commit to main and Netlify prod deploys immediately — branches do not guarantee isolation
 
-**Objects (60+):** houses, trees, mountains, fences, roads; vehicles (car, boat, submarine); ferris wheel (0.5 rpm, `userData.ferrisWheelGroup`); landmarks (lighthouse, castle, ruins, volcano, observatory, radio tower); energy (solar panel array); air (hot air balloon, airship); windmill; baseball diamond, horse racetrack; characters (Explorer, Merchant, Scholar, Wizard, Warrior, Knight)
-
-**Stamps:** only `stunt_plane.glb` remains in `models/` — `treasure_chest.glb` removed with legacy demo assets (6db8afa). Stunt-plane is the canonical flyable plane. User-dropped GLBs persist via IndexedDB.
-
-**AI Agents tab:** 6 pre-made agents (Aria, Nova, Sage, Rex, Luna, Byte); stationary — no pathfinding system.
-
----
-
-## Memory Constraints
-
-- No emoji in any UI, code, or output
-- Reuse existing components; never reimplement
-- Verify UI/interactions in the real app, not synthetic events
-- Verify 3D correctness via positions/bbox/ray-math, not screenshots
-- SVG glyphs only — no PNG baked-icon system
-- CodeSurf auto-commits and auto-pushes to main → Netlify prod; branches do not guarantee isolation
-- Only HEAVY (rocket) engines have plume/glow; lift/turbo are propeller-only; plume must stay frustum-visible
-- Stone/path are one edge family — no bricks/risers between adjacent stone/path cells
-- `okKind` in `26-ai-generation.js` MUST include `model-stamp` and `blank-island`; do not adopt the fork's trimmed version
-
----
-
-## Fork Improvements Report (`fork-improvements-report.md`, dated 2026-06-04)
-
-Two forks were ahead of upstream: `limudim972/main` (+168 commits) and `yuxiaoli/develop` (+5 commits).
-
-**Recommended to lift (status: liftable):**
-- Schema validation in `validateWorld()` — add per-cell `extras`/`transform` + landscape field checks in `26-ai-generation.js`; small effort; destructuring in both tuple and object paths must be updated
-- `?world=` URL param world loading (inline JSON + remote fetch) — `29-persistence-api.js` + `30-ui-boot-wiring.js`; medium effort
-- `touch-action: none` on `.minimap-wrap` — trivial CSS fix in `styles/tiny-world.css` (~line 2814)
-- `publish.sh` copy `data/` into `dist/data` — trivial
-
-**Needs investigation before lifting:**
-- Crowd walk-trail stroke renderer + visibility toggle (`17`, `25`, `11`)
-- Crop-duster/banner camera-relative flight refactor (`24`)
-- Ambient route anti-repeat/anti-loop concept (`11`)
-- House-edit long-press vs repeat-click floor removal (`20`)
-- Center modals vertically — trivial CSS
-- CRLF normalize in `tools/check.js`
-
-**Do not lift:**
-- House-aware crowd routing subsystem (~1900 lines) — architecturally incompatible with path-cell-only ambient crowd
-- Mobile toolbar redesign (hamburger/grid)
-- Any fork change that removes `model-stamp` from `okKind`
+**UI wiring convention**
+- New top-level mode entry points go through `30-ui-boot-wiring.js`; keep the boot file thin (delegation only, not logic)
 
 ---
 
 ## Open Threads
 
-- AGENTS.md routing section lists skills but modules 38–44 have no corresponding skill routing entries — stale
-- `tinyworld-ghost-world-gen` and `threejs-primitive-reconstructor` skills on disk, not routed in AGENTS.md
-- `fork-improvements-report.md` — four liftable items (schema validation, URL param world load, minimap touch-action, publish data copy) not yet applied
-- `.claude/workflows/split-god-file.js` (~16k chars, dated 2026-06-04) — workflow script for splitting the old god-file; purpose/active status unconfirmed
-- Blast door concept — waiting on user mockup; no code yet
-- Day/night cycle — `39-atmosphere-effects.js` exists, no time-progression wired
-- NPC/agent pathfinding — Characters and AI Agents are stationary; no movement system
+- `window.__tinyworldBattleworlds` referenced from `30-ui-boot-wiring.js` but no corresponding module confirmed; guard is in place but the system may be a stub or future module
+- AGENTS.md skill routing stale: modules 38–45, `46-worlds-universe`, `47-worlds-room`, `48-worlds-harvest-hud`, `49-worlds-avatar-picker` have no `.codex/skills/` routing entries
+- `tinyworld-ghost-world-gen` and `threejs-primitive-reconstructor` skills exist on disk but absent from AGENTS.md routing
+- Four liftable fork items remain unapplied: schema validation, URL param world loading, minimap touch-action, `publish.sh` data copy
+- `39-atmosphere-effects.js` — day-night time-progression not wired to any UI control
+- Window interior system has no `.codex/skills/` entry yet
+- `49-worlds-avatar-picker.js` planned `@open-pets/client` provider integration not yet started
+- OpenClaw gateway agent (`mc-gateway-894a3d5b`) is failing every heartbeat with connection refused — may need env/port check

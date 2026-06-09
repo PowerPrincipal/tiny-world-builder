@@ -58,9 +58,11 @@ many tiny greebles each round), so keep bevel modest. The **distant ghost-island
 dressing** (tiny far preview islands) intentionally stays `noBevel` for perf.
 
 Island shell materials (`M.boardSide`, `M.boardSideEdge`, `M.islandUnder`,
-`M.islandUnderD`) opt into the world-UV shader pass in `04-textures.js`. Side
-faces use the internal `island-side-blocks` texture for large pale stone
-squares, while underside materials use
+`M.islandUnderD`) opt into the world-UV shader pass in `04-textures.js`.
+Grass tile risers use `M.boardSide` and should read as dirt/soil directly under
+the grass cap, not rock; keep that material on the `soil-side` texture family.
+The dedicated strata side backing (`M.boardSideEdge`) can still show deeper
+soil-to-rock banding lower down, while underside materials use
 `textures/island-underside-voxel.png` (`texIslandUndersideVoxel`) so the bottom
 reads as larger dark beveled voxel blocks; keep replacement shell art seamless
 and power-of-two because Three.js r128 repeats it with mipmaps. The shader pass

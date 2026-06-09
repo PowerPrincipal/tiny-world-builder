@@ -328,7 +328,7 @@
       }
     } else if (terrain === 'path') {
       const runsX = !!(pathN && (pathN.e || pathN.w) && !(pathN.n || pathN.s));
-      addBucket(M.pathScuff, rutGeo, 2, (i, d) => {
+      addBucket(terrainShadeMaterial(M.pathTrim, -12), rutGeo, 2, (i, d) => {
         const offset = (i ? 1 : -1) * (0.13 + cellRand(x + i, z - i, 505) * 0.045);
         if (runsX) {
           d.position.set(0, y + 0.005, offset);
@@ -345,12 +345,6 @@
         d.position.set(px, y + 0.004, pz);
         d.rotation.set(0, (cellRand(x + i, z, 520) > 0.5 ? Math.PI / 2 : 0), 0);
         d.scale.set(0.75 + cellRand(x, z + i, 530) * 0.45, 1, 0.85);
-      });
-      addBucket(M.pathScuff, pebbleGeo, 4, (i, d) => {
-        const [px, pz] = scatter(i, 540, 0.10);
-        d.position.set(px, y + 0.008, pz);
-        d.rotation.set(0, cellRand(x - i, z, 550) * Math.PI, 0);
-        d.scale.set(0.80, 1, 0.80);
       });
       if (wear > 0.02) {
         addBucket(M.wearChip, grimeGeo, Math.max(1, Math.round(wear * 5)), (i, d) => {

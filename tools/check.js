@@ -15,7 +15,6 @@ const htmlRaw = fs.readFileSync(htmlPath, 'utf8');
 const cssRaw = fs.readFileSync(cssPath, 'utf8');
 const publishRaw = fs.existsSync(publishPath) ? fs.readFileSync(publishPath, 'utf8') : '';
 const defaultsPath = path.join(root, 'tinyworld-defaults.json');
-const islandSideStrataPath = path.join(root, 'textures', 'island-side-strata-gpt.png');
 
 // The app was split out of the old single-file HTML into external <script src>
 // modules (LandscapeEngine.js + engine/**/*.js). The DOM markup still lives in
@@ -330,36 +329,25 @@ if (!/id="render-material-target"/.test(html) || !/id="render-material-texture"/
 if (!/textures\/HJCliEjbEAA9Ah2\.jpeg/.test(html) || !/dist\/textures/.test(fs.readFileSync(path.join(root, 'publish.sh'), 'utf8'))) {
   fail('texture-folder material assets must be referenced by the app and copied to dist/textures');
 }
-if (!fs.existsSync(islandSideStrataPath)) {
-  fail('island side edge strata must use the generated GPT texture asset');
-}
-{
-  const dims = pngDimensions(islandSideStrataPath);
-  if (!dims || dims.width !== 1024 || dims.height !== 192) {
-    fail('island side edge strata texture must stay exactly 1024x192');
-  }
-  const brown = pngBrownBandAverage(islandSideStrataPath);
-  if (!brown || brown.count < 80000 || brown.r > 124 || brown.r < 96 || brown.g > 78 || brown.g < 54 || brown.b < 28 || brown.b > 48) {
-    fail('island side edge strata brown band must match the darker soil-side greeble palette');
-  }
-}
-const islandSideStrataImageBody = sourceFunctionBody(html, 'createIslandSideStrataImageTexture');
-if (!/createIslandSideStrataImageTexture\('textures\/island-side-strata-gpt\.png'\)/.test(html) || !/new THREE\.CanvasTexture\(canvas\)/.test(islandSideStrataImageBody) || !/tex\.wrapS = THREE\.RepeatWrapping/.test(islandSideStrataImageBody) || !/tex\.wrapT = THREE\.ClampToEdgeWrapping/.test(islandSideStrataImageBody) || !/liftStrataCanvasShadows/.test(islandSideStrataImageBody)) {
-  fail('island side edge strata must load the generated image through a canvas texture with repeat-X/clamp-Y wrapping and a shadow floor');
-}
 const islandShellMaterialBody = sourceFunctionBody(html, 'syncIslandShellMaterial');
 if (!/baseMat\.isShaderMaterial/.test(islandShellMaterialBody) || !/shellMat\.uniforms = baseMat\.uniforms/.test(islandShellMaterialBody) || !/shellMat\.vertexShader = baseMat\.vertexShader/.test(islandShellMaterialBody)) {
   fail('island shell material clones must preserve ShaderMaterial uniforms and shader source');
 }
 const islandStrataShaderBody = sourceFunctionBody(html, 'makeIslandSideStrataMaterial');
-if (!/col = max\(col, vec3\(0\.18, 0\.16, 0\.12\)\)/.test(islandStrataShaderBody)) {
-  fail('island side edge shader must keep a brightness floor so generated textures cannot render black');
+if (!/twStrataHash/.test(islandStrataShaderBody) || !/grassMask/.test(islandStrataShaderBody) || !/dirtToRock/.test(islandStrataShaderBody) || !/rockMask/.test(islandStrataShaderBody)) {
+  fail('island side edge shader must procedurally mix grass, dirt, and noisy rock strata');
+}
+if (/uniform sampler2D uMap/.test(islandStrataShaderBody) || /texture2D\(uMap/.test(islandStrataShaderBody) || /uRepeatWidth/.test(islandStrataShaderBody)) {
+  fail('island side edge shader must not sample the old brick-like strata image');
+}
+if (!/col = max\(col, vec3\(0\.14, 0\.13, 0\.11\)\)/.test(islandStrataShaderBody)) {
+  fail('island side edge shader must keep a brightness floor so procedural rock cannot render black');
 }
 if (!/const ISLAND_SIDE_STRATA_TOP_OVERLAP = 0\.075/.test(html) || !/const ISLAND_SIDE_STRATA_RENDER_TOP_Y = ISLAND_SIDE_STRATA_TOP_Y \+ ISLAND_SIDE_STRATA_TOP_OVERLAP/.test(html) || !/const ISLAND_SIDE_STRATA_RENDER_HEIGHT = ISLAND_SIDE_STRATA_HEIGHT \+ ISLAND_SIDE_STRATA_TOP_OVERLAP/.test(html)) {
   fail('island side edge strata must define a raised render top and full render height for the texture carrier');
 }
-if (!/uTopY: \{ value: ISLAND_SIDE_STRATA_RENDER_TOP_Y \}/.test(islandStrataShaderBody) || !/uHeight: \{ value: ISLAND_SIDE_STRATA_RENDER_HEIGHT \}/.test(islandStrataShaderBody) || !/uRepeatWidth: \{ value: ISLAND_SIDE_STRATA_RENDER_HEIGHT \* ISLAND_SIDE_STRATA_TEXTURE_ASPECT \}/.test(islandStrataShaderBody)) {
-  fail('island side edge shader must sample from the raised carrier top so the side texture meets the grass cap');
+if (!/uTopY: \{ value: ISLAND_SIDE_STRATA_RENDER_TOP_Y \}/.test(islandStrataShaderBody) || !/uHeight: \{ value: ISLAND_SIDE_STRATA_RENDER_HEIGHT \}/.test(islandStrataShaderBody)) {
+  fail('island side edge shader must sample from the raised carrier top so the side strata meets the grass cap');
 }
 // The page hard-depends on its external stylesheet. A build that does not copy
 // styles/ into dist deploys an unstyled page (CSS 404 served as text/html), so
@@ -595,12 +583,12 @@ if (!shippedCamera || !shippedCamera.target || shippedCamera.target.x !== 0 || s
 if (!/const RENDER_SETTINGS_VERSION = '24'/.test(html) || !/resolution:\s*'0\.75'/.test(html) || !/brightness:\s*'0\.80'/.test(html) || !/tiltBlur:\s*'10\.5'/.test(html)) {
   fail('hard-coded render defaults must match the shipped v24 defaults');
 }
-if (!/<div id="welcome-modal" class="modal launch-modal" hidden aria-hidden="true">[\s\S]*<img class="welcome-logo" src="assets\/twlogo\.png" alt="Tiny World Builder"[\s\S]*id="welcome-build"[^>]*>BUILD<\/button>[\s\S]*id="welcome-play"[^>]*>PLAY<\/button>[\s\S]*class="welcome-credit"[\s\S]*Created by Jason Kneen[\s\S]*https:\/\/x\.com\/jasonkneen[\s\S]*@jasonkneen[\s\S]*https:\/\/x\.com\/tinyworldsapp[\s\S]*@tinyworldsapp/.test(htmlRaw)) {
-  fail('welcome launcher must render the Tiny World logo, BUILD/PLAY buttons, creator credit, and social links');
+if (!/<div id="welcome-modal" class="modal launch-modal" hidden aria-hidden="true">[\s\S]*<img class="welcome-logo" src="assets\/twlogo\.png" alt="Tiny World Builder"[\s\S]*id="welcome-tinyverse"[^>]*>Tinyverse<\/button>[\s\S]*id="welcome-battleworlds"[^>]*>Battleworlds<\/button>[\s\S]*id="welcome-build"[^>]*>Build<\/button>[\s\S]*id="welcome-play"[^>]*>Play<\/button>[\s\S]*class="welcome-credit"[\s\S]*Created by Jason Kneen[\s\S]*https:\/\/x\.com\/jasonkneen[\s\S]*@jasonkneen[\s\S]*https:\/\/x\.com\/tinyworldsapp[\s\S]*@tinyworldsapp/.test(htmlRaw)) {
+  fail('welcome launcher must render the Tiny World logo, Tinyverse/Battleworlds/Build/Play buttons, creator credit, and social links');
 }
 const welcomeDialogBody = sourceFunctionBody(html, 'initWelcomeDialog');
-if (!/modal\.hidden = false;/.test(welcomeDialogBody) || !/welcome-launch-open/.test(welcomeDialogBody) || !/__tinyworldMode/.test(welcomeDialogBody) || !/chooseWelcomeMode\('build'\)/.test(welcomeDialogBody) || !/chooseWelcomeMode\('play'\)/.test(welcomeDialogBody)) {
-  fail('welcome launcher must open at boot and route choices through Build/Play mode');
+if (!/modal\.hidden = false;/.test(welcomeDialogBody) || !/welcome-launch-open/.test(welcomeDialogBody) || !/__tinyworldMode/.test(welcomeDialogBody) || !/__tinyworldWorlds/.test(welcomeDialogBody) || !/__tinyworldBattleworlds/.test(welcomeDialogBody) || !/chooseWelcomeMode\('build'\)/.test(welcomeDialogBody) || !/chooseWelcomeMode\('play'\)/.test(welcomeDialogBody)) {
+  fail('welcome launcher must open at boot and route choices through Tinyverse/Battleworlds/Build/Play mode');
 }
 if (!/\.launch-modal\s*\{[\s\S]*align-items:\s*center/.test(cssRaw) || !/\.welcome-logo\s*\{[\s\S]*border-radius:\s*20px/.test(cssRaw) || !/\.welcome-mode-btn\s*\{[\s\S]*border:\s*1\.5px solid var\(--welcome-outline\)/.test(cssRaw) || !/\.welcome-credit\s*\{[\s\S]*justify-content:\s*center/.test(cssRaw)) {
   fail('welcome launcher must be a centered rounded logo dialog with block-style mode buttons and footer credit');
@@ -869,10 +857,10 @@ for (const [section, ids] of Object.entries(settingsControlGroups)) {
 
 if (!externalSchema.properties || !externalSchema.properties.gridSize) fail('schema missing gridSize contract');
 const gridSizeEnum = externalSchema.properties.gridSize.enum || [];
-if (JSON.stringify(gridSizeEnum) !== JSON.stringify([8, 12, 16, 20])) {
+if (JSON.stringify(gridSizeEnum) !== JSON.stringify([8, 10, 12, 16, 20])) {
   fail('gridSize enum must stay capped at 20');
 }
-if (!/const HOME_GRID_MAX = 20;/.test(html) || !/const HOME_GRID_OPTIONS = \[8, 12, 16, 20\];/.test(html)) {
+if (!/const HOME_GRID_MAX = 20;/.test(html) || !/const HOME_GRID_OPTIONS = \[8, 10, 12, 16, 20\];/.test(html)) {
   fail('home grid constants must stay capped at 20');
 }
 const homeGridResizeBody = sourceFunctionBody(html, 'setHomeGridSize');

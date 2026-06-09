@@ -123,6 +123,12 @@ The existing minimap implementation (`clampMinimapPosition` /
 reference pattern. Minimap collapse must shrink in place; do not use a
 `translateX(...)` trick that pushes the map outside the viewport.
 
+The AI chat panel is a fixed right-side rail, not a draggable bottom prompt.
+Persist only width/collapse state under `tinyworld:agent:panel-pos` (the `-pos`
+suffix keeps it out of shipped defaults). Do not restore absolute `left/top`
+coordinates for the AI chat; it should stay anchored to the right edge, with a
+left-edge resize grip and a compact collapsed rail.
+
 ## Audio system
 
 Two layers:
@@ -169,7 +175,11 @@ defaults — sets the welcome shot for new users.
 
 - `tinyworld:features:cluso` — legacy Cluso flag. The in-page Cluso embed has
   been removed, and no app runtime path reads this key.
-- `tinyworld:features:ai` — AI panel.
+- `tinyworld:features:ai` — AI panel. AI surfaces (`[data-ai-interface]`) are
+  hidden on prod via `html.ai-disabled`, enabled by local host / `?ai=1` / this
+  flag. Additionally, signed-in accounts whose email is in `AI_ACCOUNT_ALLOWLIST`
+  (in `30-ui-boot-wiring.js`) unlock AI live on login (`applyAccountAiEntitlement`)
+  and revert on logout — tied to the account, not persisted to this key.
 - `tinyworld:features:model-stamp-api` — stamp-defaults dev endpoint.
 
 ## Inline `<script>` gotcha (read this!)

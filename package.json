@@ -11,6 +11,7 @@
     "i18n:report": "node tools/i18n-check.js --report",
     "smoke": "node tools/smoke-static.js",
     "perf": "node tools/perf-probe.js",
+    "db:local": "tools/db-local.sh",
     "party:dev": "partykit dev party/index.js --port 1999",
     "dev:party": "partykit dev party/index.js --port 1999",
     "demo:vehicles": "node plugins/examples/vehicle-road-demo.js",
@@ -31,6 +32,7 @@
   "dependencies": {
     "@netlify/database": "^1.0.0",
     "@netlify/identity": "^1.2.0",
+    "@open-pets/client": "^2.1.1",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
