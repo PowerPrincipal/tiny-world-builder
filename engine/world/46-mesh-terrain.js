@@ -33,7 +33,7 @@
     const FLOATS_PER_VOXEL = 360;
     // Top-edge bevel as a FRACTION of voxel spacing (scales with voxel size). Only
     // applied on EXPOSED edges so flat interiors stay seamless. Set to 0 to disable.
-    const BEVEL = 0.11;
+    const BEVEL = 0.05;
     // Grass voxels show a band of the grass TOP colour draping down each exposed
     // side before the dirt riser, like the home-island edge. World units; ~thick.
     const GRASS_BAND = 0.16;
