@@ -86,24 +86,30 @@
         this.box = new THREE.BoxGeometry(1, 1, 1);
         this.box.userData.cached = true;
 
+        // Lambert, not Standard: the structural materials are matte and
+        // non-metallic (roughness ~0.9, metalness ~0.05), so PBR buys nothing
+        // visible here, and the rest of the app is Lambert. Standard's BRDF is
+        // ~2-3x the per-fragment cost of Lambert, paid across all ~760 shield
+        // meshes for every active shield PointLight — the main driver of the
+        // sustained frame-time hit while the shield is up. The glow cubes keep
+        // their emissive (Lambert supports emissive/emissiveIntensity) so the
+        // glow look is unchanged.
         this.materials = {
-          stone: new THREE.MeshStandardMaterial({ color: 0x3e4248, roughness: 0.88, metalness: 0.05 }),
-          stoneDark: new THREE.MeshStandardMaterial({ color: 0x2a2e35, roughness: 0.95, metalness: 0.03 }),
-          edge: new THREE.MeshStandardMaterial({ color: 0x20242b, roughness: 0.9 }),
-          slot: new THREE.MeshStandardMaterial({ color: 0x121821, roughness: 0.95, metalness: 0.1 }),
-          glowBase: new THREE.MeshStandardMaterial({
+          stone: new THREE.MeshLambertMaterial({ color: 0x3e4248 }),
+          stoneDark: new THREE.MeshLambertMaterial({ color: 0x2a2e35 }),
+          edge: new THREE.MeshLambertMaterial({ color: 0x20242b }),
+          slot: new THREE.MeshLambertMaterial({ color: 0x121821 }),
+          glowBase: new THREE.MeshLambertMaterial({
             color: 0x26c8ff,
             emissive: 0x19bfff,
             emissiveIntensity: 0,
-            roughness: 0.25,
             transparent: true,
             opacity: 0.35,
           }),
-          glowFaintBase: new THREE.MeshStandardMaterial({
+          glowFaintBase: new THREE.MeshLambertMaterial({
             color: 0x2d8fb6,
             emissive: 0x0e8ece,
             emissiveIntensity: 0,
-            roughness: 0.35,
             transparent: true,
             opacity: 0.35,
           }),
