@@ -295,11 +295,6 @@
     </section>
 
     <section class="features-list-section" aria-labelledby="features-list-title">
-      <div id="features-admin-bar" class="features-admin-bar" hidden>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Admin mode — you can submit and vote without wallet, and change feature statuses
-        <button id="features-exit-btn" style="margin-left:auto;padding:4px 10px;border-radius:7px;border:1px solid rgba(23,107,235,.3);background:transparent;font:600 12px/1 'Space Grotesk',sans-serif;color:#164a9d;cursor:pointer">Exit admin</button>
-      </div>
       <div class="features-toolbar">
         <div class="features-filter" role="group" aria-label="Filter by status">
           <button class="filter-btn active" data-status="open">Open</button>
@@ -414,7 +409,7 @@
       try { localStorage.removeItem('twAdminSecret'); } catch (_) {}
       renderAdminBar(); renderList();
     }
-    document.getElementById('features-exit-btn').addEventListener('click', exitAdmin);
+    document.getElementById('features-exit-btn')?.addEventListener('click', exitAdmin);
 
     function renderAdminBar() {
       document.getElementById('features-admin-bar').hidden = !adminMode;
