@@ -507,6 +507,9 @@
 
   function tickPlanetLandscapeStream(dt) {
     if (!planetLandscapeEngine) return;
+    // Voxel terrain retired (poser surface replaces it): never stream chunks
+    // while the underlay group is hidden.
+    if (planetLandscapeGroup && planetLandscapeGroup.visible === false) return;
     const focus = landscapeMeshFocusPos(planetLandscapeFocusScratch);
     planetLandscapeStreamElapsed += dt;
     const nearPending = planetLandscapeEngine.pendingChunkBuilds ? planetLandscapeEngine.pendingChunkBuilds.length : 0;
@@ -576,6 +579,11 @@
       -next.drop,
       -LANDSCAPE_MESH_OFFSET - GRID / 2 + 0.5
     );
+    // The old streaming voxel terrain is retired: the planet surface is now the
+    // actual voxel-poser island/sea system (engine/world/57-poser-surface.js).
+    // We keep the engine object (atmosphere/fog code references it) but its group
+    // never renders and it never streams chunks (see tickPlanetLandscapeStream).
+    planetLandscapeGroup.visible = false;
     worldGroup.add(planetLandscapeGroup);
     planetLandscapeEngine = new window.LandscapeEngine({
       scene: planetLandscapeGroup,
@@ -589,11 +597,9 @@
     resetPlanetLandscapeStreamState();
     initPlanetAtmosphere(next);
     planetLandscapeEngine.clearClipBounds();
-    // Kick enough near/far chunks to establish a broad horizon immediately,
-    // then let the normal frame loop keep streaming around camera movement.
-    for (let i = 0; i < PLANET_LANDSCAPE_PRIME_TICKS; i++) {
-      planetLandscapeEngine.update(landscapeMeshFocusPos(), 0);
-    }
+    // (No chunk priming — the voxel terrain is retired; the poser surface is the
+    // visible planet. tickPlanetLandscapeStream() also early-returns while the
+    // underlay group is hidden, so no chunks are built.)
     schedulePlanetLandscapeWarmup();
     if (document.body.classList.contains('planet-proof-active')) enablePlanetLandscapeProofChrome(next);
     lastPlanetLandscapeConfig = next;

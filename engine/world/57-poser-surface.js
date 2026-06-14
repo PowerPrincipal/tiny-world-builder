@@ -103,7 +103,7 @@
       return tex;
     }
 
-    let group = null, foams = [], built = false, raf = null, hiddenUnderlay = null;
+    let group = null, foams = [], built = false, raf = null;
 
     function parentNode() {
       if (typeof worldGroup !== 'undefined' && worldGroup) return worldGroup;
@@ -264,10 +264,10 @@
     }
 
     // World placement: native poser units (~150 wide, ~0.9 tall relief) are scaled
-    // up and dropped to where fly-down points the descent gaze. Y is boosted so the
-    // low meadows read with some relief from the orbit camera. Tune SCALE/Y_BOOST/
-    // DROP if the framing needs it.
-    const SCALE = 1.6, Y_BOOST = 9, DROP = 60;
+    // up and dropped to where fly-down points the descent gaze. Y is boosted only
+    // slightly so the islands stay low + gentle like the poser (not tall cliffs).
+    // Tune SCALE/Y_BOOST/DROP if the framing needs it.
+    const SCALE = 1.6, Y_BOOST = 3, DROP = 60;
 
     function show() {
       build();
@@ -279,17 +279,14 @@
       group.scale.set(SCALE, SCALE * Y_BOOST, SCALE);
       group.position.set(tx, -DROP, tz);
       group.visible = true;
-      // Hide the streaming voxel underlay so only the poser surface shows.
-      const wg = (typeof worldGroup !== 'undefined') ? worldGroup : null;
-      const ul = wg && wg.getObjectByName ? wg.getObjectByName('planetLandscapeUnderlay') : null;
-      if (ul) { hiddenUnderlay = ul; ul.visible = false; }
+      // (The old streaming voxel underlay is kept permanently hidden in module 27,
+      // so there is nothing to hide here — the poser surface is the only terrain.)
       startTick();
       return true;
     }
 
     function hide() {
       if (group) group.visible = false;
-      if (hiddenUnderlay) { hiddenUnderlay.visible = true; hiddenUnderlay = null; }
       stopTick();
     }
 
