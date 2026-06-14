@@ -135,6 +135,56 @@
       select(id) { if (typeof WS.setAvatarStrip === 'function') WS.setAvatarStrip(id); },
     });
 
+    // ---- voxel avatars (real 3D voxel people — the networked identity) ----
+    // Drives WS.setAvatarVoxel / WS.avatarVoxel (47), which stores a fully-resolved
+    // descriptor and sends it on world.join so other clients render THIS look. A small
+    // set of hand-tuned presets plus a "Randomize" tile (random seed -> fresh look).
+    // Descriptors are resolved through window.voxelAvatarDescriptor (53) so the stored
+    // form is complete and round-trips bit-identically to peers. Thumbs are simple CSS
+    // color swatches (the voxel body is 3D — there's no sprite sheet to slice).
+    const VOXEL_PRESETS = [
+      { id: 'vx-scout',   displayName: 'Scout',    spec: { seed: 11, body: 'Masc', fit: 'Scout',     skin: 1, head: 'Wide', hair: 'Short' },  swatch: '#5d8a4a' },
+      { id: 'vx-formal',  displayName: 'Formal',   spec: { seed: 22, body: 'Masc', fit: 'Formal',    skin: 2, head: 'Slim', hair: 'Page' },   swatch: '#262a33' },
+      { id: 'vx-sport',   displayName: 'Sport',    spec: { seed: 33, body: 'Fem',  fit: 'Sport',     skin: 0, head: 'Slim', hair: 'Tail' },   swatch: '#e85d75' },
+      { id: 'vx-rogue',   displayName: 'Rogue',    spec: { seed: 44, body: 'Fem',  fit: 'Rogue',     skin: 3, head: 'Wide', hair: 'Bob' },    swatch: '#3f4b4e' },
+      { id: 'vx-barb',    displayName: 'Barbarian', spec: { seed: 55, body: 'Masc', fit: 'Barbarian', skin: 4, head: 'Wide', hair: 'Mohawk' }, swatch: '#8a4b2a' },
+      { id: 'vx-casual',  displayName: 'Casual',   spec: { seed: 66, body: 'Masc', fit: 'Casual',    skin: 1, head: 'Wide', hair: 'Curls' },  swatch: '#4f8ef7' },
+      { id: 'vx-random',  displayName: 'Randomize', random: true,                                                                              swatch: '#7bdc2e' },
+    ];
+    function voxelDesc(spec) {
+      return (typeof window.voxelAvatarDescriptor === 'function')
+        ? window.voxelAvatarDescriptor(spec)
+        : Object.assign({ kind: 'voxel' }, spec);
+    }
+    function voxelThumb(p) {
+      // a flat color swatch with a subtle inner shading so cards read as distinct.
+      return 'background:linear-gradient(135deg,' + p.swatch + ' 0%,' + p.swatch + ' 60%,rgba(0,0,0,.35) 100%)';
+    }
+    // Register the voxel provider at LOAD time (no guard): this file loads BEFORE
+    // 53-voxel-avatar.js, so window.voxelAvatarDescriptor is undefined here — a
+    // load-time guard would permanently skip the tab. Both cross-file deps are
+    // deferred to call-time (post-load): voxelDesc() falls back if 53 is missing, and
+    // select() guards WS.setAvatarVoxel. list()/voxelThumb have no cross-file deps.
+    // Track "current" by preset id (the room stores a full descriptor, not a preset
+    // id); Randomize never stays "selected".
+    let voxelCurrentId = null;
+    // Use the i18n key if a locale defines one; otherwise a safe English fallback
+    // (this file doesn't own engine/i18n/*, so it must not REQUIRE a new key).
+    const trVoxel = (k, fb) => { const v = T(k); return (v && v !== k) ? v : fb; };
+    WS.registerAvatarProvider({
+      id: 'voxel',
+      label: trVoxel('worlds.avatarVoxel', 'Voxel'),
+      list() { return VOXEL_PRESETS.map(p => ({ id: p.id, displayName: p.displayName, builtIn: true, broken: false, thumb: voxelThumb(p) })); },
+      current() { return voxelCurrentId; },
+      select(id) {
+        if (typeof WS.setAvatarVoxel !== 'function') return;
+        const p = VOXEL_PRESETS.find(x => x.id === id);
+        if (!p) return;
+        if (p.random) { WS.setAvatarVoxel(voxelDesc({ seed: (Math.random() * 0xffffffff) >>> 0 })); voxelCurrentId = null; }
+        else { WS.setAvatarVoxel(voxelDesc(p.spec)); voxelCurrentId = id; }
+      },
+    });
+
     function injectStyles() {
       if (document.getElementById('tw-avp-style')) return;
       const css = `

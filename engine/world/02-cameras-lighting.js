@@ -104,8 +104,22 @@
       } catch (_) {}
     }, 250);
   }
+  // Far-plane ownership during a planet descent (module 54). The far value is
+  // only ever set at construction (200) and by the proof view / descent, and
+  // nothing in updateCamera/onResize touches it, so writing it here persists.
+  // Exposed as a named helper so 54 extends the far plane through the camera
+  // module (reversible) instead of hardcoding/clobbering persCam.far elsewhere.
+  function setPersCamFarForDescent(far) {
+    const next = Number(far);
+    if (!Number.isFinite(next) || next <= 0) return;
+    persCam.far = next;
+    persCam.updateProjectionMatrix();
+  }
   function clampTargetToHomeBoard() {
-    if (renderAutoExpand || isLandscapeMeshActive()) return false;
+    // Relax the home-board pin while a fly-down descent is active/in progress
+    // (window.__flyDownActive, set by module 54) — mirrors the landscape-mesh
+    // early-return so the orbit target can travel down to the planet.
+    if (renderAutoExpand || isLandscapeMeshActive() || window.__flyDownActive) return false;
     const min = -GRID / 2 + 0.5;
     const max = GRID / 2 - 0.5;
     const beforeX = target.x;

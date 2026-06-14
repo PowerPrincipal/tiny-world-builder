@@ -160,6 +160,18 @@
     cloudSeaGroup.visible = renderCloudSea;
   }
 
+  // Transient veil opacity for the fly-down transition (module 54). Writes the
+  // live shader uniform without touching renderCloudSea / localStorage, so the
+  // user's cloud-sea preference is never clobbered by the descent fade. Returns
+  // the current opacity (so 54 can snapshot the start of an ease).
+  function setCloudSeaVeilOpacity(value) {
+    if (cloudSeaMesh && cloudSeaMesh.material && cloudSeaMesh.material.uniforms && cloudSeaMesh.material.uniforms.opacity) {
+      if (Number.isFinite(value)) cloudSeaMesh.material.uniforms.opacity.value = Math.max(0, value);
+      return cloudSeaMesh.material.uniforms.opacity.value;
+    }
+    return 0;
+  }
+
   // ===== Soft sky clouds (small drifting clumps at cloud height) =====
   const skyCloudsGroup = new THREE.Group();
   skyCloudsGroup.name = 'sky-clouds-soft';

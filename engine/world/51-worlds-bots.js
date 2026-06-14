@@ -19,11 +19,19 @@
       return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
     }
 
+    // Each bot gets a DISTINCT networked voxel descriptor (sent in world.join) so
+    // Scout/Forge/Mira render as visibly different people. `avatarSpec` is the partial
+    // look; resolved to a full descriptor at join time via window.voxelAvatarDescriptor
+    // (53) so it round-trips through the server exactly like a real player's pick.
     const BOT_DEFS = [
-      { name: 'Scout',  color: '#e05c5c', chatOffset: 0 },
-      { name: 'Forge',  color: '#5ac44e', chatOffset: 4 },
-      { name: 'Mira',   color: '#b060e0', chatOffset: 8 },
+      { name: 'Scout',  color: '#e05c5c', chatOffset: 0, avatarSpec: { seed: 101, body: 'Masc', fit: 'Scout',     skin: 1, head: 'Wide', hair: 'Short' } },
+      { name: 'Forge',  color: '#5ac44e', chatOffset: 4, avatarSpec: { seed: 202, body: 'Masc', fit: 'Barbarian', skin: 3, head: 'Wide', hair: 'Mohawk' } },
+      { name: 'Mira',   color: '#b060e0', chatOffset: 8, avatarSpec: { seed: 303, body: 'Fem',  fit: 'Rogue',     skin: 0, head: 'Slim', hair: 'Tail' } },
     ];
+    function botAvatar(spec) {
+      if (typeof window.voxelAvatarDescriptor === 'function') return window.voxelAvatarDescriptor(spec);
+      return Object.assign({ kind: 'voxel' }, spec);
+    }
 
     const CHAT_LINES = [
       'Anyone found good fishing spots?',
@@ -66,6 +74,7 @@
         this.name = def.name;
         this.color = def.color;
         this.chatOffset = def.chatOffset;
+        this.avatarSpec = def.avatarSpec;
         this.rng = makePrng(index * 0x9e3779b9 + 0x6c62272e);
         this.socket = null;
         this.connected = false;
@@ -91,6 +100,7 @@
             cells: compactCells(world && world.data && world.data.cells),
             taxPercent: world && world.taxPercent,
             ownerProfileId: world && world.ownerProfileId,
+            avatar: botAvatar(this.avatarSpec), // distinct networked voxel look per bot
           };
           this.send(joinMsg);
         });

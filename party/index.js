@@ -133,6 +133,58 @@ function cleanSelection(value) {
   }).filter(Boolean);
 }
 
+// Validate an UNTRUSTED networked voxel-avatar descriptor (client -> server ->
+// other clients). Security boundary: whitelist fields, clamp the seed, reject
+// anything not a 'voxel' descriptor or with any out-of-domain look field.
+//
+// Contract: PASS-THROUGH-VALID or NULL — never keep-some-drop-others. The client's
+// deriveCfg (engine/world/53-voxel-avatar.js) fills unset look fields from the seed
+// via SHORT-CIRCUIT PRNG calls, so a partially-stripped descriptor would RESHUFFLE
+// every later field and make a peer render a coherent-but-WRONG look. Returning null
+// instead lets the peer fall back to its id-seed (a clean, distinct look).
+//
+// Field domains MUST mirror 53-voxel-avatar.js (no shared import across client/server):
+//   body  : 'Masc' | 'Fem'
+//   skin  : int 0..4   (SKINS.length === 5)
+//   hairC : int 0..6   (HAIRC.length === 7)
+//   hair  : one of HAIRS
+//   fit   : one of OUTFIT_KEYS
+//   head  : 'Wide' | 'Slim'
+const VOXEL_HAIRS = ['Buzz', 'Short', 'Spike', 'Mohawk', 'Curls', 'Page', 'Bob', 'Tail', 'Knot'];
+const VOXEL_OUTFITS = ['Casual', 'Formal', 'Scout', 'Sport', 'Rogue', 'Barbarian'];
+function cleanAvatar(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  if (input.kind !== 'voxel') return null;
+  // Cap object size — an honest descriptor has <= 8 keys; reject obvious bloat.
+  if (Object.keys(input).length > 12) return null;
+  const out = { kind: 'voxel' };
+  // seed: always keep, coerced to a finite non-negative int (uint32).
+  const seedN = Number(input.seed);
+  out.seed = Number.isFinite(seedN) ? (seedN >>> 0) : 0;
+  // Each optional look field: validate IF PRESENT; any present-and-invalid => reject whole.
+  const intInRange = (v, max) => { const n = Number(v); return Number.isInteger(n) && n >= 0 && n < max ? n : undefined; };
+  if (Object.prototype.hasOwnProperty.call(input, 'body')) {
+    if (input.body !== 'Masc' && input.body !== 'Fem') return null;
+    out.body = input.body;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'skin')) {
+    const v = intInRange(input.skin, 5); if (v === undefined) return null; out.skin = v;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'hairC')) {
+    const v = intInRange(input.hairC, 7); if (v === undefined) return null; out.hairC = v;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'hair')) {
+    if (!VOXEL_HAIRS.includes(input.hair)) return null; out.hair = input.hair;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'fit')) {
+    if (!VOXEL_OUTFITS.includes(input.fit)) return null; out.fit = input.fit;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'head')) {
+    if (input.head !== 'Wide' && input.head !== 'Slim') return null; out.head = input.head;
+  }
+  return out;
+}
+
 function cleanPresence(input, fallbackId) {
   if (!input || typeof input !== 'object') return null;
   const out = {};
@@ -889,7 +941,7 @@ export default class TinyWorldParty {
     let p = this.players.get(id);
     if (!p) {
       const spawn = this.safeSpawn();
-      p = { x: spawn.x, z: spawn.z, hearts: HEART_MAX, lastRegenAt: Date.now(), cooldowns: {}, profileId: null, role: 'observe', name: 'Builder', color: '#3c82f7', busyUntil: 0, busyNode: null, busyAction: null, busySeq: 0 };
+      p = { x: spawn.x, z: spawn.z, hearts: HEART_MAX, lastRegenAt: Date.now(), cooldowns: {}, profileId: null, role: 'observe', name: 'Builder', color: '#3c82f7', avatar: null, busyUntil: 0, busyNode: null, busyAction: null, busySeq: 0 };
       this.players.set(id, p);
     }
     const reg = heartsNow(p.hearts, p.lastRegenAt, Date.now());
@@ -900,7 +952,7 @@ export default class TinyWorldParty {
 
   presenceFor(id) {
     const p = this.getPlayer(id);
-    return { id, name: p.name, color: p.color, cursor: { x: p.x, y: 0, z: p.z }, hearts: p.hearts, role: p.role };
+    return { id, name: p.name, color: p.color, cursor: { x: p.x, y: 0, z: p.z }, hearts: p.hearts, role: p.role, avatar: p.avatar || null };
   }
 
   nodeWire(nodeId) {
@@ -917,7 +969,7 @@ export default class TinyWorldParty {
       type: 'world.state',
       gridSize: this.worldState ? this.worldState.gridSize : 8,
       taxPercent: this.world ? this.world.taxPercent : null,
-      you: { x: p.x, z: p.z, hearts: p.hearts, role: p.role },
+      you: { x: p.x, z: p.z, hearts: p.hearts, role: p.role, avatar: p.avatar || null },
       nodes,
       animals: this.animals,
       peers: Array.from(this.presence.values()).filter(pr => pr.id !== id),
@@ -970,6 +1022,10 @@ export default class TinyWorldParty {
       p.profileId = profileId;
       p.name = cleanText(data.name, 48) || p.name;
       if (/^#[0-9a-f]{6}$/i.test(String(data.color || ''))) p.color = data.color;
+      // Networked avatar identity: validate the untrusted descriptor; a rejected one
+      // leaves p.avatar null so peers fall back to an id-seed look (still distinct).
+      const av = cleanAvatar(data.avatar);
+      if (av) p.avatar = av;
       const spawn = this.safeSpawn();
       p.x = spawn.x; p.z = spawn.z;
       this.presence.set(id, this.presenceFor(id));
@@ -1280,7 +1336,7 @@ export default class TinyWorldParty {
 // tests/party.test.mjs exercise the validation / gating logic directly.
 export {
   cleanText, cleanNumber, cleanVec3, cleanCursor, cleanSelection,
-  cleanPresence, cleanCell, cleanCellSet, cleanRole, cleanIsland,
+  cleanPresence, cleanAvatar, cleanCell, cleanCellSet, cleanRole, cleanIsland,
   clampFloors, inIsland, takeToken, safeJson, RATE_LIMITS, MAX_CELL_COORD, MAX_FLOORS,
   // Worlds MMO pure helpers (authoritative game rules).
   cleanHarvestAction, actionDurationMs, isAdjacentStep, withinReach, taxSplit,

@@ -109,6 +109,7 @@
           type: 'world.join', token, worldId: w.id, name: playerName(), color: playerColor(),
           role, profileId: (WS.myProfileId != null ? WS.myProfileId : null),
           gridSize, cells: compactCells(w.data), taxPercent: w.taxPercent, ownerProfileId: w.ownerProfileId,
+          avatar: getSelfAvatarDescriptor(), // networked voxel identity (server validates via cleanAvatar)
         });
         emit('status', { connected: true });
         // If the room never answers with world.state, it's an un-upgraded server.
@@ -638,6 +639,34 @@
     let avatarPetId = null; // non-null => pet mode (overrides class)
     let avatarStripId = null; // non-null => strip mode (overrides class). Mutually exclusive with avatarPetId.
     let _texLoader = null;
+    // The player's NETWORKED voxel identity: a fully-resolved descriptor sent in
+    // world.join so every other client renders THIS player's chosen look (not a
+    // local id-seed). Defaults to a descriptor seeded from a stable per-browser id
+    // (persisted like the class choice) so a fresh visitor still looks consistent
+    // across reloads. myId is NOT available at join time (it arrives in `welcome`
+    // AFTER the join envelope is sent), so the seed must be a local id.
+    const AVATAR_VOXEL_LS = 'tinyworld:multiplayer:avatar-voxel-seed';
+    function stableVoxelSeed() {
+      try {
+        let v = localStorage.getItem(AVATAR_VOXEL_LS);
+        if (!v) { v = 'v' + Math.floor(Math.random() * 1e9).toString(36); localStorage.setItem(AVATAR_VOXEL_LS, v); }
+        return v;
+      } catch (_) { return 'v' + Math.floor(Math.random() * 1e9).toString(36); }
+    }
+    // Resolved LAZILY: 53-voxel-avatar.js loads AFTER this file, so
+    // window.voxelAvatarDescriptor is undefined at 47's module-load time. Resolving
+    // eagerly here would collapse every player's default to a single seed. All read
+    // sites fire at join/render time (post-load), so getSelfAvatarDescriptor() sees
+    // the real 53 helper and seeds from the stable per-browser id => distinct defaults.
+    let selfAvatarDescriptor = null;
+    function getSelfAvatarDescriptor() {
+      if (!selfAvatarDescriptor) {
+        selfAvatarDescriptor = (typeof window !== 'undefined' && typeof window.voxelAvatarDescriptor === 'function')
+          ? window.voxelAvatarDescriptor({ seed: stableVoxelSeed() })
+          : { kind: 'voxel', seed: stableVoxelSeed() };
+      }
+      return selfAvatarDescriptor;
+    }
 
     function avatarParent() {
       if (typeof worldGroup !== 'undefined' && worldGroup) return worldGroup;
@@ -789,6 +818,22 @@
     WS.setAvatarStrip = setAvatarStrip;
     WS.avatarStrip = () => avatarStripId;
     WS.strips = () => Object.keys(STRIPS);
+    // ---- voxel avatar identity (networked) ----
+    // Set the player's chosen voxel look. Unlike class/pet/strip (which swap textures
+    // in place), a voxel body is BAKED at makeVoxelAvatar construction — there is no
+    // in-place swap — so the self entity must be rebuilt. The descriptor is stored and
+    // sent on the NEXT world.join; mid-session picks are local-only until reconnect.
+    function setAvatarVoxel(desc) {
+      if (!desc || typeof desc !== 'object') return null;
+      const resolved = (typeof window !== 'undefined' && typeof window.voxelAvatarDescriptor === 'function')
+        ? window.voxelAvatarDescriptor(desc)
+        : desc;
+      selfAvatarDescriptor = resolved;
+      if (selfEnt) { disposeEntity(selfEnt); selfEnt = null; updateSelfAvatar(); }
+      return selfAvatarDescriptor;
+    }
+    WS.setAvatarVoxel = setAvatarVoxel;
+    WS.avatarVoxel = () => getSelfAvatarDescriptor();
     // Voxel avatars (real 3D voxel people) replace the 2.5D sprite "stripes" when the
     // builder module is loaded. Opt out with ?voxel=0 to fall back to sprites.
     function voxelAvatarsOn() {
@@ -796,13 +841,20 @@
       try { return new URLSearchParams(location.search).get('voxel') !== '0'; } catch (_) { return true; }
     }
     // A fresh texture per avatar+sheet so each can hold its own frame/row offset.
-    // `seed` (peer id / self id) gives each person a DISTINCT voxel look pre-networked-identity.
-    function createAvatar(seed) {
+    // `idOrDescriptor` is EITHER a networked voxel descriptor ({ kind:'voxel', ... } —
+    // a player's chosen look) OR a string id (peer/self) used purely as a seed so each
+    // person renders DISTINCT even with no chosen identity. A descriptor wins; a string
+    // becomes { seed: id }. Backward compatible with the old seed-only call.
+    function createAvatar(idOrDescriptor) {
+      const isDesc = idOrDescriptor && typeof idOrDescriptor === 'object';
+      const voxOpts = isDesc
+        ? idOrDescriptor
+        : { seed: (idOrDescriptor != null ? idOrDescriptor : ('a' + Math.floor(Math.random() * 1e9))) };
       const ent = { x: 0, z: 0, sector: 0, lastMove: 0, lastDx: 0, lastDz: 0, state: 'idle', frame: 0, frameTime: 0, tex: {}, sprite: null, voxel: null, disposed: false, avatarClassName };
       if (typeof THREE === 'undefined') { avatarError('THREE unavailable'); return ent; }
       if (voxelAvatarsOn()) {
         try {
-          ent.voxel = window.makeVoxelAvatar({ seed: (seed != null ? seed : ('a' + Math.floor(Math.random() * 1e9))) });
+          ent.voxel = window.makeVoxelAvatar(voxOpts);
           if (ent.voxel && ent.voxel.group) {
             ent.sprite = ent.voxel.group;            // alias so placeEntity/moveEntity/bubble keep working
             ent.sprite.renderOrder = 10;
@@ -1114,7 +1166,7 @@
     WS.showChatBubble = showChatBubble;
 
     function updateSelfAvatar() {
-      if (!selfEnt) selfEnt = createAvatar(myId || 'self');
+      if (!selfEnt) selfEnt = createAvatar(getSelfAvatarDescriptor());
       // Pet choice is SELF-ONLY and local (peers keep their class avatars; createAvatar
       // is shared with the peer path, so the pet must never be applied there).
       if (avatarPetId && PETS[avatarPetId] && (!selfEnt.pet || selfEnt.pet.id !== avatarPetId)) loadPetTextures(selfEnt, PETS[avatarPetId]);
@@ -1133,7 +1185,9 @@
         const pos = p.cursor || p; if (pos.x == null) return;
         seen.add(p.id);
         let ent = peerEnts.get(p.id);
-        if (!ent) { ent = createAvatar(p.id); peerEnts.set(p.id, ent); }
+        // Prefer the peer's NETWORKED voxel look (round-tripped via the server);
+        // fall back to the id-seed so a peer with no descriptor still renders distinct.
+        if (!ent) { ent = createAvatar(p.avatar || p.id); peerEnts.set(p.id, ent); }
         moveEntity(ent, pos.x, pos.z);
       });
       peerEnts.forEach((ent, id) => { if (!seen.has(id)) { disposeEntity(ent); peerEnts.delete(id); } });

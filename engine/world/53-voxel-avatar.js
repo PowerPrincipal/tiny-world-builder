@@ -464,4 +464,36 @@
     }
 
     window.makeVoxelAvatar = makeVoxelAvatar;
+
+    // ---- networked descriptor: a strict, fully-RESOLVED subset of makeVoxelAvatar
+    //      opts, safe to send over the wire so every client renders the SAME look.
+    //      Returns { kind:'voxel', seed, body, skin, hairC, hair, fit, head } with
+    //      ALL look fields populated (deriveCfg fills any unset from seed). Storing
+    //      the resolved form (not seed-only) is deliberate: deriveCfg derives later
+    //      fields via short-circuit PRNG calls, so an under-specified descriptor
+    //      reshuffles — a complete one makes deriveCfg do zero PRNG work and renders
+    //      bit-identically on self and on peers. Field domains (keep in sync with the
+    //      server's cleanAvatar in party/index.js): body Masc|Fem; skin int 0..4
+    //      (SKINS.length); hairC int 0..6 (HAIRC.length); hair in HAIRS; fit in
+    //      OUTFIT_KEYS; head Wide|Slim.
+    function voxelAvatarDescriptor(opts) {
+      const c = deriveCfg(opts);
+      return {
+        kind: 'voxel',
+        seed: c.seed >>> 0,
+        body: c.body,
+        skin: c.skin,
+        hairC: c.hairC,
+        hair: c.hair,
+        fit: c.fit,
+        head: c.head,
+      };
+    }
+    // Expose the wardrobe option lists so the picker (49) can build preset/random
+    // voxel looks without re-declaring them (single source of truth).
+    voxelAvatarDescriptor.SKINS = SKINS.length;
+    voxelAvatarDescriptor.HAIRC = HAIRC.length;
+    voxelAvatarDescriptor.HAIRS = HAIRS.slice();
+    voxelAvatarDescriptor.OUTFITS = OUTFIT_KEYS.slice();
+    window.voxelAvatarDescriptor = voxelAvatarDescriptor;
   })();
