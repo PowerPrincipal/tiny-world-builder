@@ -119,23 +119,47 @@
       window.addEventListener('tinyworld:avatar-picker-closed', onClosed);
       try { WS.openAvatarPicker(); } catch (_) { finish(true); }
     });
-    // Tinyverse is invite-only for now: only these accounts get in; everyone else
-    // sees the button as "Coming soon" (the Battleworlds treatment).
-    const TINYVERSE_ALLOWLIST = ['jason@bouncingfish.com', 'jason.kneen@gmail.com'];
-    async function tinyverseEmailAllowed() {
-      try {
-        const A = window.TinyWorldAuth;
-        if (A && typeof A.getUser === 'function') {
+    const _twbTinyverseWalletKey = 'tinyworld:auth:wallet-session.v1';
+    function _twbTinyverseCookieToken() {
+      try { const m = document.cookie.match(/(?:^|; )nf_jwt=([^;]*)/); return m ? decodeURIComponent(m[1]) : ''; } catch (_) { return ''; }
+    }
+    function _twbTinyverseWalletToken() {
+      try { return localStorage.getItem(_twbTinyverseWalletKey) || ''; } catch (_) { return ''; }
+    }
+    async function _twbTinyverseAccessToken() {
+      const A = window.TinyWorldAuth;
+      if (A && typeof A.getUser === 'function') {
+        try {
           const u = await A.getUser();
-          const email = ((u && u.email) || '').trim().toLowerCase();
-          if (email) return TINYVERSE_ALLOWLIST.includes(email);
-        }
+          if (u) {
+            if (typeof u.jwt === 'function') { try { return await u.jwt(); } catch (_) {} }
+            if (u.token && u.token.access_token) return u.token.access_token;
+          }
+        } catch (_) {}
+      }
+      return _twbTinyverseWalletToken() || _twbTinyverseCookieToken() || '';
+    }
+    // Tinyverse/lobby/multiplayer access is now account-scoped and managed from
+    // /admin-users. The server is authoritative; built-in god-admin emails still
+    // get access as a safe fallback.
+    async function tinyverseAccountAllowed() {
+      try {
+        const token = await _twbTinyverseAccessToken();
+        if (!token) return null;
+        const res = await fetch('/api/admin-users?action=tinyverse-access', {
+          headers: { Authorization: 'Bearer ' + token },
+          credentials: 'same-origin',
+        });
+        if (res.status === 401) return null;
+        if (!res.ok) return false;
+        const data = await res.json();
+        return data && data.allowed === true;
       } catch (_) {}
       return null; // not logged in / unknown
     }
     async function applyTinyverseAccessGate() {
       if (!tinyverseBtn) return;
-      const allowed = await tinyverseEmailAllowed();
+      const allowed = await tinyverseAccountAllowed();
       // Anyone who isn't a known-allowlisted account sees the "Coming soon" look.
       tinyverseBtn.classList.toggle('is-soon', allowed !== true);
       // Hard-disable only a KNOWN non-allowlisted account; leave it clickable when
@@ -161,8 +185,8 @@
           }
           return;
         }
-        // 1b. Email allowlist gate — Tinyverse is invite-only for now.
-        if ((await tinyverseEmailAllowed()) !== true) {
+        // 1b. Server access gate — Tinyverse/lobby/multiplayer is invite-only.
+        if ((await tinyverseAccountAllowed()) !== true) {
           applyTinyverseAccessGate();
           if (typeof twToast === 'function') twToast('Tinyverse is coming soon');
           return;
@@ -225,7 +249,7 @@
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('welcome-launch-open');
     if (tinyverseBtn) tinyverseBtn.addEventListener('click', openTinyverse);
-    applyTinyverseAccessGate();   // reflect the email allowlist on the Tinyverse button
+    applyTinyverseAccessGate();   // reflect account lobby access on the Tinyverse button
     if (battleworldsBtn) battleworldsBtn.addEventListener('click', openBattleworlds);
     if (buildBtn) buildBtn.addEventListener('click', () => chooseWelcomeMode('build'));
     if (playBtn) playBtn.addEventListener('click', () => chooseWelcomeMode('play'));

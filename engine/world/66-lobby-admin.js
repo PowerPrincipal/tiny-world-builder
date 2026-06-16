@@ -32,7 +32,7 @@
     // worldAdminEmails). The server is authoritative — it re-checks on adminSave —
     // but we also confirm locally so the bar never flashes for a non-admin if a
     // stale WS.canAdminEdit ever slipped through. Keep in sync with the server list.
-    const _laAdminEmails = ['jason@bouncingfish.com'];
+    const _laAdminEmails = ['jason@bouncingfish.com', 'jason.kneen@bouncingfish.com'];
     async function _laEmailIsAdmin() {
       try {
         const A = window.TinyWorldAuth;

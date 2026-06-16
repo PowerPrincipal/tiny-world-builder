@@ -17,9 +17,9 @@ export const MAX_WORLD_NAME = 48;
 // lobby/demo world that no single player "owns" — and save straight to the live
 // record. Gated by the authenticated account EMAIL so it follows the person, not
 // a browser or a draft's ownership row. Mirrors the client allowlist in
-// engine/world/30-ui-boot-wiring.js (AI_ACCOUNT_ALLOWLIST / TINYVERSE_ALLOWLIST).
+// engine/world/30-ui-boot-wiring.js (Tinyverse access API) and 66-lobby-admin.js.
 // Extra admins can be added via a comma-separated TINYWORLD_WORLD_ADMIN_EMAILS env.
-const WORLD_ADMIN_DEFAULT_EMAILS = ['jason@bouncingfish.com'];
+const WORLD_ADMIN_DEFAULT_EMAILS = ['jason@bouncingfish.com', 'jason.kneen@bouncingfish.com'];
 export function worldAdminEmails() {
   const extra = String(process.env.TINYWORLD_WORLD_ADMIN_EMAILS || '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);

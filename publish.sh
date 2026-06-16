@@ -63,6 +63,7 @@ cp docs.html "$DIST/docs.html"
 cp doc.html "$DIST/doc.html"
 cp features.html "$DIST/features.html"
 cp community.html "$DIST/community.html"
+cp admin-users.html "$DIST/admin-users.html"
 cp terms.html "$DIST/terms.html"
 cp privacy.html "$DIST/privacy.html"
 cp code-of-conduct.html "$DIST/code-of-conduct.html"
@@ -102,6 +103,17 @@ if [[ -d styles ]]; then
     for f do
       mkdir -p "../dist/styles/$(dirname "$f")"
       cp "$f" "../dist/styles/$f"
+    done
+  ' sh {} +)
+fi
+
+# Small standalone page scripts for the landing/admin/community-adjacent pages.
+if [[ -d scripts ]]; then
+  mkdir -p "$DIST/scripts"
+  (cd scripts && find . -type f ! -name '.DS_Store' -exec sh -c '
+    for f do
+      mkdir -p "../dist/scripts/$(dirname "$f")"
+      cp "$f" "../dist/scripts/$f"
     done
   ' sh {} +)
 fi

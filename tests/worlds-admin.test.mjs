@@ -10,6 +10,7 @@ test('isWorldAdminEmail allows the default god-admin account (case/space-insensi
   delete process.env.TINYWORLD_WORLD_ADMIN_EMAILS;
   assert.equal(isWorldAdminEmail('jason@bouncingfish.com'), true);
   assert.equal(isWorldAdminEmail('  JASON@BouncingFish.com  '), true);
+  assert.equal(isWorldAdminEmail('jason.kneen@bouncingfish.com'), true);
 });
 
 test('isWorldAdminEmail rejects non-admin and empty emails', () => {
@@ -24,6 +25,7 @@ test('worldAdminEmails merges extra emails from env', () => {
   process.env.TINYWORLD_WORLD_ADMIN_EMAILS = 'co-admin@example.com, Second@Example.com';
   const set = worldAdminEmails();
   assert.equal(set.has('jason@bouncingfish.com'), true);
+  assert.equal(set.has('jason.kneen@bouncingfish.com'), true);
   assert.equal(set.has('co-admin@example.com'), true);
   assert.equal(set.has('second@example.com'), true);
   assert.equal(isWorldAdminEmail('co-admin@example.com'), true);

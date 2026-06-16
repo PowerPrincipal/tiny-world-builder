@@ -1,7 +1,7 @@
 import { requireAuthUser } from './lib/auth.mjs';
 import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
-import { ensureProfile, normalizeUsername, profileDto } from './lib/profiles.mjs';
+import { ensureProfile, normalizeProfileHandle, normalizeUsername, profileDto } from './lib/profiles.mjs';
 
 export const config = { path: '/api/profile' };
 
@@ -10,6 +10,8 @@ function validateProfile(body) {
   const displayName = String((body && body.displayName) || '').trim().slice(0, 80);
   const about = String((body && body.about) || '').trim().slice(0, 1000);
   const image = String((body && body.image) || '').trim().slice(0, 2048);
+  const twitter = normalizeProfileHandle(body && body.twitter);
+  const github = normalizeProfileHandle(body && body.github);
   if (!/^[a-z0-9_]{3,24}$/.test(username)) return { error: 'Username must be 3-24 lowercase letters, numbers, underscores' };
   if (!displayName) return { error: 'Display name required' };
   // Reject non-http(s) image URLs so a stored `javascript:`/`data:text/html` value
@@ -17,7 +19,7 @@ function validateProfile(body) {
   if (image && !/^https:\/\/[^\s]+$/i.test(image) && !/^http:\/\/localhost(:\d+)?\//i.test(image)) {
     return { error: 'Image must be an https URL' };
   }
-  return { username, displayName, about, image };
+  return { username, displayName, about, image, twitter, github };
 }
 
 export default async function profileFunction(request) {
@@ -48,9 +50,11 @@ export default async function profileFunction(request) {
             display_name = ${input.displayName},
             about = ${input.about},
             image = ${input.image},
+            twitter = ${input.twitter},
+            github = ${input.github},
             updated_at = NOW()
         WHERE auth0_id = ${user.id}
-        RETURNING id, auth0_id, username, display_name, about, image, created_at, updated_at
+        RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, created_at, updated_at
       `;
       if (!rows.length) return errorResponse('Profile not found', 404, origin);
       return jsonResponse(profileDto(rows[0]), origin);
