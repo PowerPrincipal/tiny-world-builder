@@ -72,7 +72,7 @@ function makeDoc() {
   };
 }
 
-function makeEnv({ adminEmail = 'jason@bouncingfish.com', canAdminEdit = true } = {}) {
+function makeEnv({ adminEmail = 'jason@bouncingfish.com', canAdminEdit = true, worldSlug = 'tidewater-bay' } = {}) {
   const listeners = {};
   const apiCalls = [];
   const modeCalls = [];
@@ -96,6 +96,7 @@ function makeEnv({ adminEmail = 'jason@bouncingfish.com', canAdminEdit = true } 
   window.__tinyworldWorlds = {
     canAdminEdit,
     adminWorldId: 42,
+    getState: () => ({ world: { slug: worldSlug, id: 42 } }),
     on: (ev, cb) => { (listeners[ev] = listeners[ev] || []).push(cb); },
     adminBroadcastWorld: () => {},
   };
@@ -126,6 +127,26 @@ test('admin bar appears on enter for an allow-listed account and toggles editing
   WS.lobbyAdmin.stopEditing();
   assert.ok(!window.document.body.classList.contains('tw-admin-editing'), 'editing class cleared');
   assert.ok(modeCalls.includes('play'), 'returned to play view');
+});
+
+test('full builder unlock (tw-admin-fulledit) is added only in the lobby world', async () => {
+  // In the lobby, editing unlocks the full builder.
+  const lobby = makeEnv({ worldSlug: 'tidewater-bay' });
+  lobby.fire('enter', { world: { slug: 'tidewater-bay', id: 42 }, role: 'play' });
+  await flush();
+  lobby.WS.lobbyAdmin.startEditing();
+  assert.ok(lobby.window.document.body.classList.contains('tw-admin-editing'), 'editing class set in lobby');
+  assert.ok(lobby.window.document.body.classList.contains('tw-admin-fulledit'), 'full builder unlocked in lobby');
+  lobby.WS.lobbyAdmin.stopEditing();
+  assert.ok(!lobby.window.document.body.classList.contains('tw-admin-fulledit'), 'full builder class cleared on stop');
+
+  // In any other world, the bar still edits but the full builder stays locked.
+  const other = makeEnv({ worldSlug: 'someones-world' });
+  other.fire('enter', { world: { slug: 'someones-world', id: 7 }, role: 'play' });
+  await flush();
+  other.WS.lobbyAdmin.startEditing();
+  assert.ok(other.window.document.body.classList.contains('tw-admin-editing'), 'editing class set outside lobby');
+  assert.ok(!other.window.document.body.classList.contains('tw-admin-fulledit'), 'full builder NOT unlocked outside lobby');
 });
 
 test('Save posts adminSave with the live board to the world id', async () => {

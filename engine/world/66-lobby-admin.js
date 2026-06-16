@@ -45,6 +45,21 @@
       return false;
     }
 
+    // The full builder unlock (tw-admin-fulledit) is gated to the LOBBY world
+    // only — "just the lobby for now". The admin grant (WS.canAdminEdit) is
+    // issued for ANY world an admin loads, so we compare the entered world's
+    // slug against the lobby slug (same source the other lobby modules use,
+    // 64-lobby-chat-bridge.js). Outside the lobby the bar still works but only
+    // surfaces basic place/erase (today's behaviour) — no full builder.
+    function _laIsLobby() {
+      try {
+        const st = (typeof WS.getState === 'function') ? WS.getState() : null;
+        const slug = ((st && st.world && st.world.slug) || '').toLowerCase();
+        const lobby = (window.__TW_LOBBY_WORLD_SLUG || 'tidewater-bay').toLowerCase();
+        return !!slug && slug === lobby;
+      } catch (_) { return false; }
+    }
+
     let _laBar = null;
     let _laEditing = false;
     let _laWorldId = null;
@@ -86,6 +101,29 @@
   body.tw-admin-editing.tw-worlds-play .tool-palette{display:flex !important}
   body.tw-admin-editing .toolbar{bottom:calc(132px + var(--tw-worlds-bottom-inset,0px)) !important}
   body.tw-admin-editing .tool-palette{bottom:calc(132px + var(--tw-worlds-bottom-inset,0px)) !important}
+
+  /* ---- FULL builder unlock (lobby admins only) ----
+     The room keeps tw-worlds-play ON, so its left-pill trim and #world-pill
+     hide keep world-management controls (import/export/reset/clear/switch)
+     out for free — the only way to persist stays "Save to Live Lobby". These
+     rules re-show the *building* surfaces tw-worlds-play hides. tiny-world.css
+     hides most of them by ID with !important (specificity 1,1,1); scoping each
+     override to both body classes + the id beats it (1,2,1). Each toggle panel
+     keys off its own closed-state (:not([hidden]) / :not(.collapsed)) so its
+     normal open/close logic still governs visibility. */
+  body.tw-admin-fulledit.tw-worlds-play:not(.hide-groups) #toolbar{display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play #tool-palette:not([hidden]){display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play .flyout{display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play #agent-panel:not(.collapsed){display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play #layers-toggle{display:inline-flex !important}
+  body.tw-admin-fulledit.tw-worlds-play #layers-panel:not([hidden]){display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play #stamp-builder-panel:not([hidden]){display:flex !important}
+  body.tw-admin-fulledit.tw-worlds-play .radial-menu:not([hidden]){display:block !important}
+  /* The Stamps button lives inside .controls, hidden by the pill-trim
+     (.controls > :not(#home)…:not(#account-btn)) whose chained :not(#id) args
+     give it a high id-weight. The trailing :not(#…) here match nothing on this
+     button — they only inflate specificity enough to beat that trim. */
+  body.tw-admin-fulledit.tw-worlds-play .controls > #stamp-builder:not(#home):not(#persp):not(#generate):not(#import){display:inline-flex !important}
   `;
       const style = document.createElement('style');
       style.id = 'tw-lobby-admin-style';
@@ -145,6 +183,10 @@
       if (_laEditing) return;
       _laEditing = true;
       document.body.classList.add('tw-admin-editing');
+      // In the lobby, unlock the FULL builder (inspector, radial menu, layers,
+      // stamp library, flyouts) via the tw-admin-fulledit CSS below. Gated to
+      // the lobby world only.
+      if (_laIsLobby()) document.body.classList.add('tw-admin-fulledit');
       // Flip the room out of play-mode so the real builder tools edit the live
       // board. The room forced play on enter; build mode re-enables placement.
       try { if (window.__tinyworldMode && window.__tinyworldMode.setBuild) window.__tinyworldMode.setBuild(); } catch (_) {}
@@ -158,6 +200,7 @@
       if (!_laEditing) return;
       _laEditing = false;
       document.body.classList.remove('tw-admin-editing');
+      document.body.classList.remove('tw-admin-fulledit');
       // Return to the immersive play view (tools hidden again).
       try { if (window.__tinyworldMode && window.__tinyworldMode.setPlay) window.__tinyworldMode.setPlay(); } catch (_) {}
       if (_laToggleBtn) { _laToggleBtn.classList.remove('on'); _laToggleBtn.textContent = T('lobbyAdmin.edit'); }
