@@ -28,6 +28,7 @@
     const TRACK_LERP = 0.06;                   // how fast the camera swings to the subject
     const IDLE_LERP = 0.018;                   // idle sweep return speed
     const SIGNAL_RECOVER = 0.8;                // how fast signal health climbs back to 1
+    const ACTIVITY_DECAY = 0.55;               // per-second decay of a feed's activity score
 
     const cams = [];                           // ordered feed list (round-robin capture)
     const camById = new Map();
@@ -189,6 +190,7 @@
         sweep: opts.sweep || { yaw: 0.55, pitch: 0.10, speed: 0.35 },
         tint: opts.tint == null ? 1 : opts.tint,
         signal: 1,
+        activity: 0,
         watching: false,
         watchName: null,
         phase: Math.random() * Math.PI * 2,
@@ -260,10 +262,27 @@
     function show() { enabled = true; }
     function hide() { enabled = false; }
 
-    // ---- per-feed aim logic (idle sweep <-> look at nearest subject) -------
+    // The feed with the most live activity (a moving subject in frame), or null if
+    // everything is quiet. Used by the lobby screen to auto-cut to the "hot" cam.
+    function activeFeed(minActivity) {
+      const thresh = (minActivity == null) ? 0.25 : minActivity;
+      let best = null;
+      for (const f of cams) {
+        if (f.activity >= thresh && (!best || f.activity > best.activity)) best = f;
+      }
+      return best;
+    }
+    // All feeds sorted by activity desc (for round-robin biasing).
+    function feedsByActivity() { return cams.slice().sort((a, b) => b.activity - a.activity); }
+
+    // ---- per-feed aim logic (idle sweep <-> look at nearest MOVING subject) -
+    // "Truman" behaviour: a camera prefers the subject that is actually MOVING
+    // near it. Each feed accumulates an activity score that decays over time and
+    // spikes when its watched subject moves — so the lobby auto-cut can pick the
+    // feed where something is happening.
     function aim(f, t, dt) {
-      // gather candidate subjects
-      let best = null, bestD = TRACK_RANGE;
+      // gather candidate subjects; weight by proximity AND recent movement
+      let best = null, bestScore = 0;
       if (subjectsProvider) {
         let subs = null;
         try { subs = subjectsProvider(); } catch (_) { subs = null; }
@@ -271,8 +290,27 @@
           for (const s of subs) {
             if (!s || !s.pos) continue;
             const d = f.cam.position.distanceTo(s.pos);
-            if (d < bestD) { bestD = d; best = s; }
+            if (d > TRACK_RANGE) continue;
+            // per-subject movement since last frame (tracked on the feed by name key)
+            const key = s.name || ('s' + (subs.indexOf(s)));
+            const prev = f._subPrev && f._subPrev[key];
+            let moved = 0;
+            if (prev) moved = Math.min(1.5, prev.distanceTo(s.pos) / Math.max(dt, 1e-3) * 0.25);
+            const prox = 1 - (d / TRACK_RANGE);            // 0..1, nearer = higher
+            const score = prox * 0.6 + moved * 1.0;        // movement dominates
+            if (score > bestScore) { bestScore = score; best = s; }
           }
+          // remember positions for next-frame movement detection
+          f._subPrev = f._subPrev || {};
+          const seen = {};
+          for (const s of subs) {
+            if (!s || !s.pos) continue;
+            const key = s.name || ('s' + (subs.indexOf(s)));
+            seen[key] = 1;
+            if (!f._subPrev[key]) f._subPrev[key] = s.pos.clone();
+            else f._subPrev[key].copy(s.pos);
+          }
+          for (const k in f._subPrev) if (!seen[k]) delete f._subPrev[k];
         }
       }
       if (best) {
@@ -281,6 +319,8 @@
         f.curLook.lerp(_target, TRACK_LERP);
         f.watching = true;
         f.watchName = best.name || 'SUBJECT';
+        // activity spikes with the winning score; clamped and smoothed
+        f.activity = Math.min(1, Math.max(f.activity, bestScore));
       } else {
         // idle sweep around the home look direction
         f.phase += dt * (f.sweep.speed || 0.35);
@@ -299,6 +339,8 @@
         f.watching = false;
         f.watchName = null;
       }
+      // activity always decays so "hot" reflects what's happening NOW
+      f.activity = Math.max(0, f.activity - dt * ACTIVITY_DECAY);
       f.cam.lookAt(f.curLook);
     }
 
@@ -353,6 +395,7 @@
       buildMonitor, monitorMaterialFor,
       feed, feeds,
       setSubjectsProvider, setEnabled, show, hide,
+      activeFeed, feedsByActivity,
       glitch, tick,
       FEED_W, FEED_H,
     };
