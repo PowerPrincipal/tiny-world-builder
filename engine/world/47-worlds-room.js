@@ -2208,12 +2208,14 @@
       // the pose every frame, and peers (who have no _crouchHeld/_sitToggle)
       // would never show sit/crouch at all.
       if (ent.emote) {
-        if (emoteShouldClear(ent.emote, Date.now(), moving)) {
+        // Always render the rising-edge frame before movement/expiry can cancel, so a
+        // HOLD emote applied while the entity is still tweening isn't swallowed unseen.
+        if (!ent._emoteFresh && emoteShouldClear(ent.emote, Date.now(), moving)) {
           ent.emote = null;            // expired, or movement cancelled a HOLD pose
-        } else if (ent._emoteFresh || ent.emote.hold) {
+        } else {
           // one-shot: set once on the rising edge; HOLD: re-assert each frame so
           // the rig can't fall back to idle (and dance keeps looping).
-          ent.voxel.setState(ent.emote.state);
+          if (ent._emoteFresh || ent.emote.hold) ent.voxel.setState(ent.emote.state);
           ent._emoteFresh = false;
         }
       }
