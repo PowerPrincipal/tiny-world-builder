@@ -846,7 +846,7 @@
           // re-asserting them while the key is held / sit toggle is on, and switches
           // to walk/idle to release. crouch blends in over _poseT so the squat eases
           // down instead of snapping.
-          if (s === 'crouch' || s === 'sit' || s === 'skydive' || s === 'rocket') this._poseT = 0;
+          if (s === 'crouch' || s === 'sit' || s === 'skydive' || s === 'rocket' || s === 'dance') this._poseT = 0;
           this._state = (s === 'walk' || s === 'attack' || s === 'jump' || s === 'crouch' || s === 'sit' || s === 'climb' || s === 'skydive' || s === 'rocket' || s === 'wave' || s === 'dance') ? s : 'idle';
         },
         // blink runs on its own clock, independent of walk/idle/jump, and re-meshes
