@@ -28,6 +28,12 @@ Running log of UI elements hidden "for now". Each entry says exactly how to rest
 - **Also:** `renderTabs()` now hides the tab bar when only one visible category remains (goes straight to the Voxel customizer).
 - **Restore:** un-comment the three registrations.
 
+### 5. Edge portal + its sign (lobby/demo)
+- **What:** the sky-edge stargate portal and the "GROUND LEVEL" sign placed next to it on world enter.
+- **Where:** `engine/world/56-gate-transit.js` — the `on('enter')` auto-placement (`placeGate()/placeLobbyGates()/startAutoTravel()`) is commented out.
+- **Kept in library:** `buildSign()` and `window.__tinyworldStargate.build()` factories are untouched — just not placed.
+- **Restore:** un-comment the `on('enter')` line.
+
 ## Related items already hidden previously (not changed in this pass)
 
 - **Mesh Terrain standalone toggle button** (`mesh-terrain-toggle`) — `engine/world/46-mesh-terrain.js`, `toggleBtn.style.display = 'none'` (commented "hidden for now"). Restore: remove that line.

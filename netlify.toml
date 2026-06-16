@@ -42,6 +42,11 @@
   status = 200
 
 [[redirects]]
+  from = "/community"
+  to = "/community.html"
+  status = 200
+
+[[redirects]]
   from = "/worlds"
   to = "/worlds.html"
   status = 200

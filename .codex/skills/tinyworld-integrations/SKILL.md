@@ -18,6 +18,26 @@ backend:
   intents, `players.mjs` tracks online presence/search/chat requests/parties,
   and `livekit-token.mjs` issues LiveKit room tokens when `LIVEKIT_URL`,
   `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` are configured.
+- Community functions: `community.mjs` (`/api/community`) backs the `/community`
+  Discord-lite page — rooms, DMs, members, bans, blocks, invites; tables
+  auto-create + seed on first request. Channel names are forced lowercase and
+  the super-owner (`TINYWORLD_COMMUNITY_OWNER`, default `jasonkneen`) is made an
+  owner of every room each request via `ensureCommunityDefaults`. Only staff
+  (super-owner / `TINYWORLD_COMMUNITY_STAFF`) or a room owner can create/delete
+  channels and ban; the same `admin` flag gates every privileged action.
+  `community.html` signs users in **in-page** (no bounce to the builder): it
+  loads `vendor/tinyworld-auth.js` via the import map for Netlify Identity email
+  login/signup and calls `/api/wallet` for Phantom login, storing the session
+  under the shared `tinyworld:auth:wallet-session.v1` key.
+- Community moderation webhook: `community-webhook.mjs` (`/api/community/webhook`)
+  is a server-to-server endpoint for an agent (Hermes) to ban/unban/block/delete
+  messages/purge spam/delete rooms. Auth is a shared secret
+  (`TINYWORLD_COMMUNITY_WEBHOOK_SECRET`) via `x-tinyworld-signature: sha256=<hmac
+  of raw body>` (preferred) or `x-webhook-secret`. Shared primitives live in
+  `lib/community-moderation.mjs`; `community.mjs` also emits outbound
+  `message.created` events to `HERMES_COMMUNITY_WEBHOOK_URL` (signed, fire-and-
+  forget) so the agent can observe and react. Full reference:
+  `docs/community-webhook.md`.
 - User auth is Netlify Identity. The browser bridge is self-hosted through
   `vendor/tinyworld-auth.js` with an import map to vendored
   `@netlify/identity` / `gotrue-js`; do not reintroduce a remote identity

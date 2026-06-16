@@ -119,6 +119,32 @@
       window.addEventListener('tinyworld:avatar-picker-closed', onClosed);
       try { WS.openAvatarPicker(); } catch (_) { finish(true); }
     });
+    // Tinyverse is invite-only for now: only these accounts get in; everyone else
+    // sees the button as "Coming soon" (the Battleworlds treatment).
+    const TINYVERSE_ALLOWLIST = ['jason@bouncingfish.com', 'jason.kneen@gmail.com'];
+    async function tinyverseEmailAllowed() {
+      try {
+        const A = window.TinyWorldAuth;
+        if (A && typeof A.getUser === 'function') {
+          const u = await A.getUser();
+          const email = ((u && u.email) || '').trim().toLowerCase();
+          if (email) return TINYVERSE_ALLOWLIST.includes(email);
+        }
+      } catch (_) {}
+      return null; // not logged in / unknown
+    }
+    async function applyTinyverseAccessGate() {
+      if (!tinyverseBtn) return;
+      const allowed = await tinyverseEmailAllowed();
+      // Anyone who isn't a known-allowlisted account sees the "Coming soon" look.
+      tinyverseBtn.classList.toggle('is-soon', allowed !== true);
+      // Hard-disable only a KNOWN non-allowlisted account; leave it clickable when
+      // logged out so an allowlisted user can still sign in through the login gate.
+      if (allowed === false) tinyverseBtn.setAttribute('aria-disabled', 'true');
+      else tinyverseBtn.removeAttribute('aria-disabled');
+    }
+    window.__applyTinyverseGate = applyTinyverseAccessGate;
+
     let tinyverseOpening = false;
     const openTinyverse = async () => {
       if (tinyverseOpening) return;
@@ -133,6 +159,12 @@
           } else {
             showTinyverseUnavailable();
           }
+          return;
+        }
+        // 1b. Email allowlist gate — Tinyverse is invite-only for now.
+        if ((await tinyverseEmailAllowed()) !== true) {
+          applyTinyverseAccessGate();
+          if (typeof twToast === 'function') twToast('Tinyverse is coming soon');
           return;
         }
         setTinyverseLoading(true);
@@ -193,6 +225,7 @@
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('welcome-launch-open');
     if (tinyverseBtn) tinyverseBtn.addEventListener('click', openTinyverse);
+    applyTinyverseAccessGate();   // reflect the email allowlist on the Tinyverse button
     if (battleworldsBtn) battleworldsBtn.addEventListener('click', openBattleworlds);
     if (buildBtn) buildBtn.addEventListener('click', () => chooseWelcomeMode('build'));
     if (playBtn) playBtn.addEventListener('click', () => chooseWelcomeMode('play'));
@@ -1356,6 +1389,7 @@
     function enterApp() {
       closeTinyModal(modal);
       setLoggedInState(true);
+      if (typeof window.__applyTinyverseGate === 'function') window.__applyTinyverseGate();  // refresh Tinyverse access once email is known
       applyAccountAiEntitlement();
       bootApp();
       initAccountModal();
@@ -1538,6 +1572,14 @@
     twPerfMark('boot:start');
     appBooted = true;
     initWelcomeDialog();
+    // Top-right home button -> back to the marketing landing page (full nav to "/").
+    try {
+      const homeBtn = document.getElementById('landing-home-btn');
+      if (homeBtn && !homeBtn.__wired) {
+        homeBtn.__wired = true;
+        homeBtn.addEventListener('click', () => { window.location.href = '/'; });
+      }
+    } catch (_) {}
     twPerfMark('boot:welcome-ready');
     buildToolbar();
     twPerfMark('boot:toolbar-built');

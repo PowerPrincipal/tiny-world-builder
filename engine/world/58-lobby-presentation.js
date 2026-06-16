@@ -208,6 +208,29 @@
       };
       makeLadder(deckXL + 0.3);                         // left ladder
       makeLadder(deckXR - 0.3);                         // right ladder
+      // Single NARROW vertical ladder straight up the right leg to a railed top
+      // viewing deck. Replaces the old switchback stairs: one climb run, no
+      // sideways exposure, and a fully-railed deck so you don't fall off.
+      const HALF = 0.13;                              // rail half-spacing (narrow)
+      const RUNG_W = 0.30;
+      const ladder = (cx, cz, y0, y1) => {
+        box(0.045, (y1 - y0), 0.045, cx - HALF, (y0 + y1) / 2, cz, steel);   // left rail
+        box(0.045, (y1 - y0), 0.045, cx + HALF, (y0 + y1) / 2, cz, steel);   // right rail
+        for (let y = y0 + 0.22; y < y1; y += 0.27) box(RUNG_W, 0.04, 0.04, cx, y, cz, grate);  // rungs
+      };
+      ladder(PX, BZ, 0.1, TOP);
+      // marker so the climb mechanic (47) can locate this ladder: world pos + the
+      // climb volume (base->top) and where to step off at the top deck.
+      const ladderMarker = new THREE.Object3D();
+      ladderMarker.name = 'climb-ladder';
+      ladderMarker.position.set(PX, 0, BZ);
+      ladderMarker.userData = { climbable: true, baseY: 0.1, topY: TOP, halfW: HALF + 0.06, halfD: HALF + 0.06, exitDX: -0.5, exitDZ: -0.45 };
+      rig.add(ladderMarker);
+      // Railed top viewing deck beside the ladder top. platform() adds side posts +
+      // a back rail; add a front (screen-facing) rail too so it's enclosed.
+      const deckX = PX - 0.5, deckZ = BZ - 0.45;
+      platform(deckX, TOP, deckZ);
+      box(platW, 0.05, 0.05, deckX, TOP + 0.55, deckZ + (platD / 2 - 0.05));        // front rail
       group.add(rig);
       return rig;
     }

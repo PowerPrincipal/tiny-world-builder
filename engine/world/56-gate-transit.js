@@ -580,7 +580,10 @@
     // down on leave so re-entering a world never strands a stale gate. A short delay
     // lets the home board's cellMeshes exist so the gate seats on the ground.
     if (window.__tinyworldWorlds && typeof window.__tinyworldWorlds.on === 'function') {
-      window.__tinyworldWorlds.on('enter', () => { setTimeout(() => { try { placeGate(); placeLobbyGates(); startAutoTravel(); } catch (_) {} }, 600); });
+      // DISABLED: the edge portal + its sign are hidden for the lobby/demo. The
+      // buildSign() / stargate factories stay in the library — just not placed.
+      // Re-enable by restoring the placeGate()/placeLobbyGates()/startAutoTravel() calls.
+      // window.__tinyworldWorlds.on('enter', () => { setTimeout(() => { try { placeGate(); placeLobbyGates(); startAutoTravel(); } catch (_) {} }, 600); });
       window.__tinyworldWorlds.on('leave', () => { try { remove(); removeLobby(); } catch (_) {} });
     }
 

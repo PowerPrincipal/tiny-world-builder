@@ -1707,6 +1707,50 @@
   .audio-mute.muted .ic-off { display: block; }
 
   /* --- Sound icon (lives inside the bottom toolbar) --- */
+  /* Top-right corner chrome (home / sign out) — same glass treatment as the
+     sound/layers chrome buttons, parked above the welcome modal. */
+  .top-corner-chrome {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 80;
+    display: flex;
+    gap: 8px;
+  }
+  button.corner-chrome-btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.6);
+    color: #8a7a58;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.85) inset,
+      0 -1px 0 rgba(120, 130, 150, 0.10) inset,
+      0 1px 2px rgba(20, 30, 50, 0.05),
+      0 12px 36px -12px rgba(40, 50, 80, 0.22);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    transition: background 120ms ease, transform 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  }
+  .corner-chrome-btn:hover { color: var(--ink); transform: scale(1.02); }
+  .corner-chrome-btn:active { transform: scale(0.98); }
+  .corner-chrome-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .corner-chrome-btn[hidden] { display: none; }
+
   button.sound-icon {
     position: fixed;
     right: 24px;

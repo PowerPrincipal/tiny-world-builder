@@ -87,10 +87,19 @@
     function enterRoom(w, joinToken, joinRole) {
       leaveRoom();
       world = w; token = joinToken || ''; role = joinRole || 'play';
+      try { window.__tinyworldInWorldRoom = true; } catch (_) {}   // relax camera pan clamp (02) for island exploration
       gridSize = w.gridSize || 8; taxPercent = w.taxPercent != null ? w.taxPercent : null;
       cells = w.data && Array.isArray(w.data.cells) ? w.data.cells : [];
       rebuildBlocked();
-      if (w.data && typeof applyState === 'function') { try { applyState(w.data); } catch (_) {} }
+      if (w.data && typeof applyState === 'function') {
+        // The lobby/demo world is static (visitors don't edit it), so bake its
+        // ground tiles into merged meshes once it finishes rendering — big draw-call
+        // cut on the larger 20x20 board. onDone fires after tiles paint + settle.
+        const bakeOnDone = (w.slug === 'tidewater-bay')
+          ? { onDone: () => { try { if (typeof window.__tinyworldSetTerrainBakeForced === 'function') window.__tinyworldSetTerrainBakeForced(true); } catch (_) {} } }
+          : undefined;
+        try { applyState(w.data, bakeOnDone); } catch (_) {}
+      }
       // One map: hide the builder's own minimap, and lock out builder tools.
       hideBaseMinimap(true);
       setAmbientCrowdVisibleForRoom(false);
@@ -130,6 +139,14 @@
     function leaveRoom() {
       cancelWalk();
       stopAvatars();
+      try { window.__tinyworldInWorldRoom = false; } catch (_) {}   // restore tight board pin for the home builder
+      // Turn off the static terrain bake and restore live tiles before the world
+      // tears down, so the next world / home builder never inherits a stale merged
+      // mesh or a "baked" cell set that blocks re-baking.
+      try {
+        if (typeof window.__tinyworldSetTerrainBakeForced === 'function') window.__tinyworldSetTerrainBakeForced(false);
+        if (typeof window.__tinyworldUnbakeTerrain === 'function') window.__tinyworldUnbakeTerrain();
+      } catch (_) {}
       if (socket) { try { socket.close(); } catch (_) {} socket = null; }
       connected = false; peers.clear(); nodes = {}; animals = [];
       unbindInput(); hideMinimap();
@@ -1133,6 +1150,7 @@
       if (ny >= c.topY) { ny = c.topY; if (climbDir > 0) { exitClimbToPlatform(c); exited = true; } }
       else if (ny <= c.baseY) { ny = c.baseY; if (climbDir < 0) { sp.y = ny; ent._yc = ny; ent.ty = ny; exitClimbToGround(); exited = true; } }
       if (exited) return;
+      sp.x = c.cx; sp.z = c.cz;                          // stay locked to the ladder — no sideways fall-off
       sp.y = ny; ent._yc = ny; ent.ty = ny;
       // phase delta: 2*pi per ~0.5 world unit climbed -> a brisk hand-over-hand cadence.
       ent.voxel.climbAdvance(Math.abs(vy) * (Math.PI * 2 / 0.5));
@@ -1811,6 +1829,8 @@
         _wsGroundBox.setFromObject(cm.tile);
         if (isFinite(_wsGroundBox.max.y)) return _wsGroundBox.max.y;
       }
+      // Tile baked away (static lobby): use the height cached at bake time.
+      if (cm && typeof cm.bakedGroundY === 'number') return cm.bakedGroundY;
       return 0.02;
     }
     function placeEntity(ent) {
@@ -1985,6 +2005,9 @@
       const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
       return a + d * t;
     }
+    // Avatar's last rendered XZ — the camera follows only while it actually changes
+    // (i.e. while walking), so a standing player can pan freely without snap-back.
+    let _camFollowLastX = null, _camFollowLastZ = null;
     function updateAvatarCameraOrbit(dt) {
       if (!selfEnt || !selfEnt.sprite) return;
       // Freefall: hand the camera to the 3rd-person chase rig (behind + above the avatar).
@@ -2002,11 +2025,18 @@
       }
       if (typeof updateCamera !== 'function' || typeof target === 'undefined' || !target) return;
       // Follow the RENDERED position (tweened for voxel) so the camera glides with the
-      // avatar instead of snapping cell-to-cell. Position only — the player owns the orbit.
+      // avatar — BUT only while the avatar is actually MOVING. When it's idle, leave the
+      // target wherever the player panned it so they can look around the island without
+      // the view snapping back to the avatar. (Position only; the player owns the orbit.)
       const px = selfEnt.sprite.position.x, pz = selfEnt.sprite.position.z;
-      target.x += (px - target.x) * 0.15;
-      target.z += (pz - target.z) * 0.15;
-      target.y += (0 - target.y) * 0.18;                  // restore ground level after a landing
+      const moving = _camFollowLastX === null
+        || Math.hypot(px - _camFollowLastX, pz - _camFollowLastZ) > 0.0015;
+      _camFollowLastX = px; _camFollowLastZ = pz;
+      if (moving) {
+        target.x += (px - target.x) * 0.15;
+        target.z += (pz - target.z) * 0.15;
+        target.y += (0 - target.y) * 0.18;                // restore ground level after a landing
+      }
       updateCamera();
     }
 
