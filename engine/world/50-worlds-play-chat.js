@@ -160,6 +160,72 @@
         .tw-play-chat-pname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tw-play-chat-you { font-size: 9px; color: rgba(160,190,240,.55); background: rgba(80,110,200,.15);
           border: 1px solid rgba(80,110,200,.2); border-radius: 4px; padding: 1px 4px; flex-shrink: 0; }
+
+        /* Clickable names — zoom-to-player affordance. */
+        body.tw-worlds-play .mp-chat-name.tw-chat-clickable,
+        .tw-play-chat-pname.tw-chat-clickable { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color .1s; }
+        body.tw-worlds-play .mp-chat-name.tw-chat-clickable:hover,
+        .tw-play-chat-pname.tw-chat-clickable:hover { text-decoration-color: currentColor; }
+
+        /* Per-message meta row: name + time on the left, reply button on the right. */
+        body.tw-worlds-play .mp-chat-meta { display: flex; align-items: center; gap: 6px; }
+        .tw-chat-reply-btn {
+          margin-left: auto; flex-shrink: 0;
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 20px; height: 20px; padding: 0;
+          border: none; border-radius: 6px; background: transparent;
+          color: #7e9bd0; cursor: pointer; opacity: 0; transition: opacity .1s, background .1s, color .1s;
+        }
+        .mp-chat-msg:hover .tw-chat-reply-btn { opacity: 1; }
+        .tw-chat-reply-btn:hover { background: rgba(255,255,255,.08); color: #cfe0ff; }
+        .tw-chat-reply-btn:focus-visible { opacity: 1; outline: 2px solid rgba(80,130,230,.6); }
+
+        /* Quoted-parent block above a reply's text. */
+        .tw-chat-quote {
+          display: flex; flex-direction: column; gap: 1px; width: 100%;
+          margin: 0 0 4px; padding: 4px 8px; text-align: left;
+          border: none; border-left: 2px solid rgba(120,160,240,.55);
+          border-radius: 4px; background: rgba(80,110,200,.12);
+          cursor: pointer; font-family: 'Space Grotesk', system-ui, sans-serif;
+        }
+        .tw-chat-quote:hover { background: rgba(80,110,200,.2); }
+        .tw-chat-quote-name { font-size: 10px; font-weight: 700; color: #9db8ee; }
+        .tw-chat-quote-text { font-size: 11px; color: rgba(200,216,245,.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Brief flash when jumping to an original message. */
+        @keyframes tw-chat-jump { 0% { background: rgba(90,138,224,.5); } 100% { background: rgba(20,30,60,.35); } }
+        body.tw-worlds-play .mp-chat-msg.tw-chat-jumped { animation: tw-chat-jump 1.1s ease-out; }
+
+        /* "Replying to ..." bar above the input. */
+        .tw-chat-replybar {
+          display: none; align-items: center; gap: 8px; flex: 0 0 auto;
+          margin: 0 1px 4px; padding: 5px 8px;
+          border: 1px solid rgba(80,110,200,.22); border-left: 2px solid rgba(120,160,240,.6);
+          border-radius: 8px; background: rgba(80,110,200,.12);
+          font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 11px; color: #cfe0ff;
+        }
+        .tw-chat-replybar.is-active { display: flex; }
+        .tw-chat-replybar-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+        .tw-chat-replybar-label { font-size: 10px; color: #9db8ee; }
+        .tw-chat-replybar-label b { color: #cfe0ff; }
+        .tw-chat-replybar-snip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(200,216,245,.7); }
+        .tw-chat-replybar-x {
+          flex-shrink: 0; width: 20px; height: 20px; padding: 0;
+          display: inline-flex; align-items: center; justify-content: center;
+          border: none; border-radius: 6px; background: transparent; color: #8aa4d0; cursor: pointer;
+        }
+        .tw-chat-replybar-x:hover { background: rgba(255,255,255,.08); color: #cfe0ff; }
+
+        /* Resize grip — bottom-right inner corner. */
+        .mp-chat-panel { position: relative; }
+        .tw-chat-resize {
+          position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
+          cursor: nwse-resize; touch-action: none; z-index: 2; opacity: .5;
+          background:
+            linear-gradient(135deg, transparent 0 50%, rgba(150,180,240,.7) 50% 60%, transparent 60% 70%, rgba(150,180,240,.7) 70% 80%, transparent 80%);
+        }
+        .tw-chat-resize:hover { opacity: 1; }
+        .mp-chat-panel.resizing { transition: none; user-select: none; }
       `;
       document.head.appendChild(s);
     }
@@ -168,12 +234,15 @@
     let toggleEl = null, panelEl = null, logEl = null, typingEl = null;
     let inputEl = null, playersEl = null, badgeEl = null;
     let chatTabEl = null, playersTabEl = null;
+    let replyBarEl = null, replyBarLabelEl = null, replyBarSnipEl = null;
     let activeTab = 'chat';
     let isOpen = false;
     let unread = 0;
     let typingPeers = new Map(); // id -> { name, timer }
     let myId = null;
     let peers = [];
+    let pendingReply = null; // { id, name, snippet } while composing a reply
+    const SIZE_LS = 'tinyworld:playchat:size';
 
     // ---- helpers -----------------------------------------------------------
     function initials(name) {
@@ -187,6 +256,53 @@
     }
 
     function isVisible() { return !!panelEl && panelEl.classList.contains('visible'); }
+
+    function loadSize() {
+      try {
+        const raw = localStorage.getItem(SIZE_LS);
+        if (!raw) return null;
+        const v = JSON.parse(raw);
+        if (v && Number.isFinite(v.w) && Number.isFinite(v.h)) return v;
+      } catch (_) {}
+      return null;
+    }
+    function saveSize(w, h) {
+      try { localStorage.setItem(SIZE_LS, JSON.stringify({ w: Math.round(w), h: Math.round(h) })); } catch (_) {}
+    }
+
+    function focusPlayer(id) {
+      if (id != null && typeof WS.focusPlayer === 'function') WS.focusPlayer(id);
+    }
+
+    function clearPendingReply() {
+      pendingReply = null;
+      if (replyBarEl) replyBarEl.classList.remove('is-active');
+    }
+    function setPendingReply(d) {
+      const id = d && d.mid;
+      if (!id) return; // without a stable message id the reply can't round-trip
+      pendingReply = { id, name: d.name || 'Player', snippet: String(d.text || '').slice(0, 120) };
+      if (replyBarEl) {
+        replyBarLabelEl.innerHTML = '';
+        replyBarLabelEl.appendChild(document.createTextNode('Replying to '));
+        const b = document.createElement('b');
+        b.textContent = pendingReply.name;
+        replyBarLabelEl.appendChild(b);
+        replyBarSnipEl.textContent = pendingReply.snippet;
+        replyBarEl.classList.add('is-active');
+      }
+      if (inputEl) inputEl.focus();
+    }
+    function jumpToMessage(mid) {
+      if (!logEl || !mid) return;
+      const orig = logEl.querySelector('[data-mid="' + (window.CSS && CSS.escape ? CSS.escape(mid) : mid) + '"]');
+      if (!orig) return;
+      orig.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      orig.classList.remove('tw-chat-jumped');
+      // reflow so the animation restarts even on repeat clicks
+      void orig.offsetWidth;
+      orig.classList.add('tw-chat-jumped');
+    }
 
     // ---- DOM ---------------------------------------------------------------
     function ensureToggle() {
@@ -278,10 +394,15 @@
       form.addEventListener('submit', (ev) => {
         ev.preventDefault();
         const text = input.value.trim();
-        if (text && typeof WS.sendChat === 'function') WS.sendChat(text);
+        if (text && typeof WS.sendChat === 'function') WS.sendChat(text, pendingReply);
         input.value = '';
+        clearPendingReply();
         clearTimeout(typingTimer);
         if (typeof WS.sendTyping === 'function') WS.sendTyping(false);
+      });
+      // Esc clears a pending reply (before it would bubble to close the panel).
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && pendingReply) { ev.stopPropagation(); clearPendingReply(); }
       });
       input.addEventListener('input', () => {
         if (typeof WS.sendTyping === 'function') {
@@ -297,12 +418,39 @@
         if (typeof WS.sendTyping === 'function') WS.sendTyping(false);
       });
 
+      // Reply bar (above the input; hidden until you reply to a message)
+      const replyBar = document.createElement('div');
+      replyBar.className = 'tw-chat-replybar';
+      const replyBody = document.createElement('div');
+      replyBody.className = 'tw-chat-replybar-body';
+      const replyLabel = document.createElement('span');
+      replyLabel.className = 'tw-chat-replybar-label';
+      const replySnip = document.createElement('span');
+      replySnip.className = 'tw-chat-replybar-snip';
+      replyBody.appendChild(replyLabel);
+      replyBody.appendChild(replySnip);
+      const replyX = document.createElement('button');
+      replyX.type = 'button';
+      replyX.className = 'tw-chat-replybar-x';
+      replyX.setAttribute('aria-label', 'Cancel reply');
+      replyX.appendChild(ic('close', 12));
+      replyX.addEventListener('click', clearPendingReply);
+      replyBar.appendChild(replyBody);
+      replyBar.appendChild(replyX);
+
+      // Resize grip (bottom-right inner corner)
+      const grip = document.createElement('div');
+      grip.className = 'tw-chat-resize';
+      grip.setAttribute('aria-hidden', 'true');
+
       panel.appendChild(head);
       panel.appendChild(tabs);
       panel.appendChild(log);
       panel.appendChild(players);
       panel.appendChild(typing);
+      panel.appendChild(replyBar);
       panel.appendChild(form);
+      panel.appendChild(grip);
       document.body.appendChild(panel);
 
       panelEl = panel;
@@ -310,10 +458,49 @@
       typingEl = typing;
       inputEl = input;
       playersEl = players;
+      replyBarEl = replyBar;
+      replyBarLabelEl = replyLabel;
+      replyBarSnipEl = replySnip;
+
+      // Restore a previously chosen size (stays bottom-right anchored, so it
+      // grows up/left from the corner — never off-screen).
+      const saved = loadSize();
+      if (saved) {
+        panel.style.width = Math.min(saved.w, window.innerWidth - 16) + 'px';
+        panel.style.height = Math.min(saved.h, window.innerHeight - 16) + 'px';
+      }
 
       wireDrag(panel, head);
+      wireResize(panel, grip);
       setTab('chat');
       return panel;
+    }
+
+    // ---- resize ------------------------------------------------------------
+    function wireResize(panel, grip) {
+      const MINW = 240, MINH = 280;
+      let rz = false, sx = 0, sy = 0, sw = 0, sh = 0, baseL = 0, baseT = 0;
+      grip.addEventListener('pointerdown', (e) => {
+        rz = true; panel.classList.add('resizing');
+        const r = panel.getBoundingClientRect();
+        // Normalize to top/left so the panel grows down/right from a fixed corner.
+        panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
+        panel.style.right = 'auto'; panel.style.bottom = 'auto';
+        baseL = r.left; baseT = r.top; sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height;
+        grip.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      grip.addEventListener('pointermove', (e) => {
+        if (!rz) return;
+        const maxW = window.innerWidth - baseL - 8;
+        const maxH = window.innerHeight - baseT - 8;
+        panel.style.width = Math.max(MINW, Math.min(maxW, sw + (e.clientX - sx))) + 'px';
+        panel.style.height = Math.max(MINH, Math.min(maxH, sh + (e.clientY - sy))) + 'px';
+      });
+      grip.addEventListener('pointerup', () => {
+        if (!rz) return; rz = false; panel.classList.remove('resizing');
+        saveSize(panel.offsetWidth, panel.offsetHeight);
+      });
     }
 
     function makeTab(label, iconName, active) {
@@ -406,6 +593,25 @@
       const self = d.id && d.id === currentId;
       const row = document.createElement('div');
       row.className = 'mp-chat-msg' + (self ? ' is-self' : '');
+      if (d.mid) row.dataset.mid = d.mid;
+
+      // Quoted parent (denormalized on the message — renders even if we never
+      // saw the original). Clicking scrolls to the original when it's in the log.
+      if (d.replyTo && (d.replyTo.name || d.replyTo.snippet)) {
+        const q = document.createElement('button');
+        q.type = 'button';
+        q.className = 'tw-chat-quote';
+        const qn = document.createElement('span');
+        qn.className = 'tw-chat-quote-name';
+        qn.textContent = d.replyTo.name || 'Player';
+        const qt = document.createElement('span');
+        qt.className = 'tw-chat-quote-text';
+        qt.textContent = d.replyTo.snippet || '';
+        q.appendChild(qn);
+        q.appendChild(qt);
+        q.addEventListener('click', () => jumpToMessage(d.replyTo.id));
+        row.appendChild(q);
+      }
 
       const meta = document.createElement('div');
       meta.className = 'mp-chat-meta';
@@ -419,15 +625,30 @@
       meta.appendChild(av);
 
       const nameEl = document.createElement('span');
-      nameEl.className = 'mp-chat-name';
+      nameEl.className = 'mp-chat-name tw-chat-clickable';
       nameEl.style.color = d.color || peerColor(d.id);
       nameEl.textContent = d.name || 'Player';
+      nameEl.setAttribute('role', 'button');
+      nameEl.tabIndex = 0;
+      nameEl.title = 'Zoom to ' + (d.name || 'player');
+      nameEl.addEventListener('click', () => focusPlayer(d.id));
+      nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusPlayer(d.id); } });
       meta.appendChild(nameEl);
 
       const timeEl = document.createElement('span');
       timeEl.className = 'mp-chat-time';
       timeEl.textContent = fmtTime(d.ts);
       meta.appendChild(timeEl);
+
+      // Reply affordance (appears on row hover; needs a stable message id).
+      const replyBtn = document.createElement('button');
+      replyBtn.type = 'button';
+      replyBtn.className = 'tw-chat-reply-btn';
+      replyBtn.setAttribute('aria-label', 'Reply');
+      replyBtn.title = 'Reply';
+      replyBtn.appendChild(ic('reply', 13));
+      replyBtn.addEventListener('click', () => setPendingReply(d));
+      meta.appendChild(replyBtn);
 
       const textEl = document.createElement('div');
       textEl.className = 'mp-chat-text';
@@ -499,9 +720,14 @@
       av.style.background = color;
       av.textContent = initials(name);
       const nameEl = document.createElement('span');
-      nameEl.className = 'tw-play-chat-pname';
+      nameEl.className = 'tw-play-chat-pname tw-chat-clickable';
       nameEl.style.color = color;
       nameEl.textContent = name;
+      nameEl.setAttribute('role', 'button');
+      nameEl.tabIndex = 0;
+      nameEl.title = 'Zoom to ' + name;
+      nameEl.addEventListener('click', () => focusPlayer(id));
+      nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusPlayer(id); } });
       row.appendChild(av);
       row.appendChild(nameEl);
       if (isSelf) {
@@ -527,6 +753,7 @@
       // Reset state
       typingPeers.clear();
       if (typingEl) typingEl.textContent = '';
+      clearPendingReply();
       peers = [];
       unread = 0;
     });
@@ -553,6 +780,19 @@
       if (d && !d.connected) {
         typingPeers.clear();
         renderTyping();
+      }
+    });
+
+    // Keep a resized/moved panel inside the viewport when the window shrinks.
+    window.addEventListener('resize', () => {
+      if (!panelEl) return;
+      const maxW = window.innerWidth - 16, maxH = window.innerHeight - 16;
+      if (panelEl.offsetWidth > maxW) panelEl.style.width = maxW + 'px';
+      if (panelEl.offsetHeight > maxH) panelEl.style.height = maxH + 'px';
+      if (panelEl.style.left && panelEl.style.left !== 'auto') {
+        const pw = panelEl.offsetWidth, ph = panelEl.offsetHeight;
+        panelEl.style.left = Math.min(Math.max(0, parseFloat(panelEl.style.left)), window.innerWidth - pw) + 'px';
+        panelEl.style.top = Math.min(Math.max(0, parseFloat(panelEl.style.top)), window.innerHeight - ph) + 'px';
       }
     });
 

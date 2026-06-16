@@ -719,7 +719,22 @@ export default class TinyWorldParty {
       if (!text) return;
       const known = this.presence.get(sender.id);
       const name = cleanText((known && known.name) || data.name || 'Builder', 48) || 'Builder';
-      this.broadcastToAdmitted({ type: 'chat', id: sender.id, name, text, ts: Date.now() });
+      // Monotonic per-room message id so replies can reference a specific line
+      // (sender id collides across messages; ts can collide within a ms).
+      const mid = 'm' + (this.chatSeq = (this.chatSeq || 0) + 1);
+      // Quote-reply: carry a DENORMALIZED snapshot of the parent (id + name +
+      // snippet) so a reply renders even for a peer that never saw the original
+      // (no history replay on join). All fields are length-capped server-side.
+      let replyTo = null;
+      if (data.replyTo && typeof data.replyTo === 'object') {
+        const rid = cleanText(data.replyTo.id, 64);
+        const rname = cleanText(data.replyTo.name, 48);
+        const rsnip = cleanText(data.replyTo.snippet, 120);
+        if (rid && (rname || rsnip)) replyTo = { id: rid, name: rname || 'Builder', snippet: rsnip };
+      }
+      const msg = { type: 'chat', mid, id: sender.id, name, text, ts: Date.now() };
+      if (replyTo) msg.replyTo = replyTo;
+      this.broadcastToAdmitted(msg);
       return;
     }
 

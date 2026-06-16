@@ -1240,8 +1240,59 @@
       toast('No ' + action + ' node in reach');
     }
     WS.harvest = harvest;
-    WS.sendChat = (text) => { const t2 = String(text || '').slice(0, 280).trim(); if (t2) send({ type: 'chat', text: t2 }); };
+    WS.sendChat = (text, replyTo) => {
+      const t2 = String(text || '').slice(0, 280).trim();
+      if (!t2) return;
+      const msg = { type: 'chat', text: t2 };
+      if (replyTo && typeof replyTo === 'object' && replyTo.id) {
+        msg.replyTo = {
+          id: String(replyTo.id).slice(0, 64),
+          name: String(replyTo.name || '').slice(0, 48),
+          snippet: String(replyTo.snippet || '').slice(0, 120),
+        };
+      }
+      send(msg);
+    };
     WS.sendTyping = (typing) => { send({ type: 'chat.typing', typing: !!typing }); };
+
+    // Smoothly fly the orbit camera onto a player's avatar (self or peer). The
+    // chat panel (module 50, isolated IIFE) calls this; the camera state
+    // (target / viewSize / updateCamera / clampViewSize) lives in the shared
+    // engine scope, which only this module can reach. Guarded to the in-world
+    // room + orbit mode — skyfall / surface-roam / first-person drive the camera
+    // directly and bypass updateCamera, so writing `target` there is a no-op.
+    const _focusTmp = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+    let _focusRaf = null;
+    WS.focusPlayer = function (id) {
+      if (!connected || !window.__tinyworldInWorldRoom) { toast('Enter a world to focus a player'); return false; }
+      if (selfEnt && (selfEnt._skyfall || selfEnt._srActive || selfEnt._traveling)) { toast('Cannot focus a player right now'); return false; }
+      const ent = (id != null && id === myId) ? selfEnt : peerEnts.get(id);
+      if (!ent || !ent.sprite || !_focusTmp || typeof target === 'undefined' || !target) { toast('That player is not in view'); return false; }
+      if (_focusRaf) { cancelAnimationFrame(_focusRaf); _focusRaf = null; }
+      const sTx = target.x, sTy = target.y, sTz = target.z;
+      const hasVs = (typeof viewSize !== 'undefined');
+      const sVs = hasVs ? viewSize : 0;
+      const tVs = hasVs ? Math.max(3.2, sVs * 0.5) : 0;   // zoom in, but not past a sane floor
+      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const DUR = 420;
+      function step() {
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const k = Math.min(1, (now - t0) / DUR);
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // easeInOutQuad
+        ent.sprite.getWorldPosition(_focusTmp);   // re-read each frame so a moving peer is tracked
+        target.x = sTx + (_focusTmp.x - sTx) * e;
+        target.y = sTy + (_focusTmp.y - sTy) * e;
+        target.z = sTz + (_focusTmp.z - sTz) * e;
+        if (hasVs) {
+          const v = sVs + (tVs - sVs) * e;
+          viewSize = (typeof clampViewSize === 'function') ? clampViewSize(v) : v;
+        }
+        if (typeof updateCamera === 'function') updateCamera();
+        if (k < 1) _focusRaf = requestAnimationFrame(step); else _focusRaf = null;
+      }
+      _focusRaf = requestAnimationFrame(step);
+      return true;
+    };
   
     // ---- input ----
     function onKey(e) {
