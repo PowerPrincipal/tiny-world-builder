@@ -73,6 +73,10 @@ const RATE_LIMITS = {
   present: { refill: 4, burst: 10 },
 };
 
+// Server-side allowlist for chat emotes (client EMOTES table in 47-worlds-room.js
+// must stay in sync). Anything not in this set is rejected — no spoofed states.
+export const EMOTE_CMDS = new Set(['wave', 'dance', 'jump', 'sit', 'crouch', 'attack']);
+
 function takeToken(buckets, type, now) {
   const cfg = RATE_LIMITS[type];
   if (!cfg) return true;
@@ -735,6 +739,22 @@ export default class TinyWorldParty {
       const msg = { type: 'chat', mid, id: sender.id, name, text, ts: Date.now() };
       if (replyTo) msg.replyTo = replyTo;
       this.broadcastToAdmitted(msg);
+      return;
+    }
+
+    if (data.type === 'emote') {
+      // Chat-triggered avatar emote. NOT host-gated: any admitted peer may emote.
+      // Identity is server-authoritative — id is stamped from sender.id (no spoof)
+      // and name is taken from the trusted presence record. cmd is validated
+      // against EMOTE_CMDS (reject anything else). Broadcast to ALL admitted
+      // INCLUDING the sender so the action line renders through one path on every
+      // client (the sender's own line included), server-ordered.
+      if (!this.admitted.has(sender.id)) return;
+      const cmd = cleanText(data.cmd, 16);
+      if (!EMOTE_CMDS.has(cmd)) return;
+      const known = this.presence.get(sender.id);
+      const name = cleanText((known && known.name) || data.name || 'Builder', 48) || 'Builder';
+      this.broadcastToAdmitted({ type: 'emote', id: sender.id, name, cmd, ts: Date.now() });
       return;
     }
 
