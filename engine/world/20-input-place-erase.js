@@ -161,21 +161,22 @@
     return true;
   }
 
-  // Read-only mirror of applySelectedToolToSelection's gating (above) so the
+  // Read-only mirror of applySelectedToolToSelection's STATIC gating so the
   // Properties panel can disable the "Apply tool" chip when the action would
-  // no-op (feedback #5). Mirrors the handler's false-returning guards exactly —
-  // no more, no less — so keep this beside applySelectedToolToSelection.
+  // no-op (feedback #5). This runs on the panel-refresh path, so it MUST be
+  // strictly side-effect-free: it gates only on cheap, statically-knowable
+  // conditions and never calls sel.materialize() — materializeSelectedCells()
+  // mutates the world (setCell, ghost-mesh removal, key rewrite, userEdited),
+  // which must not happen just by rendering the panel. A non-empty selection is
+  // enough here; the genuinely-runtime "no cell accepted placement" outcome is
+  // covered by the dispatcher's failure toast, not pre-computed.
   function canApplySelectedToolToSelection() {
     if (window.__tinyworldIsPlayMode && window.__tinyworldIsPlayMode()) return false;
     const sel = window.__tinyworldSelection;
     if (!sel || !sel.cells || !sel.cells.size) return false;
     if (!selectedTool || selectedTool.select || selectedTool.auto || selectedTool.island || selectedTool.mooring) return false;
-    const selectedCoords = sel.materialize ? sel.materialize() : (sel.worldCoords ? sel.worldCoords() : []);
-    if (!selectedCoords.length) return false;
     // Asset-template tools no-op when their template clipboard is missing/invalid
-    // (handler's static false path). This lookup is read-only — no mutation. The
-    // runtime "no placement succeeded" outcome is NOT statically knowable and is
-    // covered by the dispatcher's failure toast, so it is deliberately not here.
+    // (handler's static false path). This lookup is read-only — no mutation.
     if (selectedTool.kind === 'asset-template') {
       const template = selectedTool.assetTemplate || assetTemplateById(selectedTool.assetTemplateId || selectedAssetTemplateId);
       if (!normalizeClipboardPayload(template && template.clipboard)) return false;
