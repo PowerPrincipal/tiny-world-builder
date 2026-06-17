@@ -226,8 +226,11 @@
         }
         .tw-chat-replybar-x:hover { background: rgba(255,255,255,.08); color: #cfe0ff; }
 
-        /* Resize grip — bottom-right inner corner. */
-        .mp-chat-panel { position: relative; }
+        /* Resize grip — bottom-right inner corner. The panel keeps the base
+           stylesheet's position:fixed (bottom-right anchored); fixed already
+           establishes a containing block for this absolutely-positioned grip,
+           so we must NOT override it with position:relative (that drops the
+           panel into normal flow and it opens top-left). */
         .tw-chat-resize {
           position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
           cursor: nwse-resize; touch-action: none; z-index: 2; opacity: .5;

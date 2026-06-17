@@ -2494,7 +2494,7 @@
     // avatar's head. Rendered to a CanvasTexture on a THREE.Sprite, so it always
     // faces the camera (the viewer) without any per-frame rotation. Same visual as
     // the 2D-map peer labels (makeNameSprite in 38-multiplayer-partykit). ----
-    const NAME_HEAD_Y = 1.46;   // world-units above the avatar's feet; pill center clears the head
+    const NAME_HEAD_Y = 1.15;   // world-units above the avatar's feet; pill center sits just over the head
     function roundRectLabel(ctx, x, y, w, h, r) {
       ctx.beginPath();
       ctx.moveTo(x + r, y);

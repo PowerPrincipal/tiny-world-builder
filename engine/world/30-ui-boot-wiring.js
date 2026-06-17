@@ -1039,6 +1039,10 @@
 
     let userProfile = null;
     let userBuilds = [];
+    // Expose the signed-in profile so other modules can read the real username.
+    // The multiplayer name tag (47-worlds-room) looks for account.profile() —
+    // without this it always falls back to the generic "Player" label.
+    window.__tinyworldAccount = { profile: function () { return userProfile; } };
 
     function showTab(tab) {
       tabProfile.classList.toggle('active', tab === 'profile');
