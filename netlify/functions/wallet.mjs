@@ -88,19 +88,78 @@ function walletLoginUserDto(user, publicKey) {
   };
 }
 
-// Sentinel thrown when a wallet is already linked to a different profile, so the
-// caller can return a 409 instead of silently reassigning ownership.
+// Sentinel thrown when a wallet is already linked to a different non-anonymous
+// profile, so the caller can return a 409 instead of silently reassigning
+// ownership.
 class WalletOwnedByOtherProfile extends Error {}
 
-async function linkWalletToProfile(sql, profile, publicKey) {
+function walletAuthId(publicKey) {
+  return 'wallet:' + publicKey;
+}
+
+function sameProfileId(a, b) {
+  return String(a) === String(b);
+}
+
+async function linkedWalletOwner(sql, publicKey) {
   // public_key is globally unique (migration: wallet_accounts_public_key_unique).
-  // Without this check, ON CONFLICT DO UPDATE would flip an existing wallet's
-  // owner from another profile to this one, defeating the per-profile payment
-  // authorization in world-claim.mjs. Reject instead of reassigning.
-  const existing = await sql`
-    SELECT profile_id FROM wallet_accounts WHERE public_key = ${publicKey} LIMIT 1
+  // Without checking the owner, ON CONFLICT DO UPDATE would flip an existing
+  // wallet's owner from another profile to this one, defeating the per-profile
+  // payment authorization in world-claim.mjs.
+  const rows = await sql`
+    SELECT wa.id AS wallet_id, wa.profile_id, p.auth0_id
+    FROM wallet_accounts wa
+    JOIN profiles p ON p.id = wa.profile_id
+    WHERE wa.public_key = ${publicKey}
+    LIMIT 1
   `;
-  if (existing.length && existing[0].profile_id !== profile.id) {
+  return rows[0] || null;
+}
+
+async function archiveAnonymousWalletProfile(sql, anonymousProfileId, targetProfileId) {
+  await sql`
+    UPDATE profiles
+    SET archived_at = COALESCE(archived_at, NOW()),
+        merged_into_profile_id = ${targetProfileId},
+        merged_reason = 'wallet_account_merge',
+        updated_at = NOW()
+    WHERE id = ${anonymousProfileId}
+      AND auth0_id LIKE 'wallet:%'
+  `;
+}
+
+async function moveAnonymousWalletToProfile(sql, profile, publicKey, owner) {
+  if (!owner || sameProfileId(owner.profile_id, profile.id)) return false;
+  if (owner.auth0_id !== walletAuthId(publicKey)) {
+    throw new WalletOwnedByOtherProfile('Wallet already linked to another account');
+  }
+  await sql.begin(async tx => {
+    await tx`
+      DELETE FROM wallet_accounts
+      WHERE profile_id = ${profile.id}
+        AND provider = 'phantom'
+        AND public_key <> ${publicKey}
+    `;
+    await tx`
+      UPDATE wallet_accounts
+      SET profile_id = ${profile.id},
+          provider = 'phantom',
+          verified_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ${owner.wallet_id}
+    `;
+    await archiveAnonymousWalletProfile(tx, owner.profile_id, profile.id);
+  });
+  return true;
+}
+
+async function linkWalletToProfile(sql, profile, publicKey, options = {}) {
+  const existingOwner = await linkedWalletOwner(sql, publicKey);
+  if (existingOwner && !sameProfileId(existingOwner.profile_id, profile.id)) {
+    if (options.mergeAnonymousWalletProfile) {
+      const moved = await moveAnonymousWalletToProfile(sql, profile, publicKey, existingOwner);
+      if (moved) return { mergedAnonymousProfileId: existingOwner.profile_id };
+    }
     throw new WalletOwnedByOtherProfile('Wallet already linked to another account');
   }
   await sql`
@@ -118,6 +177,7 @@ async function linkWalletToProfile(sql, profile, publicKey) {
           verified_at = NOW(),
           updated_at = NOW()
   `;
+  return { mergedAnonymousProfileId: null };
 }
 
 async function walletPayload(sql, profile, options = {}) {
@@ -279,8 +339,16 @@ export default async function walletFunction(request) {
         SET consumed_at = NOW()
         WHERE id = ${challenges[0].id}
       `;
-      await linkWalletToProfile(sql, profile, publicKey);
-      return jsonResponse(await walletPayload(sql, profile), origin, 201);
+      const result = await linkWalletToProfile(sql, profile, publicKey, {
+        mergeAnonymousWalletProfile: true,
+      });
+      const payload = await walletPayload(sql, profile);
+      return jsonResponse(Object.assign(payload, {
+        accountMerge: result.mergedAnonymousProfileId ? {
+          archivedProfileId: result.mergedAnonymousProfileId,
+          targetProfileId: profile.id,
+        } : null,
+      }), origin, 201);
     }
 
     if (action === 'disconnect') {

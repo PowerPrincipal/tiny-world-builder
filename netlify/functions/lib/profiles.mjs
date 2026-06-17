@@ -62,6 +62,8 @@ export function profileDto(row) {
     github: row.github || '',
     lobbyAccess: !!row.lobby_access,
     passwordResetRequestedAt: row.password_reset_requested_at || null,
+    archivedAt: row.archived_at || null,
+    mergedIntoProfileId: row.merged_into_profile_id || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -74,19 +76,28 @@ function userEmail(user) {
 export async function ensureProfile(user) {
   const sql = getSql();
   const existing = await sql`
-    SELECT id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, created_at, updated_at
+    SELECT id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, archived_at, merged_into_profile_id, created_at, updated_at
     FROM profiles
     WHERE auth0_id = ${user.id}
     LIMIT 1
   `;
   if (existing.length) {
+    if (existing[0].archived_at && existing[0].merged_into_profile_id) {
+      const merged = await sql`
+        SELECT id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, archived_at, merged_into_profile_id, created_at, updated_at
+        FROM profiles
+        WHERE id = ${existing[0].merged_into_profile_id}
+        LIMIT 1
+      `;
+      if (merged.length) return merged[0];
+    }
     const email = userEmail(user);
     if (email && existing[0].email !== email) {
       const updated = await sql`
         UPDATE profiles
         SET email = ${email}, updated_at = NOW()
         WHERE id = ${existing[0].id}
-        RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, created_at, updated_at
+        RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, archived_at, merged_into_profile_id, created_at, updated_at
       `;
       if (updated.length) return updated[0];
     }
@@ -102,7 +113,7 @@ export async function ensureProfile(user) {
       INSERT INTO profiles (auth0_id, email, username, display_name, about, image)
       VALUES (${user.id}, ${email}, ${username}, ${displayName}, '', ${image})
       ON CONFLICT (auth0_id) DO NOTHING
-      RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, created_at, updated_at
+      RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, archived_at, merged_into_profile_id, created_at, updated_at
     `;
     if (inserted.length) return inserted[0];
   } catch (err) {
@@ -114,7 +125,7 @@ export async function ensureProfile(user) {
     INSERT INTO profiles (auth0_id, email, username, display_name, about, image)
     VALUES (${user.id}, ${email}, ${fallbackUsername}, ${displayName}, '', ${image})
     ON CONFLICT (auth0_id) DO UPDATE SET updated_at = profiles.updated_at
-    RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, created_at, updated_at
+    RETURNING id, auth0_id, email, username, display_name, about, image, twitter, github, lobby_access, password_reset_requested_at, archived_at, merged_into_profile_id, created_at, updated_at
   `;
   return fallback[0];
 }
