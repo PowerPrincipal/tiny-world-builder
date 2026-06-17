@@ -163,26 +163,33 @@
 
   // Read-only mirror of applySelectedToolToSelection's gating (above) so the
   // Properties panel can disable the "Apply tool" chip when the action would
-  // no-op (feedback #5). Keep this beside applySelectedToolToSelection so the
-  // two stay in sync if the guards change.
+  // no-op (feedback #5). Mirrors the handler's false-returning guards exactly —
+  // no more, no less — so keep this beside applySelectedToolToSelection.
   function canApplySelectedToolToSelection() {
     if (window.__tinyworldIsPlayMode && window.__tinyworldIsPlayMode()) return false;
     const sel = window.__tinyworldSelection;
     if (!sel || !sel.cells || !sel.cells.size) return false;
     if (!selectedTool || selectedTool.select || selectedTool.auto || selectedTool.island || selectedTool.mooring) return false;
+    const selectedCoords = sel.materialize ? sel.materialize() : (sel.worldCoords ? sel.worldCoords() : []);
+    if (!selectedCoords.length) return false;
     return true;
   }
 
-  // True when there is a clipboard payload (copy/cut, or a single hovered cell
-  // captured for copy) that paste could place. Mirrors pasteClipboardAtTarget's
-  // content check so the panel can disable a "Paste" chip that would no-op.
+  // True when "Paste" would actually place something. Mirrors the full false
+  // path of pasteClipboardAtActiveTarget → pasteClipboardPayloadAtTarget: it
+  // needs edit permission (mpEditAllowed — read-only/play roles return false)
+  // AND a clipboard payload (copy/cut, or a single copied hover cell).
   function clipboardHasContent() {
+    if (!mpEditAllowed()) return false;
     if (assetClipboard && assetClipboard.cells && assetClipboard.cells.length) return true;
     return !!copiedHoverCell;
   }
 
-  // True when a saved asset template exists for "Paste latest".
+  // True when "Paste latest" would succeed: edit permission allowed AND a saved
+  // asset template exists. Mirrors pasteLatestTemplateAtActiveTarget's false path
+  // (the paste it calls also gates on mpEditAllowed).
   function latestTemplateAvailable() {
+    if (!mpEditAllowed()) return false;
     return !!latestTemplateClipboardPayload();
   }
 

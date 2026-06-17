@@ -1891,20 +1891,27 @@
       }
       if (rowKey === 'voxelSculpt') {
         const se = window.__tinyworldSubEdit;
-        if (se) { if (value === 'remove' && se.removeVoxel) se.removeVoxel(); else if (value === 'smooth' && se.smoothVoxel) se.smoothVoxel(); }
+        let ok;
+        if (se) { if (value === 'remove' && se.removeVoxel) ok = se.removeVoxel(); else if (value === 'smooth' && se.smoothVoxel) ok = se.smoothVoxel(); }
+        // Same failure-feedback contract as the selectionAction dispatcher: a
+        // voxel sculpt that no-ops (e.g. non-voxel part) surfaces a toast rather
+        // than silently swallowing the false (feedback #5).
+        if (ok === false && typeof twToast === 'function') twToast(window.t('props.action.failed'), 'warn');
         renderSelection();
         return;
       }
       if (rowKey === 'voxelAdd') {
         const se = window.__tinyworldSubEdit;
+        let ok;
         if (se && se.addVoxel) {
-          if (value === 'x-') se.addVoxel(-1, 0, 0);
-          else if (value === 'x+') se.addVoxel(1, 0, 0);
-          else if (value === 'y-') se.addVoxel(0, -1, 0);
-          else if (value === 'y+') se.addVoxel(0, 1, 0);
-          else if (value === 'z-') se.addVoxel(0, 0, -1);
-          else if (value === 'z+') se.addVoxel(0, 0, 1);
+          if (value === 'x-') ok = se.addVoxel(-1, 0, 0);
+          else if (value === 'x+') ok = se.addVoxel(1, 0, 0);
+          else if (value === 'y-') ok = se.addVoxel(0, -1, 0);
+          else if (value === 'y+') ok = se.addVoxel(0, 1, 0);
+          else if (value === 'z-') ok = se.addVoxel(0, 0, -1);
+          else if (value === 'z+') ok = se.addVoxel(0, 0, 1);
         }
+        if (ok === false && typeof twToast === 'function') twToast(window.t('props.action.failed'), 'warn');
         renderSelection();
         return;
       }
