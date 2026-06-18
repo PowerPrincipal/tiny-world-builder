@@ -108,3 +108,44 @@ test('non-admitted sender entity is ignored', () => {
 
   assert.equal(b.received.find(m => m.type === 'entity'), undefined, 'non-admitted sender produces no relay');
 });
+
+// The tests above call onWorldMessage() directly. These two drive the FULL onMessage
+// entry instead, locking in the two things that path actually does and that the original
+// bug got wrong: (1) a world room early-returns the entity into onWorldMessage (the relay
+// was dead because the handler had lived only in onMessage), and (2) the 'entity' bucket
+// is rate-limited BEFORE that early-return.
+test('entity sent through onMessage routes into the world relay (regression: handler must be reachable)', () => {
+  const { party, connect } = worldSetup();
+  const a = connect('a');
+  const b = connect('b');
+  a.received.length = 0; b.received.length = 0;
+
+  party.onMessage(JSON.stringify({
+    type: 'entity', kind: 'plane', active: true,
+    p: { x: 4, y: 5, z: 6 }, r: { x: 0, y: 0, z: 0 },
+  }), a);
+
+  const msgB = b.received.find(m => m.type === 'entity');
+  assert.ok(msgB, 'onMessage routes the world-room entity into onWorldMessage and relays it');
+  assert.equal(msgB.id, 'a', 'still server-stamped through the full path');
+  assert.equal(msgB.active, true);
+});
+
+test('entity flood through onMessage is rate-limited on the world path', () => {
+  const { party, connect } = worldSetup();
+  const a = connect('a');
+  const b = connect('b');
+  a.received.length = 0; b.received.length = 0;
+
+  const N = 100;
+  for (let i = 0; i < N; i++) {
+    party.onMessage(JSON.stringify({
+      type: 'entity', kind: 'plane', active: true,
+      p: { x: i, y: 0, z: 0 }, r: { x: 0, y: 0, z: 0 },
+    }), a);
+  }
+
+  const got = b.received.filter(m => m.type === 'entity').length;
+  assert.ok(got < N, `rate limit drops part of a flood on the world path (got ${got}/${N})`);
+  assert.ok(got >= 1, 'but legitimate flight traffic still gets through');
+});

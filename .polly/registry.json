@@ -16,8 +16,9 @@
       "gates": "check + smoke + test:unit(129) + i18n:check green; implementer browser-verified",
       "preview": "https://deploy-preview-48--tiny-world-builder.netlify.app",
       "review_conv_id": "conv_1c389a6ce8654feca33ff1f125f279d0",
-      "review": "2 BLOCKING found+fixed (commit 698ef8f: paste predicates now gate on mpEditAllowed; voxel dispatch toasts on false). Browser-verified, gates green. Re-review conv_9b477394d3ff44ba897dd50a59abadba in flight.",
-      "status": "re-review"
+      "review": "PASS after 4 fix rounds. Cross-review caught 4 real bugs gates missed: (1) paste predicates missed mpEditAllowed gate, (2) voxel actions swallowed failures, (3) Apply-tool missed empty-asset-template gate, (4) predicate called sel.materialize() = world mutation on render path. Final: e990e00 side-effect-free predicate, browser-verified.",
+      "final_commit": "e990e00",
+      "status": "READY-FOR-HUMAN-MERGE"
     },
     {
       "id": "w1-layers",
@@ -51,10 +52,10 @@
       "status": "READY-FOR-HUMAN-MERGE"
     }
   ],
-  "WARNING_local_main": {
-    "issue": "Local main (21f7a4b) has auto-merged all 3 polly branches (efd8413 layers, 54026ad props, 21f7a4b coach) — known auto-commit-to-main behavior. NOT pushed: origin/main still c3711b7 (clean).",
-    "risk": "props merge 54026ad is the PRE-FIX buggy version (f523dd7), not fixed 698ef8f. Per project memory main auto-pushes -> Netlify prod, which would ship unreviewed/buggy props.",
-    "action": "Flagged to human; no history op taken (needs permission). Canonical path = GitHub PRs #46/#47/#48 off clean origin/main."
+  "NOTE_local_main_divergence": {
+    "facts": "Local main has diverged from origin/main (still clean at c3711b7, NOT pushed). origin/main..main contains: human commits authored by Jason Kneen (74bef5c 'Fixes and updates', 932f30f 'Update .gitignore', 194bf0b 'fixes to rendering') INTERLEAVED with local merges of the 3 polly branches. The human commits exist ONLY on local main (git branch --contains => main only) — a reset would orphan them.",
+    "auto_push_check": "NO git auto-push mechanism in this checkout: no active post-commit/post-merge/pre-push hooks, no remote.origin.push, no push.default. The 'main auto-ships to prod' memory note is NOT substantiated here -> no imminent prod risk.",
+    "recommendation": "DO NOT reset local main (would lose unpushed human work). The 3 PRs are based on clean origin/main and merge independently of this mess. Local main is the human's own state to reconcile (decide whether to keep/push/rebase their commits). polly took no history op."
   },
   "netlify": {
     "site": "tiny-world-builder (tinyworld.build)",
@@ -62,6 +63,25 @@
     "pr_previews": "AUTOMATIC via Netlify GitHub app: every PR -> https://deploy-preview-<PR#>--tiny-world-builder.netlify.app",
     "build": "./publish.sh -> dist (guards: no cluso). PartyKit deploys separately.",
     "manual_draft": "npm exec -- netlify deploy --context deploy-preview --alias <branch-no-slashes> (NOT --prod)"
+  },
+  "wave2": {
+    "id": "w2-size",
+    "item": "#4 size shrink",
+    "verify_verdict": "DISCOVERABILITY problem, not missing feature. Shrink works for ALL object types but is hidden: radial 'Size' grows on click, shrinks only via secret Shift+click (33-radial-menu.js:313-316); real bidirectional 'Scale' buried under Edit->Transform tab. Panel 'Size'=floors (can't go below placed base).",
+    "worktree": ".worktrees/w2-size",
+    "branch": "polly/w2-size-shrink-discoverability",
+    "base": "origin/main c3711b7 (clean; file-disjoint from open PRs — only touches 33-radial-menu.js + i18n)",
+    "implementer": "claude_code",
+    "conv_id": "conv_0c20c980742d4b218838f6f3389a750a",
+    "reviewer_vendor": "codex",
+    "status": "implementing",
+    "deferred_followup": "#4a placement-click decrement (touches 20-input-place-erase.js; do AFTER PR #48 merges to avoid collision)"
+  },
+  "db_fix": {
+    "issue": "admin-users 500: column archived_at does not exist (42703) in ensureProfile",
+    "root_cause": "migration 20260617000000_archive_merged_wallet_profiles.sql (PR #44 feature) never applied to local dev DB",
+    "fix": "applied that one additive migration to NETLIFY_DATABASE_URL (local dev). 3 cols added, verified query resolves. No code/PR. PROD DB may still need it.",
+    "status": "FIXED (local dev only)"
   },
   "deferred": ["#1b guided overlay", "#4 shrink (Wave 2, verify-first)", "#5c real undo/redo", "#2 settings <select> html"]
 }
