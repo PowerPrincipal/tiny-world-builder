@@ -296,6 +296,8 @@
     'radial.color': 'Couleur',
     'radial.style': 'Style',
     'radial.size': 'Taille',
+    'radial.size.shrink': 'Réduire',
+    'radial.size.grow': 'Agrandir',
     'radial.rotate': 'Pivoter',
     'radial.more': 'Plus',
     'radial.move': 'Déplacer',

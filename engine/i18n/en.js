@@ -326,6 +326,8 @@
     'radial.color': 'Color',
     'radial.style': 'Style',
     'radial.size': 'Size',
+    'radial.size.shrink': 'Shrink',
+    'radial.size.grow': 'Grow',
     'radial.rotate': 'Rotate',
     'radial.more': 'More',
     'radial.move': 'Move',

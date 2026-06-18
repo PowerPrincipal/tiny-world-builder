@@ -296,6 +296,8 @@
     'radial.color': '颜色',
     'radial.style': '样式',
     'radial.size': '大小',
+    'radial.size.shrink': '缩小',
+    'radial.size.grow': '放大',
     'radial.rotate': '旋转',
     'radial.more': '更多',
     'radial.move': '移动',
