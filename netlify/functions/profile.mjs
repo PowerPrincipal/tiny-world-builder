@@ -1,7 +1,7 @@
 import { requireAuthUser } from './lib/auth.mjs';
 import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
-import { ensureProfile, normalizeProfileHandle, normalizeUsername, profileDto } from './lib/profiles.mjs';
+import { ensureProfile, normalizeProfileHandle, normalizeProfileImageUrl, normalizeUsername, profileDto } from './lib/profiles.mjs';
 
 export const config = { path: '/api/profile' };
 
@@ -9,7 +9,7 @@ function validateProfile(body) {
   const username = normalizeUsername(body && body.username);
   const displayName = String((body && body.displayName) || '').trim().slice(0, 80);
   const about = String((body && body.about) || '').trim().slice(0, 1000);
-  const image = String((body && body.image) || '').trim().slice(0, 2048);
+  const image = normalizeProfileImageUrl(body && body.image);
   const twitter = normalizeProfileHandle(body && body.twitter);
   const github = normalizeProfileHandle(body && body.github);
   if (!/^[a-z0-9_]{3,24}$/.test(username)) return { error: 'Username must be 3-24 lowercase letters, numbers, underscores' };

@@ -1,7 +1,7 @@
-import { requireAuthUser } from './lib/auth.mjs';
+import { accountMeetsCriteria, requireAuthUser } from './lib/auth.mjs';
 import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
-import { ensureProfile, normalizeProfileHandle, normalizeUsername, profileDto } from './lib/profiles.mjs';
+import { ensureProfile, normalizeProfileHandle, normalizeProfileImageUrl, normalizeUsername, profileDto } from './lib/profiles.mjs';
 import { isWorldAdminEmail, worldAdminEmails } from './lib/worlds.mjs';
 
 export const config = { path: '/api/admin-users' };
@@ -28,7 +28,16 @@ function isBuiltInTinyverseEmail(email) {
 }
 
 function canAccessTinyverse(user, profile) {
-  return isWorldAdminEmail(user && user.email) || isBuiltInTinyverseEmail(profile && profile.email) || !!(profile && profile.lobby_access);
+  // accountMeetsCriteria(user) makes Tinyverse access default ON for registered,
+  // email-verified accounts (no admin toggle needed). Consequence: lobby_access
+  // is no longer required for, and can no longer deny, a verified account here -
+  // it remains the explicit admin grant for accounts that do NOT auto-qualify
+  // (e.g. wallet-only). Bans are enforced separately via suspensions in
+  // worlds.mjs (activeSuspension), not via this flag.
+  return isWorldAdminEmail(user && user.email)
+    || isBuiltInTinyverseEmail(profile && profile.email)
+    || accountMeetsCriteria(user)
+    || !!(profile && profile.lobby_access);
 }
 
 function adminUserDto(row) {
@@ -45,7 +54,7 @@ function validateAdminEdit(body) {
   const username = normalizeUsername(body && body.username);
   const displayName = cleanText(body && body.displayName, 80);
   const about = cleanText(body && body.about, 1000);
-  const image = cleanText(body && body.image, 2048);
+  const image = normalizeProfileImageUrl(body && body.image);
   const email = cleanEmail(body && body.email);
   const twitter = normalizeProfileHandle(body && body.twitter);
   const github = normalizeProfileHandle(body && body.github);

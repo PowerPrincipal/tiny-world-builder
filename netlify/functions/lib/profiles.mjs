@@ -1,4 +1,7 @@
 import { getSql } from './db.mjs';
+import { absoluteSiteUrl } from './http.mjs';
+
+export const PROFILE_AVATAR_KEYS = ['knight', 'wizard', 'builder', 'explorer', 'knave', 'robot', 'fox', 'cat'];
 
 function cleanText(value, limit) {
   return String(value || '').trim().slice(0, limit);
@@ -27,6 +30,16 @@ export function normalizeProfileHandle(value) {
   return s.replace(/[^a-zA-Z0-9_-]+/g, '').slice(0, 39);
 }
 
+export function normalizeProfileImageUrl(value, limit = 2048) {
+  const image = cleanText(value, limit);
+  if (!image) return '';
+  if (/^https?:\/\//i.test(image)) return image;
+  const m = image.match(/^\/?assets\/avatars\/([a-z]+)\.png$/i);
+  const key = m ? m[1].toLowerCase() : '';
+  if (key && PROFILE_AVATAR_KEYS.includes(key)) return absoluteSiteUrl(image);
+  return image;
+}
+
 function defaultUsernameForUser(user) {
   const metadata = user.userMetadata || {};
   const raw = normalizeUsername(metadata.username || metadata.display_name || metadata.full_name || metadata.name || user.email);
@@ -45,7 +58,7 @@ function defaultDisplayNameForUser(user) {
 
 function defaultImageForUser(user) {
   const metadata = user.userMetadata || {};
-  return cleanText(user.pictureUrl || metadata.avatar_url || metadata.picture || metadata.image, 2048);
+  return normalizeProfileImageUrl(user.pictureUrl || metadata.avatar_url || metadata.picture || metadata.image);
 }
 
 export function profileDto(row) {
@@ -57,7 +70,7 @@ export function profileDto(row) {
     username: row.username,
     displayName: row.display_name,
     about: row.about || '',
-    image: row.image || '',
+    image: normalizeProfileImageUrl(row.image),
     twitter: row.twitter || '',
     github: row.github || '',
     lobbyAccess: !!row.lobby_access,

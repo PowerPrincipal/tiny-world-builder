@@ -1,11 +1,37 @@
 // -------- cors allowlist --------
+const DEFAULT_SITE_ORIGIN = 'https://tinyworld.build';
+
+export function siteOrigin() {
+  const raw = process.env.TINYWORLD_SITE_URL || process.env.URL || process.env.DEPLOY_PRIME_URL || process.env.DEPLOY_URL || DEFAULT_SITE_ORIGIN;
+  try {
+    return new URL(raw).origin;
+  } catch (_) {
+    return DEFAULT_SITE_ORIGIN;
+  }
+}
+
+export function absoluteSiteUrl(path) {
+  const value = String(path == null ? '' : path).trim();
+  if (!value || /^https?:\/\//i.test(value)) return value;
+  return new URL(value.replace(/^\/+/, ''), siteOrigin() + '/').href;
+}
+
+function envOrigin(value) {
+  if (!value) return '';
+  try {
+    return new URL(value).origin;
+  } catch (_) {
+    return '';
+  }
+}
+
 // Reflect the caller Origin only when it matches the deployed site URL (prod +
 // branch/deploy previews) or localhost for dev; otherwise omit the header. We
 // never emit Access-Control-Allow-Credentials, so a missing ACAO simply blocks
 // the cross-origin read rather than leaking it.
 function isAllowedOrigin(origin) {
   if (!origin) return false;
-  const siteOrigins = [process.env.URL, process.env.DEPLOY_PRIME_URL, process.env.DEPLOY_URL].filter(Boolean);
+  const siteOrigins = [process.env.TINYWORLD_SITE_URL, process.env.URL, process.env.DEPLOY_PRIME_URL, process.env.DEPLOY_URL].map(envOrigin).filter(Boolean);
   if (siteOrigins.includes(origin)) return true;
   return /^http:\/\/localhost(:\d+)?$/.test(origin);
 }

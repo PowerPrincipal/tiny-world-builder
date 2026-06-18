@@ -38,15 +38,32 @@ test('github validity allows single non-edge hyphens', () => {
   assert.ok(!isValidGithub('a--b'));
 });
 
-// -------- preset avatars (allowlist) --------
-test('avatar keys map to same-origin preset PNGs only', () => {
-  for (const k of AVATAR_KEYS) {
-    assert.equal(avatarUrlForKey(k), '/assets/avatars/' + k + '.png');
+function withTinyworldSiteUrl(fn) {
+  const old = process.env.TINYWORLD_SITE_URL;
+  process.env.TINYWORLD_SITE_URL = 'https://tinyworld.build';
+  try {
+    fn();
+  } finally {
+    if (old === undefined) delete process.env.TINYWORLD_SITE_URL;
+    else process.env.TINYWORLD_SITE_URL = old;
   }
-  assert.equal(avatarUrlForKey('evil'), '');
-  assert.equal(avatarUrlForKey('http://x/y.png'), '');
-  assert.equal(avatarKeyForUrl('/assets/avatars/fox.png'), 'fox');
-  assert.equal(avatarKeyForUrl('https://evil.example/x.png'), '');
+}
+
+// -------- preset avatars (allowlist) --------
+test('avatar keys map to absolute preset PNGs only', () => {
+  withTinyworldSiteUrl(() => {
+    for (const k of AVATAR_KEYS) {
+      assert.equal(avatarUrlForKey(k), 'https://tinyworld.build/assets/avatars/' + k + '.png');
+    }
+    assert.equal(avatarUrlForKey('evil'), '');
+    assert.equal(avatarUrlForKey('http://x/y.png'), '');
+    assert.equal(avatarKeyForUrl('/assets/avatars/fox.png'), 'fox');
+    assert.equal(avatarKeyForUrl('https://tinyworld.build/assets/avatars/fox.png'), 'fox');
+    assert.equal(avatarKeyForUrl('https://tinyworld.build/assets/avatars/wizard.png'), 'wizard');
+    assert.equal(avatarKeyForUrl('https://evil.example/assets/avatars/wizard.png'), '');
+    assert.equal(avatarKeyForUrl('https://evil.example/x.png'), '');
+    assert.equal(avatarKeyForUrl('https://tinyworld.build/assets/avatars/notakey.png'), '');
+  });
 });
 
 // -------- content safety --------

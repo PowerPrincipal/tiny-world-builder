@@ -56,6 +56,11 @@ backend:
   `vendor/tinyworld-auth.js` with an import map to vendored
   `@netlify/identity` / `gotrue-js`; do not reintroduce a remote identity
   widget script.
+- Profile image fields stored through `/api/profile`, `/api/admin-users`, or
+  community preset-avatar saves must be absolute `http(s)` URLs. Preset avatar
+  paths under `assets/avatars/*.png` are normalized with the trusted site origin
+  from `TINYWORLD_SITE_URL` / Netlify `URL` / deploy URL envs before validation
+  and persistence; already-absolute URLs are left unchanged.
 - Account API fetches must send `Authorization: Bearer <nf_jwt>` when possible
   and `credentials: 'same-origin'` so Netlify Functions can resolve the current
   Identity user. Wallet login uses the same bearer path with signed

@@ -11,67 +11,114 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" />
 <link rel="stylesheet" href="styles/landing.css" />
 <style>
+  /* Width matches the site's other page sections (hero, cta, roadmap) so
+     the left/right edges line up down the page. */
   .news-section {
-    width: min(820px, calc(100% - 48px));
+    width: min(1200px, calc(100% - 48px));
     margin: 0 auto;
-    padding: 8px 0 64px;
+    padding: 8px 0 72px;
   }
   .news-intro {
-    margin: 0 auto 40px;
-    max-width: 64ch;
+    margin: 0 auto 44px;
+    max-width: 68ch;
     text-align: center;
-    color: var(--muted);
-    font-size: 17px;
+    color: var(--ink);
+    font-size: 18px;
     line-height: 1.6;
   }
+
+  /* ---- Category palette (named tokens, not scattered literals) ----
+     Each entry carries one cat-* class. The chip reads --cat-bg/ink/border;
+     the timeline dot reads --cat-dot, so the rail and chips read as one
+     coherent colour system. All chip ink/bg pairs clear WCAG AA (>=4.5:1).
+     Brand anchors: wave1 dot = #f0a531, tinyverse dot = var(--accent). */
+  .cat-wave1     { --cat-bg:#fdecca; --cat-ink:#8a5300; --cat-border:#f3d59a; --cat-dot:#f0a531; }
+  .cat-space     { --cat-bg:#ece9fe; --cat-ink:#5b21b6; --cat-border:#ddd6fe; --cat-dot:#7c3aed; }
+  .cat-express   { --cat-bg:#fce7f3; --cat-ink:#9d174d; --cat-border:#fbcfe8; --cat-dot:#db2777; }
+  .cat-someone   { --cat-bg:#cdf7ef; --cat-ink:#0b6b5f; --cat-border:#a7ebdf; --cat-dot:#0d9488; }
+  .cat-travel    { --cat-bg:#ffe8d4; --cat-ink:#9a3412; --cat-border:#fdd0ab; --cat-dot:#ea580c; }
+  .cat-tinyverse { --cat-bg:#e2ecfb; --cat-ink:#1c4f9e; --cat-border:#c2d6f3; --cat-dot:var(--accent); }
+  .cat-smarter   { --cat-bg:#d3f3fb; --cat-ink:#0b5e7a; --cat-border:#b3e6f2; --cat-dot:#0891b2; }
+  .cat-together  { --cat-bg:#dcf6e4; --cat-ink:#166534; --cat-border:#b8eccb; --cat-dot:#16a34a; }
+  .cat-air       { --cat-bg:#dcefff; --cat-ink:#075985; --cat-border:#b9defb; --cat-dot:#0284c7; }
+  .cat-bolder    { --cat-bg:#ffe1e5; --cat-ink:#9f1239; --cat-border:#fbc4cc; --cat-dot:#e11d48; }
+  .cat-dayone    { --cat-bg:#e3e6ff; --cat-ink:#3730a3; --cat-border:#c7caf7; --cat-dot:#4f46e5; }
+
   .news-timeline {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 0 0 0 48px;
     position: relative;
   }
-  /* The connecting spine */
+  /* The connecting spine: a neutral soft line so the coloured dots read
+     against it without clashing. */
   .news-timeline::before {
     content: "";
     position: absolute;
-    left: 7px;
-    top: 6px;
-    bottom: 6px;
+    left: 16px;
+    top: 10px;
+    bottom: 10px;
     width: 2px;
-    background: linear-gradient(180deg, var(--accent), rgba(58,114,200,0.12));
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgba(17,27,69,0.18), rgba(17,27,69,0.10));
   }
+
+  /* Each entry is a glass card (same idiom as the roadmap list) so the
+     body copy sits on a controlled, high-contrast surface instead of the
+     busy page gradient. Two-column grid (meta | content) fills the wider
+     frame; prose is capped to a readable measure inside it. */
   .news-entry {
     position: relative;
-    padding: 0 0 36px 40px;
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    column-gap: 28px;
+    margin-bottom: 16px;
+    padding: 22px 28px;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: var(--radius-lg);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.85) inset,
+      0 1px 2px rgba(20, 30, 50, 0.05),
+      0 16px 40px -22px rgba(40, 50, 80, 0.30);
+    backdrop-filter: blur(18px) saturate(170%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
   }
-  .news-entry:last-child { padding-bottom: 0; }
+  .news-entry:last-child { margin-bottom: 0; }
+  /* Force everything except the meta block into the content column. */
+  .news-entry > :not(.news-meta) { grid-column: 2; }
+  /* Featured entries get a touch more presence. */
+  .news-entry.is-featured {
+    background: rgba(255, 255, 255, 0.74);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 1px 2px rgba(20, 30, 50, 0.06),
+      0 22px 52px -20px rgba(40, 50, 80, 0.36);
+  }
   .news-entry::before {
     content: "";
     position: absolute;
-    left: 0;
-    top: 5px;
-    width: 16px;
-    height: 16px;
+    left: -40px;
+    top: 26px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--cat-dot, var(--accent));
     border: 3px solid #fff;
-    box-shadow: 0 0 0 1px rgba(58,114,200,0.35);
-  }
-  .news-entry.is-featured::before {
-    background: #f0a531;
-    box-shadow: 0 0 0 1px rgba(240,165,49,0.45);
+    box-shadow: 0 1px 3px rgba(20, 30, 50, 0.25);
   }
   .news-meta {
+    grid-column: 1;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 2px 0 0;
   }
   .news-date {
     font-family: var(--display-font);
-    font-size: 14px;
-    color: var(--accent);
+    font-size: 15px;
+    color: var(--cat-ink, var(--accent));
     letter-spacing: 0.02em;
   }
   .news-tag {
@@ -79,17 +126,14 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 3px 9px;
+    padding: 4px 11px;
     border-radius: 999px;
-    background: rgba(58,114,200,0.12);
-    color: var(--accent);
-  }
-  .news-entry.is-featured .news-tag {
-    background: rgba(240,165,49,0.16);
-    color: #b9740a;
+    background: var(--cat-bg, rgba(58,114,200,0.12));
+    color: var(--cat-ink, var(--accent));
+    border: 1px solid var(--cat-border, transparent);
   }
   .news-entry h2 {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
     font-family: var(--display-font);
     font-size: clamp(22px, 3.4vw, 30px);
     line-height: 1.15;
@@ -97,20 +141,23 @@
   }
   .news-entry p {
     margin: 0 0 12px;
+    max-width: 74ch;
     color: var(--ink);
     font-size: 16px;
     line-height: 1.65;
   }
   .news-entry p:last-child { margin-bottom: 0; }
   .news-quote {
-    margin: 4px 0 0;
-    padding: 14px 18px;
-    border-left: 3px solid #f0a531;
-    background: rgba(240,165,49,0.08);
+    margin: 14px 0 0;
+    max-width: 74ch;
+    padding: 16px 20px;
+    border-left: 4px solid var(--cat-dot, var(--accent));
+    background: rgba(255, 255, 255, 0.55);
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
     color: var(--ink);
     font-size: 16px;
     line-height: 1.6;
+    font-style: italic;
   }
   .news-quote cite {
     display: block;
@@ -119,8 +166,26 @@
     font-size: 13px;
     color: var(--muted);
   }
+  @media (max-width: 760px) {
+    .news-entry {
+      grid-template-columns: 1fr;
+      column-gap: 0;
+      padding: 18px 20px;
+    }
+    .news-entry > :not(.news-meta) { grid-column: 1; }
+    .news-meta {
+      grid-column: 1;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+  }
   @media (max-width: 600px) {
-    .news-entry { padding-left: 32px; }
+    .news-timeline { padding-left: 30px; }
+    .news-timeline::before { left: 9px; }
+    .news-entry::before { left: -28px; top: 22px; width: 16px; height: 16px; }
     .news-intro { font-size: 16px; }
   }
 </style>
@@ -162,7 +227,7 @@
 
       <ol class="news-timeline">
 
-        <li class="news-entry is-featured">
+        <li class="news-entry is-featured cat-wave1">
           <div class="news-meta">
             <span class="news-date">June 2026</span>
             <span class="news-tag">The road to WAVE1</span>
@@ -181,7 +246,7 @@
           </p>
         </li>
 
-        <li class="news-entry is-featured">
+        <li class="news-entry is-featured cat-space">
           <div class="news-meta">
             <span class="news-date">June 14, 2026</span>
             <span class="news-tag">Meet in the space</span>
@@ -203,7 +268,7 @@
           </blockquote>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-express">
           <div class="news-meta">
             <span class="news-date">June 2026</span>
             <span class="news-tag">Express yourself</span>
@@ -216,7 +281,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-someone">
           <div class="news-meta">
             <span class="news-date">June 2026</span>
             <span class="news-tag">Be someone</span>
@@ -230,7 +295,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-travel">
           <div class="news-meta">
             <span class="news-date">June 2026</span>
             <span class="news-tag">Travel</span>
@@ -243,7 +308,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-tinyverse">
           <div class="news-meta">
             <span class="news-date">June 7, 2026</span>
             <span class="news-tag">The tinyverse</span>
@@ -257,7 +322,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-smarter">
           <div class="news-meta">
             <span class="news-date">June 2026</span>
             <span class="news-tag">Smarter tools</span>
@@ -270,7 +335,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-together">
           <div class="news-meta">
             <span class="news-date">June 1, 2026</span>
             <span class="news-tag">Together</span>
@@ -283,7 +348,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-air">
           <div class="news-meta">
             <span class="news-date">Late May 2026</span>
             <span class="news-tag">Up in the air</span>
@@ -296,7 +361,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-bolder">
           <div class="news-meta">
             <span class="news-date">Mid May 2026</span>
             <span class="news-tag">Bigger and bolder</span>
@@ -310,7 +375,7 @@
           </p>
         </li>
 
-        <li class="news-entry">
+        <li class="news-entry cat-dayone">
           <div class="news-meta">
             <span class="news-date">May 10, 2026</span>
             <span class="news-tag">Day one</span>
