@@ -5,9 +5,9 @@
   // the only global it leaks is window.twNotify.
   //
   // Design notes:
-  //  - Default-on: the bell toggle (mounted into the minimap header by 47) starts
-  //    on for fresh visitors, while a saved "0" keeps returning users muted.
-  //    Clicking back on requests OS permission once.
+  //  - Opt-in: the bell toggle (mounted into the minimap header by 47) defaults OFF.
+  //    While off, no toast and no web notification fire. Enabling it requests OS
+  //    permission once.
   //  - In-view toasts (via the existing window.twToast) fire for join/leave/bot-join.
   //    Chat is NOT toasted in-view because the room already shows a chat bubble — it
   //    only raises a web notification, and only when the tab is hidden.
@@ -27,11 +27,8 @@
     function supported() { return typeof window !== 'undefined' && 'Notification' in window; }
     function canToast() { return typeof window.twToast === 'function'; }
 
-    var enabled = true;
-    try {
-      var storedPref = localStorage.getItem(PREF_KEY);
-      enabled = storedPref === null ? true : storedPref === '1';
-    } catch (_) { /* storage unavailable — stays on for this session */ }
+    var enabled = false;
+    try { enabled = localStorage.getItem(PREF_KEY) === '1'; } catch (_) { /* storage unavailable — stays off */ }
 
     var joinBuf = [];          // [{name, bot}] accumulated within the burst window
     var joinTimer = null;
