@@ -1,61 +1,32 @@
 {
-  "epic": "builder-mode-feedback Wave 1",
-  "plan": "plans/builder-mode-feedback-plan.md",
-  "base": "main@c3711b7",
-  "shared_surface": "engine/i18n/{en,es,fr,zh}.js — all 3 tasks add keys (additive; trivial human-merge conflicts expected)",
-  "tasks": [
-    {
-      "id": "w1-props",
-      "items": ["#2 material glyphs", "#5 dead-button gating + feedback"],
-      "worktree": ".worktrees/w1-props",
-      "branch": "polly/w1-props-glyphs-gating",
-      "implementer": "claude_code",
-      "reviewer_vendor": "codex",
-      "conv_id": "conv_52bae61816474ee081ba76df42e3eb61",
-      "pr_url": "https://github.com/jasonkneen/tiny-world-builder/pull/48",
-      "gates": "check + smoke + test:unit(129) + i18n:check green; implementer browser-verified",
-      "preview": "https://deploy-preview-48--tiny-world-builder.netlify.app",
-      "review_conv_id": "conv_1c389a6ce8654feca33ff1f125f279d0",
-      "review": "PASS after 4 fix rounds. Cross-review caught 4 real bugs gates missed: (1) paste predicates missed mpEditAllowed gate, (2) voxel actions swallowed failures, (3) Apply-tool missed empty-asset-template gate, (4) predicate called sel.materialize() = world mutation on render path. Final: e990e00 side-effect-free predicate, browser-verified.",
-      "final_commit": "e990e00",
-      "status": "READY-FOR-HUMAN-MERGE"
-    },
-    {
-      "id": "w1-layers",
-      "items": ["#3 rename Layers -> Inventory + helper copy"],
-      "worktree": ".worktrees/w1-layers",
-      "branch": "polly/w1-layers-rename",
-      "implementer": "codex",
-      "reviewer_vendor": "claude_code",
-      "conv_id": "conv_5bd06988f90a421f9653b3d3bb56ad56",
-      "pr_url": "https://github.com/jasonkneen/tiny-world-builder/pull/46",
-      "gates": "i18n:check + npm test green",
-      "review_conv_id": "conv_0034c7d7299f4157ad6ea84e4c1fc31c",
-      "review": "PASS (no blocking). Polish applied (commit d5a079e): removed dup title, helper under tab row, dedicated layers-helper class + minimal CSS. i18n:check + npm test green.",
-      "preview": "https://deploy-preview-46--tiny-world-builder.netlify.app",
-      "status": "READY-FOR-HUMAN-MERGE"
-    },
-    {
-      "id": "w1-coach",
-      "items": ["#1a core-loop coach card"],
-      "worktree": ".worktrees/w1-coach",
-      "branch": "polly/w1-coach-card",
-      "implementer": "claude_code",
-      "reviewer_vendor": "codex",
-      "conv_id": "conv_ca842944175449578d0da1eb0fb01b56",
-      "pr_url": "https://github.com/jasonkneen/tiny-world-builder/pull/47",
-      "gates": "i18n:check + check green (305 keys x4)",
-      "preview": "https://deploy-preview-47--tiny-world-builder.netlify.app",
-      "review_conv_id": "conv_c59644a241cf4a29b8830e079bf6f192",
-      "review": "PASS (zero blocking/non-blocking; one cosmetic suggestion: inline section-title style -> CSS later)",
-      "followup": "eyeball fr/zh card fit at 360px on deploy-preview-47 before merge",
-      "status": "READY-FOR-HUMAN-MERGE"
-    }
+  "note": "recreated after the untracked file was cleaned during local-main merge churn; conflict resolved to current state (Wave 1 PRs 46-49 merged; wave-launch system in flight)",
+  "shipped_merged": [
+    {"pr": 46, "item": "Layers -> World Items (#3)", "merged": true},
+    {"pr": 47, "item": "core-loop coach card (#1a)", "merged": true},
+    {"pr": 48, "item": "material glyphs + dead-button gating (#2,#5)", "merged": true},
+    {"pr": 49, "item": "radial Size -> two-way Grow/Shrink (#4)", "merged": true}
   ],
-  "NOTE_local_main_divergence": {
-    "facts": "Local main has diverged from origin/main (still clean at c3711b7, NOT pushed). origin/main..main contains: human commits authored by Jason Kneen (74bef5c 'Fixes and updates', 932f30f 'Update .gitignore', 194bf0b 'fixes to rendering') INTERLEAVED with local merges of the 3 polly branches. The human commits exist ONLY on local main (git branch --contains => main only) — a reset would orphan them.",
-    "auto_push_check": "NO git auto-push mechanism in this checkout: no active post-commit/post-merge/pre-push hooks, no remote.origin.push, no push.default. The 'main auto-ships to prod' memory note is NOT substantiated here -> no imminent prod risk.",
-    "recommendation": "DO NOT reset local main (would lose unpushed human work). The 3 PRs are based on clean origin/main and merge independently of this mess. Local main is the human's own state to reconcile (decide whether to keep/push/rebase their commits). polly took no history op."
+  "db_fix": "archived_at migration applied to LOCAL dev DB only; PROD Neon still pending",
+  "wave_launch_system": {
+    "plan": "plans/wave-launch-system.md",
+    "base": "origin/main a364386",
+    "secret_decision": "keep TINYWORLD_ADMIN_SECRET as localhost-only DEV fallback (assumed; user can request full delete)",
+    "phases_in_flight": [
+      {"id": "p0", "item": "account-based admin auth (retire prod secret)", "pr": 50, "implementer": "claude_code", "reviewer_vendor": "codex", "merged": true, "merged_at": "2026-06-18T06:11:33Z", "caveat": "prod accept-path unverifiable headlessly - confirm Identity login engages admin live after deploy"},
+      {"id": "p1", "item": "WAVE1 countdown (under-logo + home + lobby)", "pr": 51, "implementer": "codex", "reviewer_vendor": "claude_code", "merged": true, "merged_at": "2026-06-18T06:11:01Z"}
+    ],
+    "p2_in_flight": {"id": "p2", "item": "WAVE labels (roadmap+suggestions) + suggestion wave filter + migration", "branch": "polly/p2-wave-labels", "implementer": "claude_code", "reviewer_vendor": "codex", "merged": true, "merged_at": "2026-06-18T06:11:17Z", "pr": 52, "deferred": "roadmap countdown header", "PROD_MIGRATION_PENDING": "p2 added wave columns via migration - must be applied to PROD Neon or roadmap/suggestions wave paths break in prod"},
+    "main_tip_after_merges": "bb84f72 (origin/main; carries #50+#51+#52)",
+    "p6_done": {"id": "p6", "item": "countdown pill BIGGER (brand+hero) ONLY (stats badge DROPPED per user)", "pr": 54, "branch": "polly/p6-countdown-bigger", "implementer": "claude_code", "reviewer_vendor": "codex", "review": "CLEAN (zero blocking/non-blocking)", "detail": "styles/countdown.css only +53/-3; 12->18px brand, 14->21px hero (1.5x); responsive caps scaled; gates green; browser-verified", "status": "READY-FOR-HUMAN-MERGE"},
+    "p7_done": {"id": "p7", "item": "remove footer X-embed + new news.html retrospective timeline + nav links", "pr": 55, "branch": "polly/p7-news-blog", "implementer": "claude_code", "reviewer_vendor": "codex", "review": "CLEAN (zero blocking/non-blocking; independent secrets/emoji/fabrication audit passed)", "detail": "14 files +364/-5; news.html ~347 lines, 11 entries May10->now; tweet+widgets.js removed from index.html; netlify.toml /news redirect + publish.sh copy; gates green 135 tests", "status": "READY-FOR-HUMAN-MERGE", "enrich_pending": "weave in real jasonkneen X posts once clawuth tokens/account provided"},
+    "p8_in_flight": {"id": "p8", "item": "README star-growth chart + home-page GitHub stars widget (repo jasonkneen/tiny-world-builder ~1023 stars)", "worktree": ".worktrees/p8-github-stars", "branch": "polly/p8-github-stars", "base": "origin/main bb84f72", "implementer": "claude_code", "conv_id": "conv_b8195cf0d13b43bb9f54d536b10de0db", "reviewer_vendor": "codex", "note": "GitHub stars != user counts (those stay dropped); NO emoji", "status": "BUILDING"},
+    "explore_onboarding": {"id": "explore-onboarding-email-gate", "item": "READ-ONLY map for forced profile-completion onboarding + email-verify hard-gate on chat/community", "conv_id": "conv_e64682255b3e4668a13e5c6949f4471c", "agent": "codex", "purpose": "explore", "key_unknown": "does any transactional email-send capability exist? (make-or-break for email verification)", "status": "INVESTIGATING"},
+    "clawuth_x_access": {"lib": "/Users/jkneen/Documents/GitHub/clawuth", "needs": "auth_token + ct0 cookies from x.com for handle jasonkneen (or an already-stored clawuth account name)", "use": "READ jasonkneen posts to enrich p7 blog; POST only with explicit per-post approval", "status": "AWAITING-TOKENS-OR-ACCOUNT-NAME"},
+    "p7_in_flight": {"id": "p7", "item": "remove footer X-embed (index.html:223) + retrospective NEWS/blog page from git history + X posts", "worktree": ".worktrees/p7-news-blog", "branch": "polly/p7-news-blog", "base": "origin/main bb84f72", "implementer": "claude_code", "conv_id": "conv_97fef554265b44798721cff0707b39cc", "reviewer_vendor": "codex", "constraints": "positive only; NO secrets/internals/polly; NO emoji (standing rule); NO fabricated tweets/metrics; NO player/follower counts; static curated, not live commit feed", "status": "BUILDING"},
+    "merge_order": "DONE for p0/p1/p2 (all merged 06:11Z). Next: p6 + p7 -> cross-review -> human merge.",
+    "phases_pending": ["p3 admin vote override (audited)", "p4 admin-only specs", "p5 roadmap<->suggestion linkage + build-itself handoff", "+ roadmap countdown header after #51"],
+    "draft_artifacts": ["plans/drafts/future-migrations.draft.sql (P3/P4/P5/comments/agent_runs SQL, additive+schema-qualified)", "plans/drafts/agent-spec-format.md (spec contract for the loop)"],
+    "overnight_status": "IDLE. p2 ready; no speculative stack built (merge-gate is the bottleneck). Awaiting human: merge #50->#51->#52, prod-DB migrations, auto-merge/deploy + Nous + coin-source decisions."
   },
   "netlify": {
     "site": "tiny-world-builder (tinyworld.build)",
@@ -63,30 +34,5 @@
     "pr_previews": "AUTOMATIC via Netlify GitHub app: every PR -> https://deploy-preview-<PR#>--tiny-world-builder.netlify.app",
     "build": "./publish.sh -> dist (guards: no cluso). PartyKit deploys separately.",
     "manual_draft": "npm exec -- netlify deploy --context deploy-preview --alias <branch-no-slashes> (NOT --prod)"
-  },
-  "wave2": {
-    "id": "w2-size",
-    "item": "#4 size shrink",
-    "verify_verdict": "DISCOVERABILITY problem, not missing feature. Shrink works for ALL object types but is hidden: radial 'Size' grows on click, shrinks only via secret Shift+click (33-radial-menu.js:313-316); real bidirectional 'Scale' buried under Edit->Transform tab. Panel 'Size'=floors (can't go below placed base).",
-    "worktree": ".worktrees/w2-size",
-    "branch": "polly/w2-size-shrink-discoverability",
-    "base": "origin/main c3711b7 (clean; file-disjoint from open PRs — only touches 33-radial-menu.js + i18n)",
-    "implementer": "claude_code",
-    "conv_id": "conv_0c20c980742d4b218838f6f3389a750a",
-    "reviewer_vendor": "codex",
-    "pr_url": "https://github.com/jasonkneen/tiny-world-builder/pull/49",
-    "approach": "radial 'Size' -> two-way sub-ring Grow(+)/Shrink(-), no modifier; removed hidden Shift branch. Browser-verified shrink on 3 object types. check+i18n green.",
-    "preview": "https://deploy-preview-49--tiny-world-builder.netlify.app",
-    "review_conv_id": "conv_05c986d121704bd183feecb334cbe1d3",
-    "review": "PASS (zero blocking/non-blocking; 1 cosmetic note: 0.87*1.15=1.0005 not exact tap-for-tap, comment only).",
-    "status": "READY-FOR-HUMAN-MERGE",
-    "deferred_followup": "#4a placement-click decrement (touches 20-input-place-erase.js; do AFTER PR #48 merges to avoid collision)"
-  },
-  "db_fix": {
-    "issue": "admin-users 500: column archived_at does not exist (42703) in ensureProfile",
-    "root_cause": "migration 20260617000000_archive_merged_wallet_profiles.sql (PR #44 feature) never applied to local dev DB",
-    "fix": "applied that one additive migration to NETLIFY_DATABASE_URL (local dev). 3 cols added, verified query resolves. No code/PR. PROD DB may still need it.",
-    "status": "FIXED (local dev only)"
-  },
-  "deferred": ["#1b guided overlay", "#4 shrink (Wave 2, verify-first)", "#5c real undo/redo", "#2 settings <select> html"]
+  }
 }
