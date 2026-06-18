@@ -1,4 +1,4 @@
-import { requireAuthUser } from './lib/auth.mjs';
+import { accountMeetsCriteria, requireAuthUser } from './lib/auth.mjs';
 import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { ensureProfile, normalizeProfileHandle, normalizeUsername, profileDto } from './lib/profiles.mjs';
@@ -28,7 +28,16 @@ function isBuiltInTinyverseEmail(email) {
 }
 
 function canAccessTinyverse(user, profile) {
-  return isWorldAdminEmail(user && user.email) || isBuiltInTinyverseEmail(profile && profile.email) || !!(profile && profile.lobby_access);
+  // accountMeetsCriteria(user) makes Tinyverse access default ON for registered,
+  // email-verified accounts (no admin toggle needed). Consequence: lobby_access
+  // is no longer required for, and can no longer deny, a verified account here -
+  // it remains the explicit admin grant for accounts that do NOT auto-qualify
+  // (e.g. wallet-only). Bans are enforced separately via suspensions in
+  // worlds.mjs (activeSuspension), not via this flag.
+  return isWorldAdminEmail(user && user.email)
+    || isBuiltInTinyverseEmail(profile && profile.email)
+    || accountMeetsCriteria(user)
+    || !!(profile && profile.lobby_access);
 }
 
 function adminUserDto(row) {
