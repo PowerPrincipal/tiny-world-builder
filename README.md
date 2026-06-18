@@ -1,5 +1,7 @@
 # Tiny World Builder
 
+[![GitHub stars](https://img.shields.io/github/stars/jasonkneen/tiny-world-builder?style=flat&logo=github&label=Stars&color=3a72c8)](https://github.com/jasonkneen/tiny-world-builder/stargazers)
+
 <img width="1324" height="1016" alt="Screenshot 2026-05-11 at 07 09 24" src="https://github.com/user-attachments/assets/1b19a5f7-def5-42bf-b85f-01714f502afa" />
 
 ## Running locally
@@ -174,6 +176,12 @@ errors; place/erase works; `C`, `P`/`I`, `R`/`F`, and tool shortcuts respond;
 fence neighbors update; cloud shadow at 0% still leaves visible clouds.
 
 See [AGENTS.md](./AGENTS.md) for guidance on extending the codebase.
+
+## Star History
+
+If Tiny World Builder is useful to you, a star helps other builders find it.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jasonkneen/tiny-world-builder&type=Date)](https://star-history.com/#jasonkneen/tiny-world-builder&Date)
 
 ## Files
 
