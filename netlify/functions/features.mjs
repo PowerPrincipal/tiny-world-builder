@@ -208,16 +208,39 @@ export default async function featuresFunction(request) {
       const suggestionId = Number(body && body.suggestionId);
       const vote = Number(body && body.vote) === -1 ? -1 : 1;
       if (!suggestionId) return errorResponse('suggestionId is required', 400, origin);
+      // Eligibility gate (pre-existing, client-trusted): a non-admin needs a minimum
+      // claimed coin balance to vote at all. This gates WHETHER you may vote; it no
+      // longer determines vote WEIGHT (see below). Tightening this gate to a verified
+      // on-chain balance is out of scope here.
       if (!isAdminReq && coinBalance < MIN_COIN_BALANCE) return errorResponse('Insufficient coin balance to vote', 403, origin);
       try {
         const sql = getSql();
         await ensureTables(sql);
-        await sql`
-          INSERT INTO feature_votes (suggestion_id, wallet, coin_balance, vote)
-          VALUES (${suggestionId}, ${wallet}, ${coinBalance}, ${vote})
-          ON CONFLICT (suggestion_id, wallet) DO UPDATE
-            SET vote = ${vote}, coin_balance = ${coinBalance}, created_at = NOW()
-        `;
+        // One vote per user per item, enforced server-side. A non-admin's contribution
+        // to vote_weight is pinned to exactly 1, regardless of the client-supplied
+        // coinBalance. This closes the old exploit where a single vote counted for the
+        // (unverified, client-claimed) coin balance - up to MIN_COIN_BALANCE and
+        // beyond. UNIQUE(suggestion_id, wallet) already keeps it to one row per wallet.
+        //
+        // Admins are exempt from the cap: each admin click ACCUMULATES weight (+1,
+        // unbounded) on their single row, so an admin can repeatedly boost or sink an
+        // item with no per-user limit. Authority is the server's isAdminReq (verified
+        // admin email or local-dev secret) - never a client-supplied flag.
+        if (isAdminReq) {
+          await sql`
+            INSERT INTO feature_votes (suggestion_id, wallet, coin_balance, vote)
+            VALUES (${suggestionId}, ${wallet}, 1, ${vote})
+            ON CONFLICT (suggestion_id, wallet) DO UPDATE
+              SET vote = ${vote}, coin_balance = feature_votes.coin_balance + 1, created_at = NOW()
+          `;
+        } else {
+          await sql`
+            INSERT INTO feature_votes (suggestion_id, wallet, coin_balance, vote)
+            VALUES (${suggestionId}, ${wallet}, 1, ${vote})
+            ON CONFLICT (suggestion_id, wallet) DO UPDATE
+              SET vote = ${vote}, coin_balance = 1, created_at = NOW()
+          `;
+        }
         // Recompute vote_weight as sum of coin_balance * vote.
         await sql`
           UPDATE feature_suggestions
