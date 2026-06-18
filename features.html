@@ -297,6 +297,8 @@
   color: var(--ink, #1a1d27);
   cursor: pointer;
 }
+/* Hardcoded amber (matches .admin-wave-select) so the WAVE pill stays distinct
+   from the blue --accent status chips; do not switch back to var(--accent). */
 .wave-badge {
   display: inline-block;
   font-size: 11px;
@@ -304,9 +306,9 @@
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--accent, #ffb020);
-  color: #1a1205;
-  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff7e6;
+  color: #6a4a00;
+  border: 1px solid #e6c98a;
 }
 .admin-wave-select {
   font: inherit;
