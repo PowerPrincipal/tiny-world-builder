@@ -399,6 +399,23 @@
 }
 .kanban-card .wave-badge { margin-top: 8px; }
 
+/* Admin inline wave control - a <select> styled as the wave badge so an admin can
+   reassign (or clear) a card's launch wave in one click, no edit/save modal. The
+   public path keeps the plain read-only .wave-badge span. */
+.wave-select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  cursor: pointer;
+}
+.wave-select:focus-visible { outline: 2px solid var(--accent, #ffb020); outline-offset: 2px; }
+/* No-wave state reads as "unset, click to assign" rather than a real wave pill. */
+.wave-select--empty {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted, #9aa3ad);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+}
+
 /* responsive */
 @media (max-width: 780px) {
   .kanban-board {
@@ -477,9 +494,10 @@
     const STATUS_CLASS = { done: 'done', active: 'active', planned: 'planned' };
 
     // ---- State ----
-    // Admin mode is LOCAL-DEV ONLY. On any non-local host (e.g. production)
-    // the admin toolbar/editing is fully disabled and never shown, regardless
-    // of any stored secret or server env. Edit the roadmap locally, then deploy.
+    // Admin mode is decided by the SERVER (see boot: adminMode = serverSaysAdmin):
+    // a verified world-admin email grants it on production, and the localhost-only
+    // dev secret grants it locally. IS_LOCAL only gates the Ctrl+Shift+A secret
+    // prompt below - it is NOT what enables/disables editing.
     const IS_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
     let milestones = [];
     let adminSecret = IS_LOCAL ? (sessionStorage.getItem('twAdminSecret') || '') : '';
@@ -535,6 +553,15 @@
     // WAVE launch label pill, or '' when the milestone has no wave.
     function waveBadge(w) {
       return WAVES.includes(w) ? `<span class="wave-badge">${esc(w)}</span>` : '';
+    }
+    // Admin-only inline wave control. A <select> (same No-wave/WAVE1-3 options as the
+    // detail modal) styled as the wave badge: changing it PATCHes the wave directly.
+    // Rendered only on admin cards; the public card path uses waveBadge() instead.
+    function waveControl(m) {
+      const isSet = WAVES.includes(m.wave);
+      const opts = `<option value="none"${!isSet ? ' selected' : ''}>No wave</option>`
+        + WAVES.map(w => `<option value="${w}"${w === m.wave ? ' selected' : ''}>${w}</option>`).join('');
+      return `<select class="wave-badge wave-select${isSet ? '' : ' wave-select--empty'}" data-wave-for="${m.id}" aria-label="Change launch wave">${opts}</select>`;
     }
 
     // Bearer token for the signed-in account, if any. Mirrors scripts/admin-users.js:
@@ -638,7 +665,7 @@
                 <div class="kanban-card-body">
                   <h3>${esc(m.title)}</h3>
                   ${m.description ? `<p>${esc(m.description)}</p>` : ''}
-                  ${waveBadge(m.wave)}
+                  ${waveControl(m)}
                 </div>
               </div>
             </div>`;
@@ -678,6 +705,43 @@
       // Add buttons
       board.querySelectorAll('.kanban-add-btn').forEach(btn => {
         btn.addEventListener('click', () => openNewCard(btn.dataset.add));
+      });
+
+      // Inline wave control (admin). stopPropagation keeps interacting with the
+      // select from also opening the card's detail modal. Change is optimistic:
+      // the UI updates immediately, then reverts if the PATCH fails.
+      board.querySelectorAll('select[data-wave-for]').forEach(sel => {
+        sel.addEventListener('click', e => e.stopPropagation());
+        sel.addEventListener('keydown', e => e.stopPropagation());
+        sel.addEventListener('change', async () => {
+          const id = Number(sel.dataset.waveFor);
+          const m = milestones.find(x => x.id === id);
+          if (!m) return;
+          const prevWave = WAVES.includes(m.wave) ? m.wave : null;
+          const prevValue = prevWave || 'none';
+          const chosen = sel.value; // 'none' | 'WAVE1' | ...
+          const nextWave = WAVES.includes(chosen) ? chosen : null;
+          if (nextWave === prevWave) return;
+          // Optimistic: reflect the choice now.
+          m.wave = nextWave;
+          sel.classList.toggle('wave-select--empty', !nextWave);
+          sel.disabled = true;
+          try {
+            await patchMilestone(id, { wave: chosen });
+            // Reconcile with the server's normalized value (source of truth).
+            const cur = WAVES.includes((milestones.find(x => x.id === id) || {}).wave)
+              ? milestones.find(x => x.id === id).wave : null;
+            sel.value = cur || 'none';
+            sel.classList.toggle('wave-select--empty', !cur);
+          } catch (err) {
+            m.wave = prevWave;
+            sel.value = prevValue;
+            sel.classList.toggle('wave-select--empty', !prevWave);
+            alert(err.message);
+          } finally {
+            sel.disabled = false;
+          }
+        });
       });
 
       // Drag and drop (admin only)
