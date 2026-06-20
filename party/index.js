@@ -1145,6 +1145,7 @@ export default class TinyWorldParty {
       this.sendTo(id, this.worldSnapshotFor(id));
       this.broadcastToAdmitted({ type: 'presence', presence: this.presenceFor(id) }, id);
       this.scheduleTick();
+    try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(id); } catch(e){}
       return;
     }
 
@@ -1397,6 +1398,7 @@ export default class TinyWorldParty {
       cooldownMs: ACTION_COOLDOWN_MS, hearts: p.hearts,
     });
     this.scheduleTick();
+    try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(id); } catch(e){}
   }
 
   accrueResource(profileId, resource, milli) {
@@ -1535,6 +1537,7 @@ export default class TinyWorldParty {
     await this.flushPending();
     // Keep ticking while anyone is connected.
     if (this.presence.size > 0) this.scheduleTick();
+    try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(id); } catch(e){}
   }
 
   onError(conn) {
