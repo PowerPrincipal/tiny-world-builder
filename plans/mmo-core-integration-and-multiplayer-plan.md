@@ -34,6 +34,14 @@
 - Safety: backend never trusts client balances/ownership; follow ECONOMY_SAFETY_RULES exactly.
 - New client code: IIFE + window.__* or proper module pattern per AGENTS.md.
 
+
+## Current Verification Status (Chrome)
+- Chrome E2E test plan: **ADDED** (see "Chrome End-to-End Test Plan for mmo-preview" section below). Run in Incognito after granting access on prod.
+- mmo-burst-3 (tax cooldown): Code complete + client surface (HUD/role/cards/dialog + in-room flow). Test using Steps 2+4 of the Chrome plan.
+- mmo-verify: Unblocked — use the numbered Chrome steps + pass criteria.
+- mmo-deploy-preview: Latest deploys include the in-room tax CD + GOLD HUD work.
+- mmo-commit-loop: Active (this update committed).
+
 ## High-Level Phases (from package integration-plan.js + trace Recommended MVP)
 
 1. **Core Contracts Adoption** (PartyKit + Functions import + tax policy)
@@ -419,3 +427,6 @@ All previous features (interest scoping, GOLD accrual on harvest, weekly payouts
 
 Run this plan in Chrome after each preview deploy. Paste results (screenshots of HUD, Console excerpts, or "PASS/FAIL + note") back for verification.
 
+
+
+**Chrome E2E test plan added to this file** (see section above). Use it in Incognito Chrome against the mmo-preview alias after granting lobby access on the main prod site. This unblocks mmo-verify.
