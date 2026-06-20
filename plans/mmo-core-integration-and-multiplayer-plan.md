@@ -225,3 +225,6 @@ This plan is the deliverable from the review. Execute in bursts; update this fil
 - All bursts committed locally
 
 **Next in loop:** Interest snapshots + cooldown + full end-to-end with local PartyKit + netlify dev smoke.
+
+
+**Latest loop run (continuing):** Interest scoping + world.interest messages + client handler live. GOLD accrual now scales with harvest reward. Cooldown enforcement stub wired. All verifications passing. Loop still running.
