@@ -244,6 +244,7 @@ function computeTaxCooldown(lastTaxChangeAt) {
       gridSize = w.gridSize || 8; taxPercent = w.taxPercent != null ? w.taxPercent : null;
       taxCooldown = w.taxCooldown || (w.lastTaxChange ? computeTaxCooldown(w.lastTaxChange) : null);
       cells = w.data && Array.isArray(w.data.cells) ? w.data.cells : [];
+      try { window.__twStargateAnimated = []; } catch (_) {}   // reset portal anim registry for the new world
       rebuildBlocked();
       if (w.data && typeof applyState === 'function') {
         // The lobby/demo world is static (visitors don't edit it), so bake its
@@ -830,12 +831,12 @@ function computeTaxCooldown(lastTaxChangeAt) {
     
 // Cross-island stargate (hub + rich islands traversal - Valheim portal style)
 function getCellAt(x, z) {
-  if (!this._cells) return null;
-  return this._cells.find(c => Math.round(c.x) === Math.round(x) && Math.round(c.z) === Math.round(z));
+  if (!Array.isArray(cells)) return null;
+  return cells.find(c => Math.round(c.x) === Math.round(x) && Math.round(c.z) === Math.round(z));
 }
 function tryCrossIslandGate() {
   if (!selfEnt || !selfEnt.voxel) return false;
-  const c = getCellAt.call(this, you.x, you.z);
+  const c = getCellAt(you.x, you.z);
   if (!c || c.kind !== "stargate" || !c.dest) return false;
   const destSlug = c.dest;
   selfEnt._traveling = true;
@@ -857,7 +858,7 @@ function tryCrossIslandGate() {
 
 function tryEnterGate() {
   if (!selfEnt || !selfEnt.voxel || selfEnt._traveling) return;
-  if (tryCrossIslandGate.call(this)) return;
+  if (tryCrossIslandGate()) return;
       const GT = window.__tinyworldGateTransit;
       if (!GT) return;
       // Sky-edge stargate -> descend to the mainland (replaces walk-off-the-edge). J still works.

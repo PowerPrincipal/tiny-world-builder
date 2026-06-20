@@ -411,7 +411,13 @@
           "lamp-post",
           "spotlight",
           "voxel-build",
-          "model-stamp", "stargate"
+          "model-stamp",
+          "artifact",
+          "relic",
+          "crystal",
+          "totem",
+          "ruins",
+          "stargate"
         ]
       },
       "island": {

@@ -403,7 +403,7 @@
       if (data.planetLandscape.drop !== undefined && (typeof data.planetLandscape.drop !== 'number' || data.planetLandscape.drop < 20 || data.planetLandscape.drop > 300)) return 'planetLandscape.drop invalid';
     }
     const okTerrain = new Set(['grass','path','dirt','water','stone','lava','sand','snow']);
-    const okKind = new Set([null,'house','tree','fence','rock','bridge','crop','corn','wheat','pumpkin','carrot','sunflower','tuft','flower','bush','cow','sheep','lamp-post','spotlight','chimney','ripple','shrub','stone','pebble','bridge-rail','voxel-build','model-stamp','blank-island']);
+    const okKind = new Set([null,'house','tree','fence','rock','bridge','crop','corn','wheat','pumpkin','carrot','sunflower','tuft','flower','bush','cow','sheep','lamp-post','spotlight','chimney','ripple','shrub','stone','pebble','bridge-rail','voxel-build','model-stamp','blank-island','stargate','crystal','relic','totem','ruins','artifact']);
     const okBT = new Set([null,'cottage','manor','tower','turret','skyscraper']);
     const okFenceSide = new Set([null,'n','s','e','w','center-x','center-z']);
     const seen = new Set();

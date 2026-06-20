@@ -232,6 +232,40 @@
     else if (kind === 'pumpkin')   mesh = (level >= MAX_FLOORS && isCarriagePumpkin(x, z)) ? makePumpkinCarriage() : makePumpkin();
     else if (kind === 'carrot')    mesh = makeCarrot();
     else if (kind === 'sunflower') mesh = makeSunflower();
+    else if (kind === 'stargate') {
+      // Tinyverse portal: reuse the stargate factory (animated rings + glowing core).
+      // Registered in a global tick list so 17 has no per-frame loop of its own.
+      const SG = window.__tinyworldStargate;
+      if (SG && typeof SG.build === 'function') {
+        const portal = SG.build();
+        mesh = portal.group;
+        mesh.userData = Object.assign({}, mesh.userData, { kind: 'stargate', dest: cell.dest || null, isStargate: true });
+        try {
+          const reg = (window.__twStargateAnimated = window.__twStargateAnimated || []);
+          reg.push(portal);
+          if (!window.__twStargateTicker) {
+            window.__twStargateTicker = true;
+            const t0 = performance.now();
+            const tick = () => {
+              const t = (performance.now() - t0) / 1000;
+              const list = window.__twStargateAnimated || [];
+              for (const p of list) { try { if (p && p.update) p.update(t); } catch (_) {} }
+              requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }
+        } catch (_) {}
+      }
+    }
+    else if (kind === 'crystal' || kind === 'relic' || kind === 'totem' || kind === 'ruins' || kind === 'artifact') {
+      // Artifact kinds (rich-island treasures). Map to existing primitives so
+      // they render as visible props until bespoke meshes are authored.
+      if (kind === 'crystal')      mesh = makeRock(getRockNeighbors(x, z), level, x, z, false);
+      else if (kind === 'totem')   mesh = makeRock(getRockNeighbors(x, z), level, x, z, false);
+      else if (kind === 'ruins')   mesh = makeRock(getRockNeighbors(x, z), level, x, z, false);
+      else                          mesh = makeBush();   // relic / artifact -> small shrub-like marker
+      if (mesh) mesh.userData = Object.assign({}, mesh.userData, { kind, artifact: true });
+    }
     else if (kind === 'lamp-post' || kind === 'spotlight') mesh = makeVoxelLightSource(kind, level, { appearance: cell.appearance });
     else if (kind === 'fence') {
       const fenceStyle = typeof fenceStyleForCell === 'function' ? fenceStyleForCell(cell) : 'wood';
@@ -320,7 +354,7 @@
       return;
     }
     repaintProfileEnd('object.build', buildStart);
-    if (!voxelRender && kind !== 'house' && kind !== 'fence' && kind !== 'rock') addEnhancementBits(mesh, kind, level);
+    if (!voxelRender && kind !== 'house' && kind !== 'fence' && kind !== 'rock' && kind !== 'stargate') addEnhancementBits(mesh, kind, level);
     if (posX === null) {
       const p = cellRenderPositionForCell(x, z);
       posX = p.x; posZ = p.z;
