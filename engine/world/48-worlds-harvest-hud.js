@@ -39,7 +39,7 @@
   .tw-hud-res{display:flex;gap:8px}
   .tw-res-item{display:flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(4,6,20,.5);border:1px solid rgba(80,110,200,.18);border-radius:8px}
   .tw-res-item svg{opacity:.9}
-  .tw-hud-role{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.72;padding:0 8px;
+  .tw-hud-gold{font-size:11px;opacity:.9;padding:0 6px;border-left:1px solid rgba(80,110,200,.25)} .tw-hud-role{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.72;padding:0 8px;
     border-left:1px solid rgba(80,110,200,.25);border-right:1px solid rgba(80,110,200,.25)}
   .tw-hud-acts{display:flex;gap:6px}
   .tw-act{display:flex;align-items:center;gap:6px;border:0;cursor:pointer;color:#fff;

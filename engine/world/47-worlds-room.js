@@ -80,6 +80,23 @@
     // Expose emit so sibling modules (e.g. 64-lobby-chat-bridge) can inject
     // synthetic events like a bridged 'chat' line into the same render path.
     WS.__emit = emit;
+
+// ---- real GOLD via mmo-core backend (Phase 2 starter) ----
+  let currentGold = { available: 0, totalAllowance: 0, tier: "none" };
+
+  async function refreshGold() {
+    try {
+      const res = await fetch("/api/me/gold", { credentials: "include" });
+      if (res.ok) {
+        currentGold = await res.json();
+        emit("gold", currentGold);
+        console.log("[worlds] GOLD allowance:", currentGold.available, "tier:", currentGold.tier);
+      }
+    } catch (e) { /* offline or no auth — normal in pure static */ }
+  }
+  WS.getGold = () => currentGold;
+  WS.refreshGold = refreshGold;
+
   
     // ---- room state ----
     let socket = null;
