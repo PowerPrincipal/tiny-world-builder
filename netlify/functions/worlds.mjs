@@ -143,7 +143,7 @@ export default async function worldsFunction(request) {
         // A small top-down preview for the card. Other players' private drafts
         // are not previewed; everything else (incl. empty unclaimed plots) is.
         const isOwner = profile && r.owner_profile_id != null && Number(r.owner_profile_id) === Number(profile.id);
-        dto.preview = { gridSize: dto.gridSize, cells: (r.status !== draft || isOwner) ? worldPreview(r.data) : [] };
+        dto.preview = { gridSize: dto.gridSize, cells: (r.status !== 'draft' || isOwner) ? worldPreview(r.data) : [] };
         dto.taxCooldown = getTaxCooldownInfo(r.last_tax_change);
         return dto;
       });
