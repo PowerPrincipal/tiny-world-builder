@@ -304,3 +304,118 @@ All previous features (interest scoping, GOLD accrual on harvest, weekly payouts
 
 
 **mmo-burst-3 (tax cooldown) completed on code side** — full server enforcement + DB state + client visibility (cards, manage dialog, HUD timer, in-room role label). Admin tool DB limitation is a platform constraint (documented above and in the page banner).
+
+## Chrome End-to-End Test Plan for mmo-preview (as of 2026-06-20)
+
+**Goal**: Manually smoke the current MMO features in a real browser (Chrome) against the live preview alias. Covers tax cooldown, GOLD, HUD indicators, harvest, interest effects, and lobby access.
+
+**Prerequisites**:
+- Chrome (latest; use Incognito or a dedicated profile to avoid cached auth/storage).
+- Access to main production site for god-admin grants (see below).
+- A test account (email-verified preferred; or wallet).
+- The preview URL: https://mmo-preview--tiny-world-builder.netlify.app
+- DevTools open (Cmd+Opt+I on Mac, Ctrl+Shift+I on Win).
+- A draft world you own + at least one published world.
+- (Optional) Second Chrome window or incognito for multiplayer smoke.
+
+**Step 0: Grant lobby / Tinyverse access (required for preview testing)**
+1. Go to the **main production site** (not the preview alias).
+2. Sign in as a god-admin account.
+3. Navigate to /admin-users.
+4. Search for your test account(s).
+5. Edit → check "Enable Tinyverse lobby + multiplayer access".
+6. Save.
+7. (Note: For verified email accounts, `accountMeetsCriteria` may grant access automatically in many cases.)
+
+**Step 1: Load the preview clean**
+1. Open https://mmo-preview--tiny-world-builder.netlify.app in a fresh Chrome Incognito tab.
+2. Hard reload (Cmd+Shift+R) to bypass any cached JS from previous deploys.
+3. Sign in with the test account (the one you just granted access).
+4. Open DevTools → Console tab. Expect no red errors on load. Look for any "[mmo]" or presence logs.
+5. Navigate to Worlds list. Confirm your granted account can see published worlds.
+
+**Step 2: Enter a world as Play + verify HUD basics**
+1. Pick a published world you can join as Play (not just observe).
+2. Click Enter / Play role.
+3. Watch for bottom HUD to appear.
+4. **Expected in HUD**:
+   - $TW indicator (e.g. "22m" or your actual holding abbrev).
+   - G (GOLD) indicator with a number (may start at 0 or show allowance).
+   - Role line showing tax % (e.g. "Visitor · 10%").
+5. DevTools → Network tab → filter WS or "party". Confirm WS connection to the room succeeds.
+6. Console: look for world state, taxPercent, gold, token updates.
+
+**Step 3: Harvest + GOLD accrual smoke**
+1. Select a harvestable node (fish/meat/plants/ore).
+2. Perform harvest action (click or tool).
+3. Watch resources update in UI.
+4. Immediately check G in HUD — should increment (small amount on harvest; reflects package accrual).
+5. Open DevTools → Network → look for calls to /api/me/gold or world-resources.
+6. Repeat harvest a few times. GOLD should grow.
+7. (If you have a draft) Check that tax is applied on flush (owner gets share).
+8. Console / Network: verify ALLOWANCE_RECALCULATED or GOLD events if logged.
+
+**Step 4: Tax cooldown test (core of burst-3)**
+1. Go back to Worlds list.
+2. Open one of your own **draft** worlds.
+3. Click Manage (name/tax editor).
+4. Change taxPercent (e.g. from 10 to 15) → Save.
+5. **Expected**:
+   - Tax field becomes disabled.
+   - Message appears: "Tax on cooldown for ~24h" (or similar remaining hours).
+   - Card in list shows (CD) badge.
+6. Re-enter the draft world as Play.
+7. HUD role line should now show tax % **plus** "(CD Xh)" (e.g. "Visitor · 15% (CD 23h)").
+8. Try to change tax again while in cooldown:
+   - In Manage: Save should be blocked client-side + show toast "Tax is on cooldown".
+   - Server should also reject (429 or clear error).
+9. DevTools → Console + Network: confirm the PUT to /api/worlds includes the cooldown check and returns the taxCooldown object in response.
+10. (Optional) Inspect the world state payload in WS messages — lastTaxChange / taxCooldown should be present.
+
+**Step 5: Interest / scoping smoke (if visible in current build)**
+1. Stay in a world for a while or trigger an onAlarm / interest tick (may require waiting or multiple clients).
+2. Watch for any visible effects (resource regrowth, hearts, or logged interest updates).
+3. In Console: look for `buildInterestSnapshot`, `world.interest`, or ALLOWANCE messages.
+4. If two tabs open (same account or different granted accounts): join the same world and confirm presence + any interest replication works.
+
+**Step 6: Multiplayer / lobby quick check**
+1. With two Chrome windows (or one incognito + normal):
+   - Both accounts must have lobby access granted (Step 0).
+   - Both enter the same published world as Play.
+2. Confirm both see each other (avatars/presence).
+3. One harvests; other should see the resource change + any GOLD/interest side effects.
+4. Check presence chat or emotes if available.
+5. Leave one; confirm the other sees the peer leave.
+
+**Step 7: Edge cases + cleanup**
+1. Try entering as Observe role — HUD should still show tax/GOLD but limited actions.
+2. Hard reload mid-session; confirm state re-hydrates correctly (GOLD, tax CD, role).
+3. Check Console for any uncaught errors or failed fetches during the session.
+4. Test on a world with 0% or max 20% tax (verify cap enforcement on harvest split).
+5. Sign out → sign back in → re-enter world; verify persisted GOLD/interest state.
+6. (If time) Open DevTools → Application → Storage → clear site data for the preview domain, reload, repeat a harvest.
+
+**Pass criteria**:
+- No hard crashes or red Console errors on the critical paths.
+- HUD always shows $TW + G after entering a world.
+- Harvest visibly increases GOLD.
+- Tax changes on drafts are blocked for ~24h with UI feedback in dialog, cards, and in-room role label.
+- Cooldown info flows from DB → server snapshot → client state → HUD/role.
+- Lobby access works (granted accounts can enter multiplayer rooms on the preview).
+
+**Chrome-specific tips**:
+- Use Incognito to avoid profile contamination.
+- Cmd+Shift+R (hard reload) + Cmd+Opt+I (DevTools) on every major step.
+- Network tab: "Preserve log" + filter "gold|worlds|party|resources".
+- Console: enable "Verbose" if needed; search for "taxCooldown", "gold", "interest".
+- If WS feels flaky: check the room slug in Network WS frames.
+- Performance tab (optional): record a harvest + interest tick to spot heavy work.
+
+**Known current limitations (do not fail the test on these)**:
+- Admin grants must be done on the main prod site (preview admin DB is unavailable by design).
+- $TW may be a demo "22m" value until real wallet holdings are wired.
+- Some interest visuals may still be server-only (logs) until client polish.
+- Full weekly payout cycle may require waiting or forcing via dev tools.
+
+Run this plan in Chrome after each preview deploy. Paste results (screenshots of HUD, Console excerpts, or "PASS/FAIL + note") back for verification.
+
