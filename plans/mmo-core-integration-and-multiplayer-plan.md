@@ -278,3 +278,16 @@ Preview alias updated with the change.
 6. Wait or use another draft to test cooldown expiry behavior.
 
 All previous features (interest scoping, GOLD accrual on harvest, weekly payouts) remain live.
+
+## Testing reality note (added 2026-06-20)
+- The /admin-users (User access) god-admin page only works against a real Netlify Database.
+- It intentionally errors with "Netlify Database is not available in this local session" in netlify dev and on deploy previews (see netlify/functions/lib/db.mjs + isDatabaseUnavailable guards used across many functions).
+- Do **not** try to wire the preview directly to live prod DB credentials.
+- Practical flow:
+  1. Go to the **main production site** (not the mmo-preview alias) and open /admin-users while signed in as a god-admin email.
+  2. Grant "Enable Tinyverse lobby + multiplayer access" (or rely on accountMeetsCriteria for email-verified accounts).
+  3. Use those accounts on https://mmo-preview--tiny-world-builder.netlify.app to test join/harvest/GOLD/interest/tax-cooldown etc.
+- tools/db-local.sh exists for full local dev with a Postgres copy.
+
+
+**mmo-burst-3 (tax cooldown) marked complete** — full server + client enforcement + visibility in HUD/role/cards + in-room lastTaxChange flow.

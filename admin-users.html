@@ -61,7 +61,7 @@
         <button class="primary-action" id="admin-user-search-btn" type="button">Search</button>
         <button class="secondary-action" id="admin-user-refresh-btn" type="button">Refresh</button>
       </div>
-      <p class="admin-users-status" id="admin-users-status">Checking admin access…</p>
+      <p class="admin-users-status" id="admin-users-status">Checking admin access…</p><p style="font-size:12px;opacity:.7;margin:8px 0;color:#f66">This admin tool only works when the Netlify function has a real database (production site or netlify dev with NETLIFY_DATABASE_URL). On preview deploys use the main production site to grant lobby access, then test the preview URL with those accounts.</p>
       <div class="admin-users-layout">
         <div class="admin-users-list-wrap">
           <table class="admin-users-table">
