@@ -6,6 +6,7 @@ import { activeSuspension } from './lib/community-moderation.mjs';
 import {
   cleanWorldName, cleanTaxPercent, computeWorldPrice, deriveTerrainCounts,
   worldDto, worldPreview, signJoinToken, isWorldAdminEmail, getTaxCooldownInfo,
+  normalizeWorldSelectionGateData, TINYVERSE_HUB_SLUG,
 } from './lib/worlds.mjs';
 
 export const config = { path: '/api/worlds' };
@@ -94,6 +95,7 @@ export default async function worldsFunction(request) {
             `;
         if (!rows.length) return errorResponse('World not found', 404, origin);
         const world = rows[0];
+        if (world.slug === TINYVERSE_HUB_SLUG) return errorResponse('World not found', 404, origin);
         const isOwner = profile && Number(world.owner_profile_id) === Number(profile.id);
         // Drafts are private to their owner — except a god-admin, who may load and
         // edit any world (including the published lobby) live.
@@ -135,7 +137,8 @@ export default async function worldsFunction(request) {
         SELECT w.*, p.display_name AS owner_name
         FROM worlds w
         LEFT JOIN profiles p ON p.id = w.owner_profile_id
-        ORDER BY (w.slug = 'tinyverse-nexus') DESC, (w.kind = 'starter') DESC, w.id ASC
+        WHERE w.slug <> ${TINYVERSE_HUB_SLUG}
+        ORDER BY (w.kind = 'starter') DESC, w.id ASC
         LIMIT 500
       `;
       const worlds = rows.map(r => {
@@ -143,7 +146,8 @@ export default async function worldsFunction(request) {
         // A small top-down preview for the card. Other players' private drafts
         // are not previewed; everything else (incl. empty unclaimed plots) is.
         const isOwner = profile && r.owner_profile_id != null && Number(r.owner_profile_id) === Number(profile.id);
-        dto.preview = { gridSize: dto.gridSize, cells: (r.status !== 'draft' || isOwner) ? worldPreview(r.data) : [] };
+        const previewData = normalizeWorldSelectionGateData(r.data, dto.gridSize);
+        dto.preview = { gridSize: dto.gridSize, cells: (r.status !== 'draft' || isOwner) ? worldPreview(previewData) : [] };
         dto.taxCooldown = getTaxCooldownInfo(r.last_tax_change);
         return dto;
       });

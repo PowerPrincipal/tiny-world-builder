@@ -13,6 +13,9 @@
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
   
     const WS = (window.__tinyworldWorlds = window.__tinyworldWorlds || {});
+    const TINYVERSE_HUB_SLUG = 'tinyverse-nexus';
+    const WORLD_SELECTION_GATE_DEST = '__world-picker';
+    const ACTIVE_TINYVERSE_LS = 'tinyworld:worlds.activeTinyverse.v1';
   
     function api(path, method, body) {
       if (typeof window.__tinyworldCloudApiCall === 'function') return window.__tinyworldCloudApiCall(path, method, body);
@@ -21,6 +24,52 @@
     function T(key, params) { return typeof window.t === 'function' ? window.t(key, params) : key; }
     function toast(msg) { if (typeof twToast === 'function') twToast(msg); else console.log('[worlds]', msg); }
     function loggedIn() { return !!(window.__loggedIn || (window.TinyWorldAuth && window.TinyWorldAuth.currentUser && window.TinyWorldAuth.currentUser())); }
+    function validWorldSlug(slug) {
+      const s = String(slug || '').trim().toLowerCase();
+      return /^[a-z0-9][a-z0-9-]{0,47}$/.test(s) && s !== TINYVERSE_HUB_SLUG ? s : '';
+    }
+    function activeTinyverseSlug() {
+      try {
+        const raw = localStorage.getItem(ACTIVE_TINYVERSE_LS);
+        if (!raw) return '';
+        const data = JSON.parse(raw);
+        return validWorldSlug(data && data.slug);
+      } catch (_) { return ''; }
+    }
+    function normalizeWorldSelectionGateData(data, gridSizeHint) {
+      const src = data && typeof data === 'object' ? data : { v: 4, cells: [] };
+      const gridSize = Math.max(1, Math.round(Number(src.gridSize || gridSizeHint) || 8));
+      const cx = Math.floor(gridSize / 2);
+      const cz = Math.floor(gridSize / 2);
+      const sourceCells = Array.isArray(src.cells) ? src.cells : [];
+      const nextCells = [];
+      sourceCells.forEach(cell => {
+        if (!cell) return;
+        const x = Math.round(Number(Array.isArray(cell) ? cell[0] : cell.x));
+        const z = Math.round(Number(Array.isArray(cell) ? cell[1] : cell.z));
+        const kind = Array.isArray(cell) ? cell[3] : cell.kind;
+        if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+        if (kind === 'stargate') return;
+        if (x === cx && z === cz) return;
+        nextCells.push(cell);
+      });
+      nextCells.push({
+        x: cx,
+        z: cz,
+        terrain: 'grass',
+        kind: 'stargate',
+        dest: WORLD_SELECTION_GATE_DEST,
+        label: 'Worlds',
+      });
+      return Object.assign({}, src, { v: src.v || 4, gridSize, cells: nextCells });
+    }
+    function normalizeWorldForEntry(world) {
+      if (!world || typeof world !== 'object') return world;
+      const next = Object.assign({}, world);
+      next.data = normalizeWorldSelectionGateData(world.data || { v: 4, cells: [] }, world.gridSize);
+      next.gridSize = next.data.gridSize || world.gridSize || 8;
+      return next;
+    }
 
     // Shared SVG icon set for the whole Worlds UI (NO emoji). Stroke icons use
     // currentColor; a few are filled. Exposed on WS so 47/48 reuse one source.
@@ -189,7 +238,6 @@
       gridEl.textContent = "";
       if (location.hostname.includes("mmo-preview")) {
         const seeds = [
-          { slug: "tinyverse-nexus", name: "Tinyverse Nexus (Hub)", status: "published", kind: "starter", gridSize: 20, tileCount: 400, taxPercent: 10, activePlayers: 0 },
           { slug: "tidewater-bay", name: "Tidewater Bay", status: "published", kind: "starter", gridSize: 20, tileCount: 400, taxPercent: 10, activePlayers: 0 },
           { slug: "iron-ridge", name: "Iron Ridge", status: "published", kind: "starter", gridSize: 18, tileCount: 324, taxPercent: 10, activePlayers: 0 },
           { slug: "crystal-canyon", name: "Crystal Canyon", status: "published", kind: "starter", gridSize: 20, tileCount: 400, taxPercent: 10, activePlayers: 0 }
@@ -201,7 +249,7 @@
       const res = await api("/api/worlds", "GET");
       if (!res || res.error) { gridEl.textContent = ""; gridEl.appendChild(el("p", { text: res && res.error ? res.error : T("worlds.empty") })); return; }
       me = res.me || null;
-      const worlds = Array.isArray(res.worlds) ? res.worlds : [];
+      const worlds = (Array.isArray(res.worlds) ? res.worlds : []).filter(w => validWorldSlug(w && w.slug));
       gridEl.textContent = "";
       if (!worlds.length) { gridEl.appendChild(el("p", { text: T("worlds.empty") })); return; }
       for (const w of worlds) gridEl.appendChild(renderCard(w));
@@ -213,10 +261,9 @@
     }
   
     function renderCard(w) {
-      // All PUBLISHED worlds are playable (the Nexus hub + rich starter islands);
+      // All PUBLISHED worlds are playable (rich starter islands + claimed worlds);
       // unclaimed plots stay locked/greyed. Access to the whole Tinyverse is
       // already gated to allowlisted accounts server-side.
-      const isHub = w.slug === 'tinyverse-nexus';
       const isDemo = w.slug === 'tidewater-bay';
       const locked = w.status !== 'published';
       const mine = me && w.ownerProfileId != null && Number(w.ownerProfileId) === Number(me.id);
@@ -238,7 +285,7 @@
         actions.appendChild(el('button', { class: 'tw-btn alt', text: T('worlds.manage'), onclick: () => manageFlow(w) }));
       }
       const baseTitle = w.name || (w.kind === 'starter' ? w.slug : T('worlds.statusUnclaimed'));
-      const title = baseTitle + (isHub ? ' (hub)' : (isDemo ? ' (demo)' : ''));
+      const title = baseTitle + (isDemo ? ' (demo)' : '');
       const prev = el('canvas', { class: 'tw-worlds-prev', width: '320', height: '200' });
       const card = el('div', { class: 'tw-worlds-card' + (locked ? ' tw-worlds-locked' : '') }, [
         prev,
@@ -251,6 +298,7 @@
       // Isometric 2D preview of the world's tiles.
       if (typeof WS.renderPreview === 'function') {
         const preview = Object.assign({ gridSize: w.gridSize, cells: [], slug: w.slug, name: w.name, id: w.id }, w.preview || {});
+        preview.cells = normalizeWorldSelectionGateData({ v: 4, gridSize: preview.gridSize, cells: preview.cells }, preview.gridSize).cells;
         WS.renderPreview(prev, preview);
       }
       return card;
@@ -402,6 +450,8 @@
     async function enterWorldFull(full) {
       if (!full || full.error || !full.world) { toast(full && full.error ? full.error : T('worlds.error')); return false; }
       if (full.world.status !== 'published') { toast(T('worlds.error')); return false; }
+      if (!validWorldSlug(full.world.slug)) { toast(T('worlds.error')); return false; }
+      full = Object.assign({}, full, { world: normalizeWorldForEntry(full.world) });
       WS.myProfileId = (full.me && full.me.id != null) ? full.me.id : (me && me.id != null ? me.id : null);
       // God-admin live-edit grant for THIS world (server-verified by account email).
       // The lobby-admin module (66) reads these to surface the live build controls.
@@ -421,7 +471,7 @@
 
     async function enterWorld(w) {
       if (location.hostname.includes("mmo-preview") && w && w.slug) {
-        const full = { world: { id: 1, slug: w.slug, name: w.name, gridSize: w.gridSize || 20, data: {v:4, gridSize: w.gridSize||20, cells: w.slug==="tinyverse-nexus" ? [{x:2,z:2,terrain:"grass",kind:"stargate",dest:"tidewater-bay"},{x:0,z:0,terrain:"grass",kind:"stargate",dest:"tinyverse-nexus"}] : [] } }, token: "" };
+        const full = { world: { id: 1, slug: w.slug, name: w.name, status: 'published', gridSize: w.gridSize || 20, data: {v:4, gridSize: w.gridSize||20, cells: [] } }, token: "" };
         return enterWorldFull(full);
       }
       const full = await api("/api/worlds?id=" + w.id, "GET");
@@ -429,10 +479,10 @@
     }
 
     async function enterBySlug(slug) {
-      const s = String(slug || "").trim().toLowerCase();
+      const s = validWorldSlug(slug);
       if (!s) { toast(T("worlds.error")); return false; }
       if (location.hostname.includes("mmo-preview")) {
-        const full = { world: { id: 1, slug: s, name: s, gridSize: 20, data: {v:4, gridSize:20, cells: s==="tinyverse-nexus" ? [{x:2,z:2,terrain:"grass",kind:"stargate",dest:"tidewater-bay"}] : [] } }, token: "" };
+        const full = { world: { id: 1, slug: s, name: s, status: 'published', gridSize: 20, data: {v:4, gridSize:20, cells: [] } }, token: "" };
         return enterWorldFull(full);
       }
       const full = await api("/api/worlds?slug=" + encodeURIComponent(s), "GET");
@@ -483,10 +533,11 @@
         ? window.__tinyworldTinyverseSlugParam
         : null;
       const slug = slugFn ? slugFn() : null;
-      if (!slug) return;
+      const resumeSlug = slug || activeTinyverseSlug();
+      if (!resumeSlug) return;
       await waitForEnterRoom();
       dismissWelcomeForDemoEntry();
-      await enterBySlug(slug);
+      await enterBySlug(resumeSlug);
     }
   
     // Netlify deploy previews (and embeds) add a bottom bar/iframe chrome that
@@ -555,7 +606,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addLauncher);
     else addLauncher();
 
-    if (typeof window.__tinyworldTinyverseSlugParam === 'function' && window.__tinyworldTinyverseSlugParam()) {
+    if ((typeof window.__tinyworldTinyverseSlugParam === 'function' && window.__tinyworldTinyverseSlugParam()) || activeTinyverseSlug()) {
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeAutoEnterDemoWorld);
       else maybeAutoEnterDemoWorld();
     }

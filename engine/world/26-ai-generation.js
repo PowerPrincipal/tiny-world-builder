@@ -411,7 +411,7 @@
       const c = data.cells[i];
       let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance;
       if (Array.isArray(c)) {
-        if (c.length < 4) return 'cells[' + i + '] tuple too short';
+        if (c.length < 3) return 'cells[' + i + '] tuple too short';
         [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance] = c;
       } else if (c && typeof c === 'object') {
         ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance } = c);

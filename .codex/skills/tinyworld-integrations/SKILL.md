@@ -84,6 +84,14 @@ backend:
   ledger, join-command, and interest-snapshot contracts. Use it when wiring the
   TinyWorld economy guide into PartyKit or Netlify Functions instead of copying
   constants between runtime files.
+- Tinyverse published-world navigation no longer uses the `tinyverse-nexus` hub.
+  `/api/worlds` should hide that slug from lists and direct loads, published
+  world data should normalize to one center `stargate` with
+  `dest: '__world-picker'`, and PartyKit `safeSpawn()` should prefer that gate
+  so players arrive where the in-world picker exit is.
+- Tinyverse room join/refresh payloads use compact cells. Terrain-only cells may
+  be `[x,z,terrain]`; object/resource cells are `[x,z,terrain,kind]`. Keep the
+  renderer validator and `applyState()` tolerant of both tuple lengths.
 - Local custom assets are account data too: `/api/assets` stores one
   `asset_libraries` row per profile containing custom voxel-build stamps and
   saved asset templates. Browser hooks in `saveCustomVoxelBuildStamps()` and

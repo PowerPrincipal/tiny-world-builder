@@ -374,7 +374,7 @@
       g.group.updateWorldMatrix(true, false);
       const off = new THREE.Vector3(0, 0, d).applyMatrix4(g.group.matrixWorld);
       // y: keep the walker's feet on the board (gate sits at _gy)
-      off.y = g._gy;
+      if (Number.isFinite(g._gy)) off.y = g._gy;
       return off;
     }
     function gateHeading(g) {
@@ -483,6 +483,119 @@
       return true;
     }
 
+    function renderedGateAtCell(cell) {
+      if (!cell) return null;
+      const list = window.__twStargateAnimated || [];
+      for (let i = 0; i < list.length; i++) {
+        const g = list[i];
+        if (!g || !g.group || !g._cell) continue;
+        if (Math.round(g._cell.x) === Math.round(cell.x) && Math.round(g._cell.z) === Math.round(cell.z)) return g;
+      }
+      return null;
+    }
+
+    function departThroughGate(a, av, opts) {
+      if (travelBusy || !a || !av || !av.group) return false;
+      opts = opts || {};
+      const FX = window.__tinyworldGateTravelFX;
+      travelBusy = true;
+      startTick();
+
+      const aOpen = gateFront(a, 1.0);
+      const aHead = gateHeading(a);
+      restoreWalkerOpacity(av);
+      av.group.position.copy(aOpen);
+      if (av.setHeading) av.setHeading(aHead);
+      if (av.setState) av.setState('idle');
+      av.group.visible = true;
+
+      let phase = 'dissolve', pt = 0, fired = false;
+      travelStep = (dt) => {
+        pt += dt;
+        if (phase === 'dissolve') {
+          if (!fired) {
+            fired = true;
+            if (a.flash) a.flash(0.55);
+            if (FX) FX.dissolveInto(av, a, { count: opts.count || 520, dur: 0.85 });
+          }
+          setWalkerOpacity(av, Math.max(0, 1 - pt / 0.85));
+          if (pt > 0.7 && a.flash) a.flash(1.0);
+          if (pt >= 0.95) {
+            av.group.visible = false;
+            setWalkerOpacity(av, 0);
+            phase = 'extrude';
+            pt = 0;
+            fired = false;
+          }
+        } else if (phase === 'extrude') {
+          if (!fired) {
+            fired = true;
+            if (FX) FX.extrudeBack(a, { count: opts.backCount || 240, dur: 0.6 });
+          }
+          if (pt >= 0.58) {
+            travelStep = null;
+            travelBusy = false;
+            if (opts.onDepart) {
+              try { opts.onDepart(); } catch (_) {}
+            }
+          }
+        }
+      };
+      return true;
+    }
+
+    function arriveFromGate(b, av, opts) {
+      if (travelBusy || !b || !av || !av.group) return false;
+      opts = opts || {};
+      const FX = window.__tinyworldGateTravelFX;
+      travelBusy = true;
+      startTick();
+
+      const bOut = gateFront(b, 1.8);
+      restoreWalkerOpacity(av);
+      av.group.position.copy(gateFront(b, 0.4));
+      if (av.setHeading) av.setHeading(gateHeading(b) + Math.PI);
+      if (av.setState) av.setState('idle');
+      av.group.visible = true;
+      setWalkerOpacity(av, 0);
+
+      let phase = 'receive', pt = 0, fired = false;
+      travelStep = (dt) => {
+        pt += dt;
+        if (phase === 'receive') {
+          if (b.edgeLight) b.edgeLight(0.9);
+          if (pt >= 0.35) {
+            if (b.flash) b.flash(1.0);
+            phase = 'emerge';
+            pt = 0;
+            fired = false;
+          }
+        } else if (phase === 'emerge') {
+          if (!fired) {
+            fired = true;
+            if (FX) FX.emergeFrom(b, av, { count: opts.count || 520, dur: 0.8 });
+          }
+          setWalkerOpacity(av, Math.min(1, pt / 0.7));
+          const k = Math.min(1, pt / 0.9);
+          const from = gateFront(b, 0.4);
+          av.group.position.lerpVectors(from, bOut, k * k * (3 - 2 * k));
+          if (pt > 0.15 && av.setState) av.setState('walk');
+          if (av.update) av.update(dt);
+          if (pt >= 1.0) {
+            restoreWalkerOpacity(av);
+            if (av.setState) av.setState('idle');
+            if (av.update) av.update(dt);
+            travelStep = null;
+            travelBusy = false;
+            if (opts.onArrive) {
+              try { opts.onArrive(); } catch (_) {}
+            }
+          }
+        }
+      };
+      return true;
+    }
+
     // Trigger the whole sequence on the first pair of lobby gates (for capture/testing).
     function travelDemo(opts) {
       placeLobbyGates();
@@ -542,6 +655,7 @@
     window.__tinyworldGateTransit = {
       placeGate, placeLandGate, enter, remove,
       placeLobbyGates, travel, travelDemo, travelPlayer, gateAtCell, removeLobby,
+      renderedGateAtCell, departThroughGate, arriveFromGate,
       isOnSurface: () => onSurface,
       // --- player stargate round-trip (47 surface-roam wires these) ---
       // The sky-edge gate cell: walk onto it to descend to the mainland.
@@ -603,4 +717,3 @@
       travelDemo();
     });
   })();
-

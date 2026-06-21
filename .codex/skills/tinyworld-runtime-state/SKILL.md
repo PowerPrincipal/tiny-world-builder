@@ -174,6 +174,10 @@ defaults — sets the welcome shot for new users.
 
 ## Feature flags
 
+- `tinyworld:worlds.activeTinyverse.v1` is per-device navigation state for
+  refreshing back into the last active Tinyverse world. It is not a world save,
+  not account-synced, and must stay excluded from shipped defaults in both
+  `tools/dev-server.js` and the client Save Defaults filter.
 - `tinyworld:features:cluso` — legacy Cluso flag; no app runtime path reads this
   key. The Cluso embed is now injected local-dev-only by `tools/dev-server.js`
   (see tinyworld-single-file SKILL), not gated by this key.

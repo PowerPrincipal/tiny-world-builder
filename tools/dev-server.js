@@ -236,6 +236,7 @@ const EXCLUDED_DEFAULT_KEY_PATTERNS = [
   /^tinyworld:auth:/,                  // account/session credentials
   /^tinyworld:ai:prompt$/,             // user prompt text
   /^tinyworld:vehicle-demo:/,          // session-only demo state
+  /^tinyworld:worlds\.activeTinyverse\.v\d+$/, // per-user active Tinyverse room
   /^tinyworld:multiplayer:avatar-voxel/, // per-user Tinyverse voxel avatar identity
   /^tinyworld:audio:music-track$/,     // per-user manual music choice
   /^tinyworld:audio:music-mode$/,      // random vs manual music mode

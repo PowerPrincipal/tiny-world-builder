@@ -350,7 +350,7 @@
       // (canonical schema, AI generation output).
       let x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow, dest, label;
       if (Array.isArray(entry)) {
-        if (entry.length < 4) continue;
+        if (entry.length < 3) continue;
         [x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow] = entry;
       } else if (entry && typeof entry === 'object') {
         ({ x, z, terrain, kind, floors, buildingType, terrainFloors, fenceSide, extras, transform, appearance, waterFlow, dest, label } = entry);

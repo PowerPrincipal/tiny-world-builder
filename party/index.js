@@ -432,6 +432,7 @@ function deriveWorldState(data, rng = Math.random) {
   const nodes = {};
   const cellIndex = {};   // 'x,z' -> nodeId (for fish this is the water body id)
   let stoneCount = 0;
+  let spawnCell = null;
 
   // Connected water bodies via 4-neighbor flood fill; one shared fish node each.
   const waterSeen = new Set();
@@ -460,6 +461,11 @@ function deriveWorldState(data, rng = Math.random) {
   // Ore (stone) + ripe plant nodes.
   for (const [key, c] of byXZ) {
     const terrain = cellTerrain(c), kind = cellKind(c);
+    if (kind === 'stargate' && !spawnCell) {
+      const x = Math.round(cellX(c));
+      const z = Math.round(cellZ(c));
+      if (Number.isFinite(x) && Number.isFinite(z)) spawnCell = { x, z };
+    }
     if (terrain === 'stone') {
       stoneCount++;
       const r = rng();
@@ -490,7 +496,7 @@ function deriveWorldState(data, rng = Math.random) {
   const grassCount = grassCells.length;
   const comfort = data && data.comfort ? data.comfort : Math.round(10 + (stoneCount * 0.6) + (grassCount / 12));
   const modifiers = data && data.modifiers ? data.modifiers : { fishing:1, mining:1, artifacts:1, comfortBonus:1 };
-  return { gridSize, nodes, cellIndex, stoneCount, grassCount, grassCells, comfort, modifiers };
+  return { gridSize, nodes, cellIndex, stoneCount, grassCount, grassCells, comfort, modifiers, spawnCell };
 }
 
 // ---- signed join token verification (Web Crypto HMAC-SHA256) ----
@@ -1008,6 +1014,10 @@ export default class TinyWorldParty {
   }
 
   safeSpawn() {
+    const spawn = this.worldState && this.worldState.spawnCell;
+    if (spawn && this.worldState.grassCells && this.worldState.grassCells.indexOf(spawn.x + ',' + spawn.z) >= 0) {
+      return { x: spawn.x, z: spawn.z };
+    }
     const cells = this.worldState && this.worldState.grassCells;
     if (cells && cells.length) {
       const k = cells[Math.floor(Math.random() * cells.length)];

@@ -111,6 +111,7 @@
         el('div', { class: 'tw-hud-grp' }, [el('span', { style: 'opacity:.6;font-size:10px' }, ['G']), goldEl]),
         taxCdEl,
         actGrp,
+        el('button', { class: 'tw-hud-icon tw-hud-worlds', title: T('worlds.launch'), onclick: () => { if (typeof WS.open === 'function') WS.open(); } }, [ic('globe', 16)]),
         el('button', { class: 'tw-hud-icon tw-hud-avatar', title: T('worlds.avatarOpen'), onclick: () => { if (typeof WS.openAvatarPicker === 'function') WS.openAvatarPicker(); } }, [ic('person', 16)]),
         el('button', { class: 'tw-hud-icon', title: T('worlds.help'), onclick: toggleHelp }, [ic('help', 16)]),
         el('button', { class: 'tw-hud-icon tw-hud-leave', title: T('worlds.leave'), onclick: () => { if (typeof WS.leaveRoom === 'function') WS.leaveRoom(); } }, [ic('leave', 16)]),

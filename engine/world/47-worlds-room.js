@@ -109,6 +109,8 @@
     let world = null;
     let token = '';
     let role = 'play';
+    const WORLD_SELECTION_GATE_DEST = '__world-picker';
+    const ACTIVE_TINYVERSE_LS = 'tinyworld:worlds.activeTinyverse.v1';
     let gridSize = 8;
     let taxPercent = null;
     
@@ -154,6 +156,17 @@ function computeTaxCooldown(lastTaxChangeAt) {
     let rosterEl = null;
     // Throttle flight broadcasts to ~15/s (same cadence as 38-multiplayer-partykit).
     let _lastFlightSent = 0;
+    let selectionGateArrivalPending = false;
+    let selectionGateArrivalTimer = null;
+
+    function rememberActiveTinyverseSession(slug) {
+      const s = String(slug || '').trim().toLowerCase();
+      if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(s) || s === 'tinyverse-nexus') return;
+      try { localStorage.setItem(ACTIVE_TINYVERSE_LS, JSON.stringify({ slug: s, ts: Date.now() })); } catch (_) {}
+    }
+    function clearActiveTinyverseSession() {
+      try { localStorage.removeItem(ACTIVE_TINYVERSE_LS); } catch (_) {}
+    }
 
     function host() {
       const explicit = window.__TINY_WORLD_PARTYKIT_HOST__ || '';
@@ -243,6 +256,8 @@ function computeTaxCooldown(lastTaxChangeAt) {
       try { window.__tinyworldInWorldRoom = true; } catch (_) {}   // relax camera pan clamp (02) for island exploration
       try { window.__tinyworldCurrentWorldSlug = (w && w.slug) || null; } catch (_) {}
       try { window.__tinyworldIsHubWorld = (w && w.slug === 'tinyverse-nexus'); } catch (_) {}
+      rememberActiveTinyverseSession(w && w.slug);
+      selectionGateArrivalPending = true;
       gridSize = w.gridSize || 8; taxPercent = w.taxPercent != null ? w.taxPercent : null;
       taxCooldown = w.taxCooldown || (w.lastTaxChange ? computeTaxCooldown(w.lastTaxChange) : null);
       cells = w.data && Array.isArray(w.data.cells) ? w.data.cells : [];
@@ -315,6 +330,8 @@ function computeTaxCooldown(lastTaxChangeAt) {
     WS.enterRoom = enterRoom;
   
     function leaveRoom() {
+      selectionGateArrivalPending = false;
+      if (selectionGateArrivalTimer) { clearTimeout(selectionGateArrivalTimer); selectionGateArrivalTimer = null; }
       cancelWalk();
       stopAvatars();
       try { window.__tinyworldInWorldRoom = false; } catch (_) {}   // restore tight board pin for the home builder
@@ -379,6 +396,7 @@ function computeTaxCooldown(lastTaxChangeAt) {
     }
     WS.leaveRoom = function () {
       leaveRoom();
+      clearActiveTinyverseSession();
       if (typeof WS.restoreFreeform === 'function') WS.restoreFreeform();
     };
     WS.getSelfEnt = () => selfEnt;
@@ -404,7 +422,7 @@ function computeTaxCooldown(lastTaxChangeAt) {
           peers.clear(); knownPeerIds.clear(); peerNames.clear();
           (d.peers || []).forEach(p => { if (p.id && !isSelfPresence(p)) { p._t = Date.now(); peers.set(p.id, p); knownPeerIds.add(p.id); peerNames.set(p.id, peerLabel(p)); } });
           peersSeeded = true;  // peers already here when we arrived are not "joins"
-          emit('state', snapshot()); drawMinimap(); updateSelfAvatar(); updatePeerAvatars(); break;
+          emit('state', snapshot()); drawMinimap(); updateSelfAvatar(); scheduleSelectionGateArrival(); updatePeerAvatars(); break;
         case 'presence': {
           const p = d.presence; if (!p || !p.id) break;
           if (isSelfPresence(p)) {
@@ -831,32 +849,76 @@ function computeTaxCooldown(lastTaxChangeAt) {
     // on THEIR avatar (dissolve here, emerge at the paired gate) and teleport their grid
     // cell to the destination. animVoxel cedes control while _traveling (see its guard).
     
-// Cross-island stargate (hub + rich islands traversal - Valheim portal style)
-function getCellAt(x, z) {
-  if (!Array.isArray(cells)) return null;
-  return cells.find(c => Math.round(c.x) === Math.round(x) && Math.round(c.z) === Math.round(z));
-}
-function tryCrossIslandGate() {
-  if (!selfEnt || !selfEnt.voxel) return false;
-  const c = getCellAt(you.x, you.z);
-  if (!c || c.kind !== "stargate" || !c.dest) return false;
-  const destSlug = c.dest;
-  selfEnt._traveling = true;
-  const GT = window.__tinyworldGateTransit;
-  if (GT && GT.flash) GT.flash(1.0);
-  const worldsApi = window.__tinyworldWorlds;
-  setTimeout(() => {
-    try {
-      if (worldsApi && typeof worldsApi.enterPublished === "function") {
-        worldsApi.enterPublished({ slug: destSlug });
-      } else if (worldsApi && typeof worldsApi.enterWorld === "function") {
-        worldsApi.enterWorld({ slug: destSlug });
+    // Cross-island stargates now use a single center gate per island. The gate
+    // leads back to the picker rather than a Nexus hub; world entry emerges from
+    // the destination island's center gate.
+    function cellKindOf(c) { return Array.isArray(c) ? c[3] : (c && c.kind); }
+    function cellDestOf(c) { return Array.isArray(c) ? c[4] : (c && c.dest); }
+    function cellXOf(c) { return Array.isArray(c) ? c[0] : (c && c.x); }
+    function cellZOf(c) { return Array.isArray(c) ? c[1] : (c && c.z); }
+    function getCellAt(x, z) {
+      if (!Array.isArray(cells)) return null;
+      return cells.find(c => Math.round(Number(cellXOf(c))) === Math.round(x) && Math.round(Number(cellZOf(c))) === Math.round(z));
+    }
+    function selectionGateCell() {
+      if (!Array.isArray(cells)) return null;
+      return cells.find(c => {
+        if (cellKindOf(c) !== 'stargate') return false;
+        const dest = cellDestOf(c);
+        return !dest || dest === WORLD_SELECTION_GATE_DEST;
+      }) || null;
+    }
+    function renderedGateForCell(cell) {
+      const GT = window.__tinyworldGateTransit;
+      if (!GT || typeof GT.renderedGateAtCell !== 'function') return null;
+      return GT.renderedGateAtCell({ x: cellXOf(cell), z: cellZOf(cell) });
+    }
+    function openWorldPickerFromGate() {
+      try { selfEnt && (selfEnt._traveling = false); } catch (_) {}
+      try { if (typeof WS.leaveRoom === 'function') WS.leaveRoom(); } catch (_) {}
+      setTimeout(() => {
+        try { if (typeof WS.open === 'function') WS.open(); } catch (_) {}
+      }, 0);
+    }
+    function scheduleSelectionGateArrival() {
+      if (!selectionGateArrivalPending || selectionGateArrivalTimer) return;
+      let tries = 0;
+      const attempt = () => {
+        selectionGateArrivalTimer = null;
+        if (!selectionGateArrivalPending) return;
+        tries += 1;
+        const gateCell = selectionGateCell();
+        const GT = window.__tinyworldGateTransit;
+        const gate = gateCell ? renderedGateForCell(gateCell) : null;
+        if (!gate || !selfEnt || !selfEnt.voxel || !GT || typeof GT.arriveFromGate !== 'function') {
+          if (tries < 14) selectionGateArrivalTimer = setTimeout(attempt, 140);
+          return;
+        }
+        selectionGateArrivalPending = false;
+        selfEnt._traveling = true;
+        const ok = GT.arriveFromGate(gate, selfEnt.voxel, {
+          onArrive: () => { if (selfEnt) selfEnt._traveling = false; },
+        });
+        if (!ok && selfEnt) selfEnt._traveling = false;
+      };
+      selectionGateArrivalTimer = setTimeout(attempt, 120);
+    }
+    function tryCrossIslandGate() {
+      if (!selfEnt || !selfEnt.voxel) return false;
+      const c = getCellAt(you.x, you.z);
+      if (!c || cellKindOf(c) !== 'stargate') return false;
+      const dest = cellDestOf(c);
+      if (dest && dest !== WORLD_SELECTION_GATE_DEST) return false;
+      const GT = window.__tinyworldGateTransit;
+      const gate = renderedGateForCell(c);
+      selfEnt._traveling = true;
+      if (GT && gate && typeof GT.departThroughGate === 'function') {
+        const ok = GT.departThroughGate(gate, selfEnt.voxel, { onDepart: openWorldPickerFromGate });
+        if (ok) return true;
       }
-    } catch (e) {}
-    selfEnt._traveling = false;
-  }, 250);
-  return true;
-}
+      openWorldPickerFromGate();
+      return true;
+    }
 
 function tryEnterGate() {
   if (!selfEnt || !selfEnt.voxel || selfEnt._traveling) return;
@@ -2020,6 +2082,7 @@ function tryEnterGate() {
       fence: '#7a4b2c',
       cow: '#f0d8b8',
       sheep: '#f7f1dc',
+      stargate: '#7fe6ff',
     };
     function previewShade(hex, amt) {
       const h = String(hex || '#000000').replace('#', '');

@@ -16,7 +16,7 @@ import TinyWorldParty, {
   heartsNow, oreRespawnMs, plantRipenMs, nodeActionForCell, deriveWorldState,
   verifyJoinTokenWeb, GROSS_REWARD, HEART_MAX, ACTION_COOLDOWN_MS,
 } from '../party/index.js';
-import { signJoinToken, worldPreview } from '../netlify/functions/lib/worlds.mjs';
+import { normalizeWorldSelectionGateData, signJoinToken, worldPreview } from '../netlify/functions/lib/worlds.mjs';
 
 // ---- mock PartyKit room + connections ----------------------------------
 function makeRoom() {
@@ -414,6 +414,20 @@ test('deriveWorldState: connected water => one shared fish body, ore/plant nodes
   assert.ok(state.grassCells.indexOf('0,0') >= 0, 'empty cells are standable grass');
 });
 
+test('deriveWorldState and safeSpawn prefer the center stargate spawn cell', () => {
+  const data = {
+    v: 4, gridSize: 8,
+    cells: [{ x: 4, z: 4, terrain: 'grass', kind: 'stargate' }, { x: 1, z: 1, terrain: 'water' }],
+  };
+  const state = deriveWorldState(data);
+  assert.deepEqual(state.spawnCell, { x: 4, z: 4 });
+  assert.ok(state.grassCells.indexOf('4,4') >= 0, 'stargate cell is standable');
+
+  const party = new TinyWorldParty(makeRoom());
+  party.setWorldStateFromData(data, { id: 42, taxPercent: 10 });
+  assert.deepEqual(party.safeSpawn(), { x: 4, z: 4 });
+});
+
 test('verifyJoinTokenWeb accepts a valid signed token and rejects tampering', async () => {
   const tok = signJoinToken({ w: 42, slug: 'meadow', p: 7, r: 'play' }, 'sekret', 60_000);
   const ok = await verifyJoinTokenWeb(tok, 'sekret');
@@ -522,6 +536,29 @@ test('worldPreview emits sparse terrain/kind tuples for the card minimap', () =>
   assert.deepEqual(p[1], [2, 2, 'stone']);
   assert.deepEqual(p[2], [3, 3, 'dirt', 'corn'], 'kind preserved for object cells');
   assert.equal(worldPreview({ cells: [] }).length, 0);
+});
+
+test('normalizeWorldSelectionGateData enforces one center picker stargate', () => {
+  const normalized = normalizeWorldSelectionGateData({
+    v: 4, gridSize: 6,
+    cells: [
+      { x: 0, z: 0, terrain: 'grass', kind: 'stargate', dest: 'old-world' },
+      { x: 3, z: 3, terrain: 'stone', kind: 'rock' },
+      { x: 4, z: 4, terrain: 'water' },
+    ],
+  });
+  const gates = normalized.cells.filter(c => c && c.kind === 'stargate');
+  assert.equal(gates.length, 1);
+  assert.deepEqual(gates[0], {
+    x: 3,
+    z: 3,
+    terrain: 'grass',
+    kind: 'stargate',
+    dest: '__world-picker',
+    label: 'Worlds',
+  });
+  assert.equal(normalized.cells.some(c => c && c.x === 0 && c.z === 0), false, 'old stargate removed');
+  assert.equal(normalized.cells.some(c => c && c.x === 4 && c.z === 4 && c.terrain === 'water'), true, 'unrelated terrain stays');
 });
 
 test('god-admin world.refresh re-derives state and relays the fresh board to peers', async () => {

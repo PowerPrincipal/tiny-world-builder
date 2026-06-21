@@ -270,7 +270,16 @@ function getTestUser() {
       try {
         const params = new URLSearchParams(location.search);
         if (params.get('party') || params.get('room') || params.get('collab') || params.get('share')) return true;
-        if (typeof window.__tinyworldTinyverseSlugParam === 'function' && window.__tinyworldTinyverseSlugParam()) return true;
+        if (typeof window.__tinyworldTinyverseSlugParam === 'function') {
+          const requestedSlug = String(window.__tinyworldTinyverseSlugParam() || '').trim().toLowerCase();
+          if (/^[a-z0-9][a-z0-9-]{0,47}$/.test(requestedSlug) && requestedSlug !== 'tinyverse-nexus') return true;
+        }
+        const rawTinyverse = localStorage.getItem('tinyworld:worlds.activeTinyverse.v1');
+        if (rawTinyverse) {
+          const active = JSON.parse(rawTinyverse);
+          const slug = String(active && active.slug || '').trim().toLowerCase();
+          if (/^[a-z0-9][a-z0-9-]{0,47}$/.test(slug) && slug !== 'tinyverse-nexus') return true;
+        }
       } catch (_) {}
       return false;
     })();

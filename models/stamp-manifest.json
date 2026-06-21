@@ -1,103 +1,67 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-28T07:08:38.420Z",
+  "generatedAt": "2026-06-21T04:17:54.920Z",
   "source": "tools/model-stamps.js",
   "models": [
     {
-      "id": "building-1",
-      "label": "Building 1",
-      "path": "Building_1.glb",
-      "url": "models/Building_1.glb",
+      "id": "people-cartoon-guy",
+      "label": "Cartoon Guy",
+      "path": "people/cartoon_guy.glb",
+      "url": "models/people/cartoon_guy.glb",
       "format": "glb",
       "supported": true,
-      "size": 449904,
-      "mtimeMs": 1779825421396
+      "size": 14044044,
+      "mtimeMs": 1780987943456
     },
     {
-      "id": "building-14",
-      "label": "Building 14",
-      "path": "Building_14.glb",
-      "url": "models/Building_14.glb",
+      "id": "people-kozak-hytale",
+      "label": "Kozak Hytale",
+      "path": "people/kozak_hytale.glb",
+      "url": "models/people/kozak_hytale.glb",
       "format": "glb",
       "supported": true,
-      "size": 184160,
-      "mtimeMs": 1779825421397
+      "size": 71220,
+      "mtimeMs": 1780987943456
     },
     {
-      "id": "buildings-pack-2",
-      "label": "Buildings Pack 2",
-      "path": "Buildings_Pack_2.obj",
-      "url": "models/Buildings_Pack_2.obj",
-      "format": "obj",
+      "id": "people-optimus",
+      "label": "Optimus",
+      "path": "people/optimus.glb",
+      "url": "models/people/optimus.glb",
+      "format": "glb",
       "supported": true,
-      "size": 1472092,
-      "mtimeMs": 1779825421401,
-      "sidecars": {
-        "mtl": [
-          {
-            "path": "City_2.mtl",
-            "url": "models/City_2.mtl",
-            "name": "City_2.mtl",
-            "exists": false
-          }
-        ]
-      },
-      "warnings": [
-        "Missing OBJ material library: City_2.mtl"
-      ]
+      "size": 47654360,
+      "mtimeMs": 1780987943546
     },
     {
-      "id": "heisenberg",
-      "label": "Heisenberg",
-      "path": "Heisenberg.obj",
-      "url": "models/Heisenberg.obj",
-      "format": "obj",
+      "id": "people-robot",
+      "label": "Robot",
+      "path": "people/robot.glb",
+      "url": "models/people/robot.glb",
+      "format": "glb",
       "supported": true,
-      "size": 147398,
-      "mtimeMs": 1779949155753,
-      "sidecars": {
-        "mtl": [
-          {
-            "path": "Heisenberg.mtl",
-            "url": "models/Heisenberg.mtl",
-            "name": "Heisenberg.mtl",
-            "exists": false
-          }
-        ]
-      },
-      "warnings": [
-        "Missing OBJ material library: Heisenberg.mtl"
-      ]
+      "size": 28458152,
+      "mtimeMs": 1780987943696
     },
     {
-      "id": "hitman-t-pose",
-      "label": "Hitman T Pose",
-      "path": "Hitman_T_Pose.obj",
-      "url": "models/Hitman_T_Pose.obj",
-      "format": "obj",
+      "id": "people-stepan-hytale",
+      "label": "Stepan Hytale",
+      "path": "people/stepan_hytale.glb",
+      "url": "models/people/stepan_hytale.glb",
+      "format": "glb",
       "supported": true,
-      "size": 156734,
-      "mtimeMs": 1666716094000,
-      "sidecars": {
-        "mtl": [
-          {
-            "path": "Hitman_T_Pose.mtl",
-            "url": "models/Hitman_T_Pose.mtl",
-            "name": "Hitman_T_Pose.mtl",
-            "exists": true,
-            "size": 214
-          }
-        ],
-        "textures": [
-          {
-            "path": "Hitman_T_Pose.png",
-            "url": "models/Hitman_T_Pose.png",
-            "name": "Hitman_T_Pose.png",
-            "format": "png",
-            "size": 504
-          }
-        ]
-      }
+      "size": 81764,
+      "mtimeMs": 1780987943697
+    },
+    {
+      "id": "people-warrior-hytale",
+      "label": "Warrior Hytale",
+      "path": "people/warrior_hytale.glb",
+      "url": "models/people/warrior_hytale.glb",
+      "format": "glb",
+      "supported": true,
+      "size": 53612,
+      "mtimeMs": 1780987943924
     },
     {
       "id": "stunt-plane",
@@ -107,7 +71,7 @@
       "format": "glb",
       "supported": true,
       "size": 264956,
-      "mtimeMs": 1779825421410,
+      "mtimeMs": 1780560737292,
       "sidecars": {
         "textures": [
           {
@@ -130,36 +94,6 @@
             "name": "Polygon_Plane_Texture_03.png",
             "format": "png",
             "size": 223156
-          }
-        ]
-      }
-    },
-    {
-      "id": "trap-1-obj",
-      "label": "Trap 1 Obj",
-      "path": "Trap 1 Obj.obj",
-      "url": "models/Trap%201%20Obj.obj",
-      "format": "obj",
-      "supported": true,
-      "size": 36515,
-      "mtimeMs": 1736461470000,
-      "sidecars": {
-        "mtl": [
-          {
-            "path": "Trap 1 Obj.mtl",
-            "url": "models/Trap%201%20Obj.mtl",
-            "name": "Trap 1 Obj.mtl",
-            "exists": true,
-            "size": 211
-          }
-        ],
-        "textures": [
-          {
-            "path": "Trap 1 Obj.png",
-            "url": "models/Trap%201%20Obj.png",
-            "name": "Trap 1 Obj.png",
-            "format": "png",
-            "size": 1158
           }
         ]
       }

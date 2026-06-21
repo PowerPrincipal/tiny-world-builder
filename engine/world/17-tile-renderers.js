@@ -206,6 +206,7 @@
     let mesh = null;
     let posX = null, posZ = null;
     let setGridUserData = true;
+    let stargatePortal = null;
 
     const buildStart = repaintProfileBegin();
     const voxelRender = useVoxelRender ? makeVoxelRenderForCell(kind, x, z, cell, level) : null;
@@ -238,6 +239,7 @@
       const SG = window.__tinyworldStargate;
       if (SG && typeof SG.build === 'function') {
         const portal = SG.build();
+        stargatePortal = portal;
         mesh = portal.group;
         mesh.userData = Object.assign({}, mesh.userData, { kind: 'stargate', dest: cell.dest || null, isStargate: true });
         // Floating name label above the portal (cell.label).
@@ -429,6 +431,12 @@
       ? landscapeHeightAtCell(x, z)
       : TOP_H + terrainRiseAt(x, z);
     mesh.position.set(posX + userOffsetX, objectY + userOffsetY, posZ + userOffsetZ);
+    if (stargatePortal) {
+      stargatePortal._cell = { x, z };
+      stargatePortal._gy = mesh.position.y;
+      stargatePortal._p = { x: mesh.position.x, z: mesh.position.z };
+      stargatePortal._dest = cell.dest || null;
+    }
     if (setGridUserData) {
       stampCellUserData(mesh, x, z);
     }
