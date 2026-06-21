@@ -114,10 +114,10 @@
         el('button', { class: 'tw-hud-icon tw-hud-worlds', title: T('worlds.launch'), onclick: () => { if (typeof WS.open === 'function') WS.open(); } }, [ic('globe', 16)]),
         el('button', { class: 'tw-hud-icon tw-hud-avatar', title: T('worlds.avatarOpen'), onclick: () => { if (typeof WS.openAvatarPicker === 'function') WS.openAvatarPicker(); } }, [ic('person', 16)]),
         el('button', { class: 'tw-hud-icon', title: T('worlds.help'), onclick: toggleHelp }, [ic('help', 16)]),
-        el('button', { class: 'tw-hud-icon tw-hud-leave', title: T('worlds.leave'), onclick: () => {
+        el('button', { class: 'tw-hud-icon tw-hud-back-worlds', title: T('worlds.backToWorlds'), 'aria-label': T('worlds.backToWorlds'), onclick: () => {
           if (typeof WS.exitToWorldPicker === 'function') WS.exitToWorldPicker();
           else if (typeof WS.leaveRoom === 'function') WS.leaveRoom();
-        } }, [ic('leave', 16)]),
+        } }, [ic('reply', 16)]),
         el('div', { class: 'tw-hud-progress' }, [progFill]),
       ]);
       document.body.appendChild(hud);

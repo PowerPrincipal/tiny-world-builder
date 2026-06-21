@@ -84,3 +84,7 @@ when changing boot mode, launcher chrome, or mode persistence.
   `renderToolGroupFlyout`).
 - The old `#mode-indicator` HUD chip has been **removed** from the DOM;
   `updateModeIndicator()` still runs but no-ops on the missing element.
+- In Tinyverse multiplayer HUD chrome, account sign-out is the only place that
+  should use the door-arrow `leave` icon. The in-world exit that returns to the
+  world picker uses `tw-hud-back-worlds`, the `reply` glyph, and
+  `worlds.backToWorlds` so it is not confused with logging out.

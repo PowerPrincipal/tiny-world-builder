@@ -48,6 +48,7 @@
     'worlds.saved': 'Draft saved.',
     'worlds.error': 'Something went wrong.',
     'worlds.leave': 'Leave world',
+    'worlds.backToWorlds': 'Back to worlds',
     'worlds.minimap': 'World map',
     'worlds.observing': 'Observing (sign in to play)',
     'worlds.notify.toggleLabel': 'Notifications',

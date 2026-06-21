@@ -36,6 +36,7 @@
     'worlds.saved': 'Borrador guardado.',
     'worlds.error': 'Algo salió mal.',
     'worlds.leave': 'Salir del mundo',
+    'worlds.backToWorlds': 'Volver a mundos',
     'worlds.minimap': 'Mapa del mundo',
     'worlds.observing': 'Observando (inicia sesión para jugar)',
     'worlds.notify.toggleLabel': 'Notificaciones',

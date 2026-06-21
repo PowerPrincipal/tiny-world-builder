@@ -36,6 +36,7 @@
     'worlds.saved': '草稿已保存。',
     'worlds.error': '出错了。',
     'worlds.leave': '离开世界',
+    'worlds.backToWorlds': '返回世界列表',
     'worlds.minimap': '世界地图',
     'worlds.observing': '观战中（登录后可游玩）',
     'worlds.notify.toggleLabel': '通知',

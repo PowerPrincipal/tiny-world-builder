@@ -36,6 +36,7 @@
     'worlds.saved': 'Brouillon enregistré.',
     'worlds.error': 'Une erreur est survenue.',
     'worlds.leave': 'Quitter le monde',
+    'worlds.backToWorlds': 'Retour aux mondes',
     'worlds.minimap': 'Carte du monde',
     'worlds.observing': 'Observation (connectez-vous pour jouer)',
     'worlds.notify.toggleLabel': 'Notifications',

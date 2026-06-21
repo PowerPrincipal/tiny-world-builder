@@ -41,6 +41,7 @@
     'worlds.saved': 'บันทึกร่างแล้ว',
     'worlds.error': 'มีบางอย่างผิดพลาด',
     'worlds.leave': 'ออกจากโลก',
+    'worlds.backToWorlds': 'กลับไปยังรายการโลก',
     'worlds.minimap': 'แผนที่โลก',
     'worlds.observing': 'กำลังดู (ลงชื่อเข้าใช้เพื่อเล่น)',
     'worlds.notify.toggleLabel': 'การแจ้งเตือน',
