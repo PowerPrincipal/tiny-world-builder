@@ -378,6 +378,21 @@
       } catch (_) {}
     }
 
+    async function collabRegistryClosed() {
+      try {
+        const res = await fetch('/api/collabs?roomId=' + encodeURIComponent(roomId), {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        if (!res || !res.ok) return false;
+        const body = await res.json();
+        return !!(body && body.closed);
+      } catch (_) {
+        return false;
+      }
+    }
+
     async function publishCollabRegistry(force = false) {
       if (!connected || !admitted || !isHost) {
         stopCollabRegistry();
@@ -2402,10 +2417,14 @@
       }
     }
 
-    function connect() {
+    async function connect() {
       if (declined) return;
       clearTimeout(reconnectTimer);
       setStatus('connecting', 'Shared room: connecting');
+      if (await collabRegistryClosed()) {
+        handleRoomClosed('This shared room has been closed.');
+        return;
+      }
       try {
         socket = new WebSocket(multiplayerSocketUrl());
       } catch (err) {
