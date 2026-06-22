@@ -64,9 +64,12 @@ when changing boot mode, launcher chrome, or mode persistence.
 
 - The grouped bottom `.toolbar` is the default. The **"Show groups"** checkbox in
   Settings → App (`#toolbar-show-groups`, persisted as `tinyworld:showGroups`,
-  default on) switches modes. When off, `body.hide-groups` hides `.toolbar` and a
-  floating, resizable, draggable `#tool-palette` shows **every** placeable block
-  (select + all `TOOL_GROUPS` tools with house variants expanded + erase).
+  default on) switches modes. When off, `body.hide-groups` hides only the
+  bottom toolbar's block tools/group buttons and a floating, resizable,
+  draggable `#tool-palette` shows **every** placeable block (select + all
+  `TOOL_GROUPS` tools with house variants expanded + erase). The bottom
+  toolbar itself must stay visible for utility controls such as Build/Play,
+  Home, Shield, View modes, Time/weather, Sound, Layers, Settings, and Account.
 - The palette is a self-contained module: `engine/world/35-tool-palette.js`.
   Blocks are built with `buildToolButton(t, { flyout: true })`, so they keep
   their colors and are highlighted by the same `updateToolActiveStates()` loop.

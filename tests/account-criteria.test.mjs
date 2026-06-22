@@ -2,8 +2,8 @@
 // predicate. Tinyverse access is separately locked to the Jason allowlist.
 // Run with: npm run test:unit
 //
-// The rule is intentionally narrow for now (registered, email-verified Identity
-// account) because a wallet-access policy decision is still pending upstream.
+// The rule is intentionally narrow for now (registered Identity email account)
+// because a wallet-access policy decision is still pending upstream.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,11 +22,16 @@ test('snake_case confirmed_at (bearer-fallback payload shape) meets criteria', (
   assert.equal(accountMeetsCriteria(user), true);
 });
 
-test('unverified Identity account (no confirmation) does NOT meet criteria', () => {
+test('Identity email account without confirmation timestamp still meets criteria', () => {
   const user = { id: 'abc-123', email: 'a@b.com', confirmedAt: undefined };
-  assert.equal(accountMeetsCriteria(user), false);
-  assert.equal(accountMeetsCriteria({ id: 'abc-123', email: 'a@b.com', confirmedAt: '' }), false);
-  assert.equal(accountMeetsCriteria({ id: 'abc-123', email: 'a@b.com', confirmedAt: null }), false);
+  assert.equal(accountMeetsCriteria(user), true);
+  assert.equal(accountMeetsCriteria({ id: 'abc-123', email: 'a@b.com', confirmedAt: '' }), true);
+  assert.equal(accountMeetsCriteria({ id: 'abc-123', email: 'a@b.com', confirmedAt: null }), true);
+});
+
+test('Identity account without email does NOT meet criteria', () => {
+  assert.equal(accountMeetsCriteria({ id: 'abc-123', confirmedAt: '2026-01-02T03:04:05Z' }), false);
+  assert.equal(accountMeetsCriteria({ id: 'abc-123', email: '   ', confirmedAt: '2026-01-02T03:04:05Z' }), false);
 });
 
 test('wallet-only session does NOT meet criteria (even if a stray confirmedAt is present)', () => {
@@ -39,5 +44,5 @@ test('anonymous / malformed accounts do NOT meet criteria', () => {
   assert.equal(accountMeetsCriteria(null), false);
   assert.equal(accountMeetsCriteria(undefined), false);
   assert.equal(accountMeetsCriteria({}), false);
-  assert.equal(accountMeetsCriteria({ confirmedAt: '2026-01-02T03:04:05Z' }), false); // no id
+  assert.equal(accountMeetsCriteria({ email: 'a@b.com', confirmedAt: '2026-01-02T03:04:05Z' }), false); // no id
 });

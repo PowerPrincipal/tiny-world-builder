@@ -211,26 +211,20 @@ export async function requireAuthUser(request, origin) {
   return { user };
 }
 
-// Centralized access-criteria predicate. This is the SINGLE place that decides
-// whether an account qualifies for auto-enabled Tinyverse/lobby/multiplayer
-// access, so the rule can change in one spot (a wallet-policy decision is still
-// pending upstream).
+// Centralized registered-account predicate. This is the SINGLE place that
+// decides whether an Identity account is treated as a usable email account, so
+// the rule can change in one spot (a wallet-policy decision is still pending
+// upstream).
 //
-// Initial criterion: a registered, email-verified Netlify Identity account
-// (confirmedAt set). Wallet-only sessions (id prefixed `wallet:`), unverified
-// Identity accounts, and anonymous/logged-out callers do NOT qualify for now.
-//
-// Fails closed: getAuthUser()/getUser() may fall back to raw JWT claims if the
-// Identity API is unreachable, in which case confirmedAt is undefined and this
-// returns false (a verified user briefly loses auto-access). There is no path
-// that spuriously sets confirmedAt, so it never grants access to an
-// unverified/wallet account.
+// Criterion: a registered Netlify Identity account with an email address.
+// Wallet-only sessions (id prefixed `wallet:`) and anonymous/logged-out callers
+// do NOT qualify. Email confirmation is intentionally not part of this app-side
+// rule because existing Identity users can be missing confirmedAt in fallback
+// payloads even when they are valid accounts.
 export function accountMeetsCriteria(account) {
   if (!account || !account.id) return false;
-  // Wallet sessions carry no Identity email confirmation; revisit when the
+  // Wallet sessions are separate from Identity email accounts; revisit when the
   // wallet-access policy is decided.
   if (String(account.id).startsWith('wallet:')) return false;
-  // getUser() exposes confirmedAt; the bearer-fallback path normalizes the
-  // GoTrue confirmed_at into confirmedAt (see userFromIdentityPayload).
-  return !!(account.confirmedAt || account.confirmed_at);
+  return !!String(account.email || '').trim();
 }

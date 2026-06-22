@@ -1,9 +1,10 @@
   // -------- floating block palette (Show groups: off) --------
-  // When the "Show groups" setting is off the grouped bottom toolbar is hidden
-  // and every placeable block lives in a single floating, resizable panel. The
-  // grid uses fixed square cells, so resizing the panel reflows the blocks to
-  // the nearest square. Blocks reuse buildToolButton, so they keep their colors
-  // and feed the same updateToolActiveStates highlight loop as the toolbar.
+  // When the "Show groups" setting is off the grouped bottom toolbar keeps its
+  // utility buttons, while every placeable block lives in a single floating,
+  // resizable panel. The grid uses fixed square cells, so resizing the panel
+  // reflows the blocks to the nearest square. Blocks reuse buildToolButton, so
+  // they keep their colors and feed the same updateToolActiveStates highlight
+  // loop as the toolbar.
   (function setupToolPalette() {
     const SHOW_KEY = 'tinyworld:showGroups';
     const POS_KEY = 'tinyworld:toolPalette.pos';

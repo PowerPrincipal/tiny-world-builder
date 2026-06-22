@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var state = { users: [], selected: null, loading: false };
+  var state = { users: [], selected: null, loading: false, total: 0, limit: 250, offset: 0 };
   var els = {};
 
   function byId(id) { return document.getElementById(id); }
@@ -19,6 +19,39 @@
     if (!els.authStatus) return;
     els.authStatus.textContent = msg || '';
     els.authStatus.dataset.tone = tone || '';
+  }
+  function cleanDate(value) {
+    if (!value) return '—';
+    var d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  function pageInfoText() {
+    if (!state.total) return '0 users';
+    var start = state.offset + 1;
+    var end = state.offset + state.users.length;
+    return start + '-' + end + ' of ' + state.total + ' users';
+  }
+  function updatePagination() {
+    if (els.pageInfo) els.pageInfo.textContent = pageInfoText();
+    if (els.prev) els.prev.disabled = state.loading || state.offset <= 0;
+    if (els.next) els.next.disabled = state.loading || (state.offset + state.users.length) >= state.total;
+  }
+  function currentLimit() {
+    var n = Number(els.limit && els.limit.value);
+    return Number.isFinite(n) ? Math.max(25, Math.min(500, Math.floor(n))) : 250;
+  }
+  function buildUserQuery() {
+    state.limit = currentLimit();
+    var params = new URLSearchParams();
+    params.set('limit', String(state.limit));
+    params.set('offset', String(state.offset));
+    if (els.search && els.search.value.trim()) params.set('q', els.search.value.trim());
+    if (els.flag && els.flag.value) params.set('flag', els.flag.value);
+    if (els.created && els.created.value) params.set('created', els.created.value);
+    if (els.seen && els.seen.value) params.set('seen', els.seen.value);
+    if (els.sort && els.sort.value) params.set('sort', els.sort.value);
+    return params.toString();
   }
   function walletToken() {
     try { return localStorage.getItem('tinyworld:auth:wallet-session.v1') || ''; } catch (_) { return ''; }
@@ -140,9 +173,27 @@
     els.lobby.disabled = !!user.builtInAccess;
     els.resetNote.textContent = user.passwordResetRequestedAt ? ('Last reset requested: ' + new Date(user.passwordResetRequestedAt).toLocaleString()) : '';
   }
+  function userFlags(u) {
+    var flags = [];
+    if (u.builtInAccess) flags.push({ text: 'Tinyverse', cls: 'ok' });
+    else if (u.legacyLobbyFlag) flags.push({ text: 'Legacy lobby', cls: 'warn' });
+    if (!u.email) flags.push({ text: 'No email', cls: 'warn' });
+    if (!u.displayName || !u.twitter || !u.github) flags.push({ text: 'Incomplete', cls: 'warn' });
+    if (u.passwordResetRequestedAt) flags.push({ text: 'Reset', cls: '' });
+    if (u.archivedAt || u.mergedIntoProfileId) flags.push({ text: 'Archived', cls: '' });
+    return flags;
+  }
+  function flagsHtml(u) {
+    var flags = userFlags(u);
+    if (!flags.length) return '<span class="admin-badge">Standard</span>';
+    return '<span class="admin-users-flags">' + flags.map(function (f) {
+      return '<span class="admin-badge ' + esc(f.cls || '') + '">' + esc(f.text) + '</span>';
+    }).join('') + '</span>';
+  }
   function renderUsers() {
     if (!state.users.length) {
-      els.list.innerHTML = '<tr><td colspan="5" class="admin-users-empty">No users found.</td></tr>';
+      els.list.innerHTML = '<tr><td colspan="7" class="admin-users-empty">No users found.</td></tr>';
+      updatePagination();
       return;
     }
     els.list.innerHTML = state.users.map(function (u) {
@@ -153,19 +204,27 @@
         '<td><strong>' + esc(u.displayName || u.username) + '</strong><small>' + esc(u.username || '') + '</small></td>' +
         '<td>' + esc(u.email || '—') + '</td>' +
         '<td>' + esc(socials.join(' · ') || '—') + '</td>' +
-        '<td>' + (u.lobbyAccess ? '<span class="admin-badge ok">Enabled</span>' : '<span class="admin-badge">Off</span>') + '</td>' +
+        '<td>' + flagsHtml(u) + '</td>' +
+        '<td class="admin-users-date">' + esc(cleanDate(u.createdAt)) + '</td>' +
+        '<td class="admin-users-date">' + esc(cleanDate(u.lastSeenAt || u.updatedAt)) + '</td>' +
         '<td><button type="button" class="secondary-action" data-edit="' + esc(u.id) + '">Edit</button></td>' +
       '</tr>';
     }).join('');
+    updatePagination();
   }
-  function loadUsers() {
-    var q = els.search.value.trim();
+  function loadUsers(opts) {
+    opts = opts || {};
+    if (opts.resetPage) state.offset = 0;
     state.loading = true;
+    updatePagination();
     setStatus('Loading users…');
-    return api('/api/admin-users' + (q ? '?q=' + encodeURIComponent(q) : ''), 'GET').then(function (data) {
+    return api('/api/admin-users?' + buildUserQuery(), 'GET').then(function (data) {
       state.users = data.users || [];
+      state.total = Number(data.total) || state.users.length;
+      state.limit = Number(data.limit) || state.limit;
+      state.offset = Number(data.offset) || 0;
       renderUsers();
-      setStatus('Loaded ' + state.users.length + ' user' + (state.users.length === 1 ? '' : 's') + '.');
+      setStatus('Loaded ' + pageInfoText() + '.');
       if (state.selected) {
         var again = state.users.find(function (u) { return Number(u.id) === Number(state.selected.id); });
         if (again) fillEditor(again);
@@ -176,12 +235,13 @@
       if (/sign in/i.test(message)) {
         showAuthPanel(true);
         setAuthStatus('Sign in to load admin users.');
-        els.list.innerHTML = '<tr><td colspan="5" class="admin-users-empty">Sign in with a world-admin account.</td></tr>';
+        els.list.innerHTML = '<tr><td colspan="7" class="admin-users-empty">Sign in with a world-admin account.</td></tr>';
       } else {
-        els.list.innerHTML = '<tr><td colspan="5" class="admin-users-empty">Admin access required.</td></tr>';
+        els.list.innerHTML = '<tr><td colspan="7" class="admin-users-empty">Admin access required.</td></tr>';
       }
-    }).finally(function () { state.loading = false; });
+    }).finally(function () { state.loading = false; updatePagination(); });
   }
+  function reloadFromFilters() { return loadUsers({ resetPage: true }); }
   function bind() {
     if (els.authPanel) {
       els.authPanel.addEventListener('submit', function (evt) {
@@ -190,9 +250,20 @@
       });
     }
     if (els.authLogout) els.authLogout.addEventListener('click', signOutAdmin);
-    els.searchBtn.addEventListener('click', loadUsers);
-    els.refreshBtn.addEventListener('click', loadUsers);
-    els.search.addEventListener('keydown', function (evt) { if (evt.key === 'Enter') { evt.preventDefault(); loadUsers(); } });
+    els.searchBtn.addEventListener('click', reloadFromFilters);
+    els.refreshBtn.addEventListener('click', function () { loadUsers(); });
+    els.search.addEventListener('keydown', function (evt) { if (evt.key === 'Enter') { evt.preventDefault(); reloadFromFilters(); } });
+    [els.flag, els.created, els.seen, els.sort, els.limit].forEach(function (el) {
+      if (el) el.addEventListener('change', reloadFromFilters);
+    });
+    if (els.prev) els.prev.addEventListener('click', function () {
+      state.offset = Math.max(0, state.offset - currentLimit());
+      loadUsers();
+    });
+    if (els.next) els.next.addEventListener('click', function () {
+      state.offset = state.offset + currentLimit();
+      loadUsers();
+    });
     els.list.addEventListener('click', function (evt) {
       var btn = evt.target && evt.target.closest && evt.target.closest('[data-edit]');
       if (!btn) return;
@@ -220,12 +291,28 @@
         setStatus(sent ? 'Password reset email requested.' : 'Reset recorded. Configure NETLIFY_AUTH_TOKEN + NETLIFY_SITE_ID to send recovery emails.', sent ? '' : 'warn');
       }).catch(function (err) { setStatus(err.message || 'Password reset failed.', 'error'); });
     });
+    if (els.confirmEmails) els.confirmEmails.addEventListener('click', function () {
+      if (!confirm('Confirm every Netlify Identity user that has an email address?')) return;
+      els.confirmEmails.disabled = true;
+      setStatus('Confirming Identity email users…');
+      api('/api/admin-users', 'POST', { action: 'confirmAllEmails' }).then(function (data) {
+        var info = data.confirm || {};
+        setStatus('Confirmed ' + (info.confirmed || 0) + ' email users. Scanned ' + (info.scanned || 0) + '.', info.errors && info.errors.length ? 'warn' : '');
+      }).catch(function (err) {
+        setStatus(err.message || 'Email confirmation failed.', 'error');
+      }).finally(function () {
+        els.confirmEmails.disabled = false;
+      });
+    });
   }
   function init() {
     els = {
       authPanel: byId('admin-users-auth'), authEmail: byId('admin-auth-email'), authPassword: byId('admin-auth-password'),
       authLogin: byId('admin-auth-login'), authLogout: byId('admin-auth-logout'), authStatus: byId('admin-auth-status'),
       search: byId('admin-user-search'), searchBtn: byId('admin-user-search-btn'), refreshBtn: byId('admin-user-refresh-btn'),
+      confirmEmails: byId('admin-user-confirm-emails'),
+      flag: byId('admin-user-flag'), created: byId('admin-user-created'), seen: byId('admin-user-seen'), sort: byId('admin-user-sort'),
+      limit: byId('admin-user-limit'), prev: byId('admin-user-prev'), next: byId('admin-user-next'), pageInfo: byId('admin-users-page-info'),
       status: byId('admin-users-status'), list: byId('admin-users-list'), editor: byId('admin-user-editor'), idPill: byId('admin-user-id-pill'),
       id: byId('admin-user-id'), username: byId('admin-user-username'), email: byId('admin-user-email'), display: byId('admin-user-display'),
       twitter: byId('admin-user-twitter'), github: byId('admin-user-github'), image: byId('admin-user-image'), about: byId('admin-user-about'),

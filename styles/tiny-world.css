@@ -551,41 +551,53 @@
 
   .token-corner {
     position: fixed;
-    top: 18px;
-    /* Clear the top-corner-chrome cluster (home / sign-out buttons) parked at
-       right:18px — two 44px buttons + gaps ≈ 100px — so the long CA string never
-       runs underneath them. */
-    right: 124px;
+    left: 50%;
+    right: auto;
+    bottom: 3px;
+    transform: translateX(-50%);
     z-index: 14;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    justify-content: center;
+    gap: 6px;
+    max-width: min(880px, calc(100vw - 28px));
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 20px -16px rgba(20, 30, 50, 0.32);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    font-size: 10px;
     line-height: 1;
     color: #2a2722;
     white-space: nowrap;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
   }
   .token-corner .token-github-link {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
-    border-radius: 10px;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    border-radius: 8px;
   }
   .token-corner .token-github-link svg {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
   }
   .token-corner .token-corner-text {
     display: inline-flex;
     align-items: baseline;
-    gap: 7px;
+    gap: 6px;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .token-corner .ticker { font-weight: 700; color: #2a2722; }
   .token-corner .token-sep { color: rgba(42, 39, 34, 0.48); }
   .token-corner .ca { font-family: ui-monospace, monospace; opacity: 0.72; }
   body.ui-theme-dark .token-corner {
+    background: rgba(18, 22, 34, 0.72);
+    border-color: rgba(170, 190, 235, 0.26);
     color: #f4f7ff;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.72);
   }
@@ -2870,8 +2882,13 @@
     justify-content: center;
   }
 
-  /* Floating block palette — shown when "Show groups" is off. */
-  body.hide-groups .toolbar { display: none; }
+  /* Floating block palette — shown when "Show groups" is off. The bottom
+     toolbar stays up for account/settings/world utilities. */
+  body.hide-groups .toolbar .tool:not(.toolbar-utility),
+  body.hide-groups .toolbar .tool-group-btn,
+  body.hide-groups .toolbar .toolbar-divider {
+    display: none;
+  }
   .tool-palette {
     position: fixed;
     left: 50%;
@@ -8860,11 +8877,12 @@
     .brand-logo { width: 156px; }
     .brand-banner { display: none; }
 
-    /* Token text stays plain; only the GitHub button carries chrome. */
     .token-corner {
-      top: 18px;
-      right: 24px;
-      font-size: 11px;
+      left: 50%;
+      right: auto;
+      bottom: 2px;
+      font-size: 9px;
+      max-width: calc(100vw - 20px);
     }
 
     /* Appbar: bottom right corner */
@@ -8987,7 +9005,7 @@
   @media (max-width: 400px) {
     .appbar { top: auto; left: auto; right: 8px; bottom: 72px; }
     .appbar .btn.icon { width: 26px; height: 26px; flex-basis: 26px; }
-    .token-corner { top: 18px; right: 8px; font-size: 10px; }
+    .token-corner { left: 50%; right: auto; bottom: 2px; font-size: 9px; }
     .minimap-wrap { top: 80px; right: 8px; }
     .topbar-popup {
       top: auto;
