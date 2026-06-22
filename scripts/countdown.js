@@ -3,6 +3,8 @@
 
   const WAVE1 = '2026-06-21T23:59:00Z';
   const WAVE1_MS = Date.parse(WAVE1);
+  const WAVE2 = '2026-06-29T23:59:00Z';
+  const WAVE2_MS = Date.parse(WAVE2);
   const SECOND = 1000;
   const MINUTE = 60 * SECOND;
   const HOUR = 60 * MINUTE;
@@ -37,7 +39,7 @@
 
   function formatRemaining(now) {
     const at = nowMs(now);
-    const remainingMs = Math.max(0, WAVE1_MS - at);
+    const remainingMs = Math.max(0, WAVE2_MS - at);
     const totalSeconds = Math.max(0, Math.ceil(remainingMs / SECOND));
     const live = remainingMs <= 0;
     const days = Math.floor(totalSeconds / (DAY / SECOND));
@@ -50,11 +52,13 @@
       unit('time.minutes', minutes, '{n}m'),
     ].join(' ');
     const label = live
-      ? T('countdown.live', null, 'WAVE1 is live')
-      : T('countdown.label', { time }, 'WAVE1 in {time}');
+      ? T('countdown.live', null, 'WAVE 2 is live')
+      : T('countdown.label', { time }, 'WAVE 1 arrives, WAVE 2 in {time}');
     return {
-      target: WAVE1,
-      targetMs: WAVE1_MS,
+      target: WAVE2,
+      targetMs: WAVE2_MS,
+      wave1Target: WAVE1,
+      wave1TargetMs: WAVE1_MS,
       live,
       days,
       hours,
@@ -148,7 +152,7 @@
     el.setAttribute('data-countdown-skin', 'app');
     el.setAttribute('data-countdown-tick', 'interval');
     el.setAttribute('aria-live', 'polite');
-    el.textContent = 'WAVE1 in';
+    el.textContent = 'WAVE 1 arrives, WAVE 2 in';
     brand.appendChild(el);
   }
 
@@ -206,7 +210,7 @@
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(174, 198, 255, 0.78)';
     ctx.font = '700 24px "Space Grotesk", system-ui, sans-serif';
-    ctx.fillText('WAVE1', w - inset - 28, h / 2 + 1);
+    ctx.fillText('WAVE2', w - inset - 28, h / 2 + 1);
     ctx.textAlign = 'left';
     return formatted;
   }
@@ -214,6 +218,8 @@
   const api = {
     WAVE1,
     WAVE1_MS,
+    WAVE2,
+    WAVE2_MS,
     formatRemaining,
     mount,
     mountAll,

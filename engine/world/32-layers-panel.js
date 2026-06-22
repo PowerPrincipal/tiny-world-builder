@@ -393,6 +393,7 @@
       panel.hidden = !open;
       toggleBtn.classList.toggle('on', open);
       toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (typeof window.syncToolbarLayersButton === 'function') window.syncToolbarLayersButton();
       try { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch (_) {}
       if (open) {
         applySavedLayersPanelPosition();

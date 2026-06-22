@@ -543,6 +543,7 @@
       // The launcher icon is "muted" when everything is muted.
       const allMuted = audioMusicMuted && audioSfxMuted && audioAmbientMuted && audioEnginesMuted;
       icon.classList.toggle('muted', allMuted);
+      if (typeof window.syncToolbarSoundButton === 'function') window.syncToolbarSoundButton();
     }
     function syncValues() {
       musicVol.value   = Math.round(audioMusicVolume   * 100);
@@ -558,12 +559,14 @@
       panel.hidden = false;
       icon.setAttribute('aria-expanded', 'true');
       icon.classList.add('open');
+      if (typeof window.syncToolbarSoundButton === 'function') window.syncToolbarSoundButton();
       renderTracks();
     }
     function closePanel() {
       panel.hidden = true;
       icon.setAttribute('aria-expanded', 'false');
       icon.classList.remove('open');
+      if (typeof window.syncToolbarSoundButton === 'function') window.syncToolbarSoundButton();
     }
     icon.addEventListener('click', () => {
       if (panel.hidden) openPanel(); else closePanel();
@@ -606,4 +609,3 @@
     ambientMute.addEventListener('click', () => { setAmbientMuted(!audioAmbientMuted); syncMuteUi(); });
     enginesMute.addEventListener('click', () => { setEnginesMuted(!audioEnginesMuted); syncMuteUi(); });
   })();
-

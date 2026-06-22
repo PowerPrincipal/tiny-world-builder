@@ -47,11 +47,16 @@
   text-overflow: ellipsis;
 }
 
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .brand-countdown {
-  position: fixed;
-  top: 84px;
-  left: 24px;
-  z-index: 10;
+  position: static;
+  z-index: auto;
   pointer-events: none;
 }
 
@@ -113,10 +118,35 @@ body.showcase .brand-countdown {
   box-shadow: 0 0 0 4px rgba(35, 178, 109, 0.16);
 }
 
+body.ui-theme-dark .tw-countdown {
+  --countdown-bg: rgba(31, 38, 53, 0.96);
+  --countdown-border: rgba(220, 232, 255, 0.24);
+  --countdown-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.40) inset,
+    0 18px 44px -18px rgba(0, 0, 0, 0.76);
+  color: #f4f7ff;
+}
+
+body.ui-theme-dark .brand-countdown.tw-countdown,
+body.ui-theme-dark .hero-countdown.tw-countdown {
+  --countdown-bg: rgba(31, 38, 53, 0.96);
+  --countdown-border: rgba(220, 232, 255, 0.24);
+  color: #f4f7ff;
+}
+
+body.ui-theme-dark .tw-countdown-dot {
+  background: #7fb2ff;
+  box-shadow: 0 0 0 4px rgba(127, 178, 255, 0.18);
+}
+
+body.ui-theme-dark .tw-countdown[data-countdown-live="true"] .tw-countdown-dot {
+  background: #79ffb0;
+  box-shadow: 0 0 0 4px rgba(121, 255, 176, 0.16);
+}
+
 @media (max-width: 620px) {
   .brand-countdown {
-    top: 72px;
-    left: 16px;
     max-width: calc(100vw - 32px);
   }
 

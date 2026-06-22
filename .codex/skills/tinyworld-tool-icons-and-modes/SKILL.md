@@ -82,6 +82,11 @@ when changing boot mode, launcher chrome, or mode persistence.
 - The group **popout** flyout (`.flyout.tool-menu`) lays its icons out as a
   2-row grid block (`gridTemplateColumns: repeat(ceil(n/2), auto)` set in
   `renderToolGroupFlyout`).
+- The old vertical `.controls` rail is no longer visible. Keep its element IDs
+  in the DOM as stable wiring targets, but put everyday chrome in the bottom
+  toolbar: Build/Play, Home, Shield, View modes, Time/weather, Settings, and
+  Account. Import/export must remain owner-gated and should not be added to the
+  normal user toolbar.
 - The old `#mode-indicator` HUD chip has been **removed** from the DOM;
   `updateModeIndicator()` still runs but no-ops on the missing element.
 - In Tinyverse multiplayer HUD chrome, account sign-out is the only place that

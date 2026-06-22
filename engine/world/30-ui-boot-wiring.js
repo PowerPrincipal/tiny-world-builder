@@ -277,6 +277,10 @@ syncTinyworldOwnerToolControls();
           if (typeof twToast === "function") twToast("Tinyverse is coming soon");
           return;
         }
+        if (typeof window.__tinyworldEnsureProfileComplete === 'function') {
+          const complete = await window.__tinyworldEnsureProfileComplete('Complete your profile before entering Tinyverse: email, full name, Twitter/X, and GitHub.');
+          if (!complete) return;
+        }
         setTinyverseLoading(true);
         const worlds = await waitForWorldsFrontend();
         if (!worlds) { setTinyverseLoading(false); showTinyverseUnavailable(); return; }
@@ -1162,6 +1166,9 @@ syncTinyworldOwnerToolControls();
     const panelApi = document.getElementById('panel-api');
     const profileUsername = document.getElementById('profile-username');
     const profileDisplayName = document.getElementById('profile-display-name');
+    const profileEmail = document.getElementById('profile-email');
+    const profileTwitter = document.getElementById('profile-twitter');
+    const profileGithub = document.getElementById('profile-github');
     const profileAbout = document.getElementById('profile-about');
     const profileImage = document.getElementById('profile-image');
     const profilePhotoFile = document.getElementById('profile-photo-file');
@@ -1230,12 +1237,29 @@ syncTinyworldOwnerToolControls();
       return twCloudApiCall(path, method, body);
     }
 
+    function requiredProfileMissing(profile) {
+      const p = profile || {};
+      const missing = [];
+      if (!String(p.email || '').trim()) missing.push({ key: 'email', label: 'email', el: profileEmail });
+      if (!String(p.displayName || '').trim()) missing.push({ key: 'displayName', label: 'full name', el: profileDisplayName });
+      if (!String(p.twitter || '').trim()) missing.push({ key: 'twitter', label: 'Twitter/X', el: profileTwitter });
+      if (!String(p.github || '').trim()) missing.push({ key: 'github', label: 'GitHub', el: profileGithub });
+      return missing;
+    }
+
+    function profileCompletionStatusText(missing) {
+      return 'Complete your profile before continuing: ' + missing.map(item => item.label).join(', ') + '.';
+    }
+
     async function loadProfile() {
       const p = await apiCall('/api/profile', 'GET');
       if (p && p.id) {
         userProfile = p;
         profileUsername.value = p.username || '';
         profileDisplayName.value = p.displayName || p.username || '';
+        if (profileEmail) profileEmail.value = p.email || '';
+        if (profileTwitter) profileTwitter.value = p.twitter || '';
+        if (profileGithub) profileGithub.value = p.github || '';
         profileAbout.value = p.about || '';
         profileImage.value = p.image || '';
         if (p.image) {
@@ -1244,7 +1268,25 @@ syncTinyworldOwnerToolControls();
         }
         _fireProfileCallbacks();
       }
+      return p;
     }
+
+    window.__tinyworldEnsureProfileComplete = async function (reason) {
+      if (!window.__loggedIn) return true;
+      const loaded = userProfile || await loadProfile();
+      if (twCloudIsUnavailable(loaded)) return true;
+      if (!userProfile) return true;
+      const missing = requiredProfileMissing(userProfile);
+      if (!missing.length) return true;
+      showTab('profile');
+      openModal();
+      profileStatus.textContent = reason || profileCompletionStatusText(missing);
+      const first = missing[0] && missing[0].el;
+      if (first && typeof first.focus === 'function') {
+        try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); }
+      }
+      return false;
+    };
 
     function syncAvatarPreview() {
       const image = profileImage.value.trim();
@@ -1283,16 +1325,26 @@ syncTinyworldOwnerToolControls();
     profileSaveBtn.addEventListener('click', async () => {
       const username = profileUsername.value.trim().toLowerCase();
       const displayName = profileDisplayName.value.trim();
+      const email = profileEmail ? profileEmail.value.trim().toLowerCase() : '';
+      const twitter = profileTwitter ? profileTwitter.value.trim() : '';
+      const github = profileGithub ? profileGithub.value.trim() : '';
       if (!username) { profileStatus.textContent = 'Username required'; return; }
       if (!/^[a-z0-9_]{3,24}$/.test(username)) { profileStatus.textContent = 'Username must be 3-24 lowercase letters, numbers, underscores'; return; }
-      if (!displayName) { profileStatus.textContent = 'Display name required'; return; }
+      if (!displayName) { profileStatus.textContent = 'Full name required'; return; }
+      if (!email) { profileStatus.textContent = 'Email required'; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { profileStatus.textContent = 'Email is not valid'; return; }
+      if (!twitter) { profileStatus.textContent = 'Twitter/X required'; return; }
+      if (!github) { profileStatus.textContent = 'GitHub required'; return; }
       profileUsername.value = username;
       profileStatus.textContent = 'Saving...';
       const result = await apiCall('/api/profile', 'PUT', {
         username,
         displayName,
+        email,
         about: profileAbout.value.trim(),
         image: profileImage.value.trim(),
+        twitter,
+        github,
       });
       if (result && (result.id || result.username)) {
         userProfile = result;
@@ -1684,6 +1736,7 @@ syncTinyworldOwnerToolControls();
       if (generateBtn) {
         generateBtn.hidden = !isLoggedIn;
       }
+      if (typeof window.syncToolbarAccountButton === 'function') window.syncToolbarAccountButton();
       if (typeof window.__tinyworldRefreshOwnerToolGate === 'function') window.__tinyworldRefreshOwnerToolGate();
     }
 
@@ -3158,6 +3211,7 @@ syncTinyworldOwnerToolControls();
         buildPlayBtn.title = playModeActive ? 'Switch to build mode' : 'Switch to play mode';
       }
       if (buildPlayLabel) buildPlayLabel.textContent = playModeActive ? 'Play' : 'Build';
+      if (typeof window.updateToolbarBuildPlayState === 'function') window.updateToolbarBuildPlayState(playModeActive);
     }
 
     function setPlayModeActive(on, opts = {}) {

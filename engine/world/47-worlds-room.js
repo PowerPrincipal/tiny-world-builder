@@ -1195,9 +1195,9 @@ function tryEnterGate() {
     const SR_PITCH_MAX = 1.4;
     const SR_FP_PITCH_MIN = -1.30; // first-person: look up
     const SR_FP_PITCH_MAX = 1.30;  // first-person: look down
-    const SR_CAM_MIN = 1.2;     // zoom-in limit (below this -> first person)
+    const SR_CAM_MIN = 2.4;     // zoom-in limit (below this -> first person)
     const SR_CAM_MAX = 14.0;    // zoom-out limit
-    const SR_FP_THRESH = 1.6;   // cam distance at/below which first-person engages
+    const SR_FP_THRESH = 2.6;   // cam distance at/below which first-person engages
     const SR_JUMP_DUR = 0.46;   // matches voxel-avatar JUMP_DUR
     const SR_JUMP_H = 1.4;      // peak hop height (world units)
     const SR_DBL_MS = 320;      // double-tap window for Space -> fly toggle
@@ -1390,8 +1390,8 @@ function tryEnterGate() {
       }
     }
 
-    // Toggle first-person (zoomed all the way in). Hides the avatar head and lets the
-    // pitch range cover looking up; restoring 3rd person re-clamps pitch to the elevation band.
+    // Toggle first-person (zoomed all the way in). Hides the local avatar body and
+    // lets the pitch range cover looking up; restoring 3rd person re-clamps pitch.
     function _srSetFirstPerson(on) {
       if (on === _srFirstPerson) return;
       _srFirstPerson = on;

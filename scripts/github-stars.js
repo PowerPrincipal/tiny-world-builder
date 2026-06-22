@@ -1,4 +1,4 @@
-/* Live GitHub stars count for the landing hero pill.
+/* Live GitHub stars count for the landing nav pill.
  *
  * Robustness contract:
  * - The pill is a plain anchor to the repo, so it works with zero JS.
@@ -8,7 +8,7 @@
  *   RESOLVES with HTTP 403 (no stargazers_count), so we gate on res.ok and on
  *   a positive finite integer - we only ever render a real count, never
  *   undefined / 0 from a bad body / NaN. On any failure we keep the cached
- *   value or the plain "Star on GitHub" label.
+ *   value or the plain "Github" label.
  */
 (function githubStars() {
   var REPO = 'jasonkneen/tiny-world-builder';

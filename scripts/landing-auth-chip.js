@@ -71,7 +71,7 @@
         '<small>' + esc(u.sub) + '</small>' +
       '</span>';
     chip.hidden = false;
-    chip.setAttribute('aria-label', 'Signed in as ' + u.name + '. Open community profile.');
+    chip.setAttribute('aria-label', 'Signed in as ' + u.name + '. Open builder account.');
     if (chip.parentElement) chip.parentElement.classList.add('has-account');
     var img = chip.querySelector('img.landing-account-avatar');
     if (img) {

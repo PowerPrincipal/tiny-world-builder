@@ -1420,6 +1420,13 @@
       life: '<svg viewBox="0 0 24 24"><circle cx="7.5" cy="10" r="2.2"/><circle cx="12" cy="7" r="2.2"/><circle cx="16.5" cy="10" r="2.2"/><path d="M6.6 17.6c0-3.2 2.4-5.4 5.4-5.4s5.4 2.2 5.4 5.4c0 1.5-.9 2.4-2.2 2.4-1.1 0-1.8-.8-3.2-.8s-2.1.8-3.2.8c-1.3 0-2.2-.9-2.2-2.4Z"/></svg>',
       home: '<svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg>',
       shield: '<svg viewBox="0 0 24 24"><path d="M12 2.8 4.5 6.1v5.7c0 4.7 3.1 8.2 7.5 9.4 4.4-1.2 7.5-4.7 7.5-9.4V6.1Z"/><path d="M12 6.2v11.4"/><path d="M8.2 8.2h7.6"/><path d="M7.8 12h8.4"/></svg>',
+      'build-play': '<svg viewBox="0 0 24 24"><path d="m14.7 6.3 3 3"/><path d="m5 21 4.8-1 9.4-9.4a2.1 2.1 0 0 0-3-3L6.2 17.2 5 21Z"/><path d="M9 5.5 5.5 2 3 4.5 6.5 8"/></svg>',
+      view: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+      time: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+      sound: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+      layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>',
+      settings: '<svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+      account: '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
     };
     return icons[id] || '';
   }
@@ -1620,6 +1627,74 @@
     return btn;
   }
 
+  function clickLegacyControlButton(id) {
+    const el = document.getElementById(id);
+    if (el && !el.hidden) {
+      el.click();
+      return true;
+    }
+    if (id === 'account-btn') {
+      const login = document.getElementById('auth-login-btn-top');
+      if (login && !login.hidden) {
+        login.click();
+        return true;
+      }
+      if (typeof window.__openLoginModal === 'function') {
+        window.__openLoginModal('Sign in to manage your account');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function syncToolbarAccountButton() {
+    const btn = document.getElementById('toolbar-account');
+    if (!btn) return;
+    const accountBtn = document.getElementById('account-btn');
+    const loginBtn = document.getElementById('auth-login-btn-top');
+    const authEnabled = !!window.__tinyworldAuthEnabled;
+    const hasVisibleAuthAction = !!((accountBtn && !accountBtn.hidden) || (loginBtn && !loginBtn.hidden));
+    btn.hidden = !authEnabled && !hasVisibleAuthAction;
+  }
+  window.syncToolbarAccountButton = syncToolbarAccountButton;
+
+  function updateToolbarBuildPlayState(isPlay) {
+    const btn = document.getElementById('toolbar-build-play-mode');
+    if (!btn) return;
+    const active = !!isPlay;
+    const label = active ? 'Switch to build mode' : 'Switch to play mode';
+    btn.classList.toggle('on', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('data-tooltip', label);
+    btn.title = label;
+  }
+  window.updateToolbarBuildPlayState = updateToolbarBuildPlayState;
+
+  function syncToolbarSoundButton() {
+    const btn = document.getElementById('toolbar-sound');
+    const sound = document.getElementById('sound-icon');
+    if (!btn || !sound) return;
+    const open = sound.classList.contains('open');
+    const muted = sound.classList.contains('muted');
+    btn.classList.toggle('active', open);
+    btn.classList.toggle('on', open);
+    btn.classList.toggle('muted', muted);
+    btn.setAttribute('aria-expanded', sound.getAttribute('aria-expanded') || (open ? 'true' : 'false'));
+  }
+  window.syncToolbarSoundButton = syncToolbarSoundButton;
+
+  function syncToolbarLayersButton() {
+    const btn = document.getElementById('toolbar-layers');
+    const layers = document.getElementById('layers-toggle');
+    if (!btn || !layers) return;
+    const open = layers.classList.contains('on') || layers.getAttribute('aria-expanded') === 'true';
+    btn.classList.toggle('active', open);
+    btn.classList.toggle('on', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  window.syncToolbarLayersButton = syncToolbarLayersButton;
+
   function updateShieldToolbarState() {
     const btn = document.getElementById('toolbar-shield-toggle');
     if (!btn) return;
@@ -1666,6 +1741,13 @@
       clearTimeout(toolThumbBuildQueueTimer);
       toolThumbBuildQueueTimer = 0;
     }
+    bar.appendChild(buildToolbarUtilityButton('toolbar-build-play-mode', 'Switch to play mode', 'build-play', () => {
+      if (window.__tinyworldMode && typeof window.__tinyworldMode.toggle === 'function') {
+        window.__tinyworldMode.toggle();
+      } else {
+        clickLegacyControlButton('build-play-mode');
+      }
+    }, { posType: 'primary', pressed: false }));
     bar.appendChild(buildToolbarUtilityButton('toolbar-home', 'Home', 'home', () => {
       if (typeof flyHomeCamera === 'function') flyHomeCamera();
     }, { posType: 'primary' }));
@@ -1674,6 +1756,26 @@
       else if (typeof ensureVoxelShield === 'function') ensureVoxelShield().toggle();
       updateShieldToolbarState();
     }, { posType: 'shield', pressed: false }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-view-modes', 'View modes', 'view', () => {
+      clickLegacyControlButton('view-modes');
+    }, { posType: 'primary' }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-time-weather', 'Time & weather', 'time', () => {
+      clickLegacyControlButton('time-weather');
+    }, { posType: 'tertiary' }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-sound', 'Sound', 'sound', () => {
+      clickLegacyControlButton('sound-icon');
+      syncToolbarSoundButton();
+    }, { posType: 'neutral' }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-layers', 'World items', 'layers', () => {
+      clickLegacyControlButton('layers-toggle');
+      syncToolbarLayersButton();
+    }, { posType: 'neutral' }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-settings', 'Settings', 'settings', () => {
+      clickLegacyControlButton('render-settings');
+    }, { posType: 'neutral' }));
+    bar.appendChild(buildToolbarUtilityButton('toolbar-account', 'My account', 'account', () => {
+      clickLegacyControlButton('account-btn');
+    }, { posType: 'neutral' }));
     const utilityDivider = document.createElement('div');
     utilityDivider.className = 'toolbar-divider toolbar-utility-divider';
     bar.appendChild(utilityDivider);
@@ -1720,6 +1822,8 @@
 
     const audioPanel = document.getElementById('audio-panel');
     if (audioPanel) bar.appendChild(audioPanel);
+    syncToolbarAccountButton();
+    if (typeof window.__tinyworldIsPlayMode === 'function') updateToolbarBuildPlayState(window.__tinyworldIsPlayMode());
     updateToolActiveStates();
     if (typeof rebuildToolPaletteIfActive === 'function') rebuildToolPaletteIfActive();
     twPerfMark('toolbar:end');
@@ -1755,6 +1859,8 @@
         if (pos) b.dataset.posType = pos; else b.removeAttribute('data-pos-type');
       }
     });
+    syncToolbarSoundButton();
+    syncToolbarLayersButton();
     updateShieldToolbarState();
   }
 

@@ -170,6 +170,7 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
     padding: 0 2px 0 0;
     font-family: inherit;
     font-size: 13px;
@@ -178,6 +179,14 @@
     line-height: 1;
     color: var(--ink);
     white-space: nowrap;
+  }
+  .world-pill #world-menu-label {
+    display: inline-block;
+    min-width: 0;
+    max-width: min(38vw, 360px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
   }
   .world-pill .brand-title-btn::before {
     content: '';
@@ -212,7 +221,7 @@
     position: fixed;
     top: 14px;
     left: calc(50% + 118px);
-    z-index: 13;
+    z-index: 17;
     height: 42px;
     display: inline-flex;
     align-items: center;
@@ -1197,10 +1206,8 @@
   /* PLAY mode is local and intentional: keep scene/camera controls reachable,
      but remove every build/editor surface and route mutations through the same
      edit gate as multiplayer no-edit roles. */
-  body.tw-play-mode #toolbar,
   body.tw-play-mode #tool-palette,
   body.tw-play-mode .flyout,
-  body.tw-play-mode #layers-toggle,
   body.tw-play-mode #layers-panel,
   body.tw-play-mode #agent-panel,
   body.tw-play-mode #agent-input,
@@ -1222,14 +1229,20 @@
   body.tw-play-mode #dev-mode {
     display: none !important;
   }
+  body.tw-play-mode #toolbar .tool:not(.toolbar-utility),
+  body.tw-play-mode #toolbar .tool-group-btn,
+  body.tw-play-mode #toolbar .toolbar-divider:not(.toolbar-utility-divider) {
+    display: none !important;
+  }
+  body.tw-play-mode.hide-groups:not(.tw-worlds-play) #toolbar {
+    display: flex !important;
+  }
 
   /* TINYVERSE PLAY — visiting a multiplayer world. Same build-surface hiding
      as tw-play-mode, plus the left pill is trimmed to Home / View modes /
      My Account / keyboard help only. */
-  body.tw-worlds-play #toolbar,
   body.tw-worlds-play #tool-palette,
   body.tw-worlds-play .flyout,
-  body.tw-worlds-play #layers-toggle,
   body.tw-worlds-play #layers-panel,
   body.tw-worlds-play #agent-panel,
   body.tw-worlds-play #agent-input,
@@ -1242,6 +1255,13 @@
     display: none !important;
   }
   body.tw-worlds-play .controls > :not(#home):not(#view-modes):not(#tips-toggle):not(#account-btn) {
+    display: none !important;
+  }
+  body.tw-worlds-play #toolbar .tool:not(.toolbar-utility),
+  body.tw-worlds-play #toolbar .tool-group-btn,
+  body.tw-worlds-play #toolbar .toolbar-divider:not(.toolbar-utility-divider),
+  body.tw-worlds-play #toolbar-build-play-mode,
+  body.tw-worlds-play #toolbar-layers {
     display: none !important;
   }
   body.tw-worlds-play #world-pill {
@@ -1257,7 +1277,7 @@
     left: 18px;
     right: auto;
     transform: translateY(-50%);
-    display: flex;
+    display: none;
     flex-direction: column;
     align-items: center;
     gap: 2px;
@@ -1938,6 +1958,10 @@
   .sound-icon.muted .ic-off { display: block; }
   body.vehicle-demo-active .sound-icon,
   body.showcase .sound-icon { display: none; }
+  #sound-icon,
+  #layers-toggle {
+    display: none !important;
+  }
 
   /* --- Floating sound panel — anchored above the toolbar --- */
   .sound-panel {
@@ -3083,6 +3107,25 @@
   }
   .toolbar .tool-group-btn[data-pos-type] .group-icon-glyph {
     --glyph-outline: var(--block-outline);
+  }
+  body.ui-theme-dark .toolbar .tool[data-pos-type],
+  body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type],
+  body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type],
+  body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type] {
+    border-width: 1px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.48),
+      inset 0 -2px 0 var(--block-bevel),
+      0 2px 5px -3px rgba(0, 0, 0, 0.74);
+  }
+  body.ui-theme-dark .toolbar .tool[data-pos-type]:hover,
+  body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type]:hover,
+  body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type]:hover,
+  body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type]:hover {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.56),
+      inset 0 -2px 0 var(--block-bevel),
+      0 3px 7px -4px rgba(0, 0, 0, 0.78);
   }
   .flyout[hidden] { display: none; }
   .flyout-item {
@@ -4641,7 +4684,8 @@
   /* --- Topbar popups (view / time / weather) --- */
   .topbar-popup {
     position: fixed;
-    top: 28px; left: 84px; right: auto;
+    top: auto; bottom: 96px; left: 50%; right: auto;
+    transform: translateX(-50%);
     z-index: 60;
     width: 240px;
     background: rgba(255, 255, 255, 0.6);
@@ -4657,9 +4701,13 @@
     padding: 8px;
     font-size: 13px;
     color: var(--ink);
-    animation: world-menu-pop 0.14s ease-out;
+    animation: topbar-popup-pop 0.14s ease-out;
   }
   .topbar-popup[hidden] { display: none; }
+  @keyframes topbar-popup-pop {
+    from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
   .topbar-popup-title {
     font-size: 10.5px; font-weight: 600;
     letter-spacing: 0.06em; text-transform: uppercase;
@@ -4993,6 +5041,29 @@
   body.ui-theme-dark .invite-top-btn:hover {
     background-color: rgba(24, 34, 51, 0.96) !important;
   }
+  body.ui-theme-dark .world-pill {
+    padding-right: 48px;
+    border-color: rgba(220, 232, 255, 0.28) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.14) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.38) inset,
+      0 18px 44px -18px rgba(0, 0, 0, 0.74) !important;
+  }
+  body.ui-theme-dark .invite-top-btn {
+    z-index: 17 !important;
+    transform: translateX(-10px);
+    border-color: rgba(220, 232, 255, 0.24) !important;
+    background-color: rgb(31, 38, 53) !important;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.14) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.40) inset,
+      0 18px 44px -18px rgba(0, 0, 0, 0.76) !important;
+  }
+  body.ui-theme-dark .invite-top-btn:hover {
+    background-color: rgba(41, 49, 66, 0.98) !important;
+    transform: translateX(-10px) translateY(-1px);
+  }
   body.ui-theme-dark .tw-invite-card {
     --ink: #f4f7ff;
     --muted: #b9c2d0;
@@ -5295,10 +5366,11 @@
     color: var(--active-outline) !important;
     background: linear-gradient(180deg, var(--active-fill), var(--active-fill-low)) !important;
     border-color: var(--active-outline) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 2px rgba(255, 255, 255, 0.98),
-      inset 0 -4px 0 var(--active-bevel),
-      0 0 0 2px var(--active-ring),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.78),
+      inset 0 -3px 0 var(--active-bevel),
+      0 0 0 1px var(--active-ring),
       0 8px 16px -10px rgba(0, 0, 0, 0.86) !important;
   }
   body.ui-theme-dark .toolbar .tool.active .tool-icon,
@@ -5313,10 +5385,12 @@
   body.ui-theme-dark .toolbar .tool.active::after,
   body.ui-theme-dark .toolbar .tool[aria-pressed="true"]::after,
   body.ui-theme-dark .toolbar .tool-group-btn.active::after {
+    bottom: -6px;
+    height: 3px;
     background: var(--active-outline) !important;
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.48),
-      0 0 12px var(--active-ring) !important;
+      0 0 0 1px rgba(255, 255, 255, 0.34),
+      0 0 10px var(--active-ring) !important;
   }
   body.ui-theme-dark .agent-target-chip,
   body.ui-theme-dark .agent-selection-count {
@@ -5657,9 +5731,10 @@
     color: var(--chrome-outline) !important;
     background: var(--chrome-dark-bg) !important;
     border-color: var(--chrome-outline) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.20),
-      inset 0 -3px 0 var(--chrome-dark-bevel),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 -2px 0 var(--chrome-dark-bevel),
       0 2px 5px -2px rgba(0, 0, 0, 0.58) !important;
   }
   body.ui-theme-dark .appbar .btn.icon[data-pos-type="primary"]:not(.active):not(.on),
@@ -5694,6 +5769,18 @@
     background: var(--chrome-dark-hover-bg) !important;
     border-color: var(--chrome-outline) !important;
   }
+  body.ui-theme-dark .world-pill[data-pos-type]:not([aria-expanded="true"]) {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)), rgba(34, 41, 58, 0.96) !important;
+    border-color: rgba(220, 232, 255, 0.28) !important;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.14) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.38) inset,
+      0 18px 44px -18px rgba(0, 0, 0, 0.74) !important;
+  }
+  body.ui-theme-dark .world-pill[data-pos-type]:not([aria-expanded="true"]):hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)), rgba(41, 49, 66, 0.98) !important;
+    transform: translateX(-50%);
+  }
   body.ui-theme-dark .appbar .btn.icon[data-pos-type].active,
   body.ui-theme-dark .appbar .btn.icon[data-pos-type].on,
   body.ui-theme-dark .token-corner .btn.icon[data-pos-type].active,
@@ -5727,10 +5814,11 @@
     color: var(--chrome-active-outline) !important;
     background: linear-gradient(180deg, var(--chrome-active-fill), var(--chrome-active-fill-low)) !important;
     border-color: var(--chrome-active-outline) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 2px rgba(255, 255, 255, 0.98),
-      inset 0 -4px 0 var(--chrome-active-bevel),
-      0 0 0 2px var(--chrome-active-ring),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.76),
+      inset 0 -3px 0 var(--chrome-active-bevel),
+      0 0 0 1px var(--chrome-active-ring),
       0 8px 16px -10px rgba(0, 0, 0, 0.86) !important;
   }
   body.ui-theme-dark .appbar-sep {
@@ -7144,10 +7232,11 @@
     color: #f4f9ff !important;
     background: linear-gradient(180deg, var(--active-fill), var(--active-fill-low)) !important;
     border-color: var(--active-outline) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 2px rgba(255, 255, 255, 0.42),
-      inset 0 -4px 0 var(--active-bevel),
-      0 0 0 2px var(--active-ring),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.36),
+      inset 0 -3px 0 var(--active-bevel),
+      0 0 0 1px var(--active-ring),
       0 10px 20px -12px rgba(0, 0, 0, 0.92) !important;
   }
   body.ui-theme-dark .toolbar .tool.active[data-pos-type="terrain"],
@@ -7203,9 +7292,10 @@
   body.ui-theme-dark .tool-palette .tool.flyout-tool {
     color: rgba(230, 237, 249, 0.86) !important;
     border-color: rgba(220, 232, 255, 0.42) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.20),
-      inset 0 -3px 0 rgba(0, 0, 0, 0.24),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.24),
       0 2px 5px -2px rgba(0, 0, 0, 0.58) !important;
   }
   body.ui-theme-dark .flyout .tool.flyout-tool > span:not(.chev),
@@ -7229,9 +7319,10 @@
     color: #f4f9ff !important;
     background: var(--block-dark-bg) !important;
     border-color: var(--block-outline) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.20),
-      inset 0 -3px 0 var(--block-dark-bevel),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 -2px 0 var(--block-dark-bevel),
       0 2px 5px -2px rgba(0, 0, 0, 0.58) !important;
   }
   body.ui-theme-dark .toolbar .tool[data-pos-type]:not(.active):not([aria-pressed="true"]):hover,
@@ -7975,30 +8066,37 @@
   }
   body.ui-theme-dark .welcome-mode-btn {
     --welcome-outline: #e8f1ff;
-    --welcome-fill: rgba(33, 42, 60, 0.94);
-    --welcome-hover-fill: rgba(44, 55, 76, 0.98);
-    --welcome-bevel: rgba(0, 0, 0, 0.28);
+    --welcome-border: rgba(220, 232, 255, 0.24);
+    --welcome-accent: rgba(220, 232, 255, 0.34);
+    --welcome-fill: rgba(31, 38, 53, 0.96);
+    --welcome-hover-fill: rgba(41, 49, 66, 0.98);
     color: var(--welcome-outline) !important;
     background: var(--welcome-fill) !important;
-    border-color: var(--welcome-outline) !important;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025)) !important;
+    border-color: var(--welcome-border) !important;
+    border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.20),
-      inset 0 -4px 0 var(--welcome-bevel),
-      0 4px 10px -4px rgba(0, 0, 0, 0.62) !important;
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40),
+      0 0 0 1px var(--welcome-accent),
+      0 18px 44px -18px rgba(0, 0, 0, 0.76) !important;
   }
   body.ui-theme-dark .welcome-mode-btn:hover {
     background: var(--welcome-hover-fill) !important;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)) !important;
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.24),
-      inset 0 -4px 0 var(--welcome-bevel),
-      0 8px 14px -8px rgba(0, 0, 0, 0.72) !important;
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+      0 0 0 1px color-mix(in srgb, var(--welcome-accent), #fff 12%),
+      0 20px 48px -20px rgba(0, 0, 0, 0.82) !important;
   }
   body.ui-theme-dark .welcome-mode-btn:focus-visible {
     box-shadow:
-      inset 0 0 0 1.5px rgba(255, 255, 255, 0.24),
-      inset 0 -4px 0 var(--welcome-bevel),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+      0 0 0 1px color-mix(in srgb, var(--welcome-accent), #fff 16%),
       0 0 0 3px rgba(8, 12, 18, 0.82),
-      0 0 0 6px rgba(169, 198, 255, 0.44) !important;
+      0 0 0 5px color-mix(in srgb, var(--welcome-accent), transparent 16%) !important;
   }
   body.ui-theme-dark .welcome-mode-btn.is-soon {
     opacity: 0.78;
@@ -8009,27 +8107,31 @@
   }
   body.ui-theme-dark .welcome-tinyverse {
     --welcome-outline: #a9c6ff;
-    --welcome-fill: rgba(34, 54, 95, 0.94);
-    --welcome-hover-fill: rgba(46, 70, 116, 0.98);
-    --welcome-bevel: rgba(0, 0, 0, 0.30);
+    --welcome-border: rgba(169, 198, 255, 0.34);
+    --welcome-accent: rgba(169, 198, 255, 0.28);
+    --welcome-fill: rgba(32, 40, 58, 0.96);
+    --welcome-hover-fill: rgba(41, 52, 74, 0.98);
   }
   body.ui-theme-dark .welcome-battleworlds {
     --welcome-outline: #9eeaff;
-    --welcome-fill: rgba(22, 68, 88, 0.94);
-    --welcome-hover-fill: rgba(28, 86, 112, 0.98);
-    --welcome-bevel: rgba(0, 0, 0, 0.30);
+    --welcome-border: rgba(158, 234, 255, 0.30);
+    --welcome-accent: rgba(158, 234, 255, 0.24);
+    --welcome-fill: rgba(30, 43, 56, 0.96);
+    --welcome-hover-fill: rgba(38, 54, 70, 0.98);
   }
   body.ui-theme-dark .welcome-build {
     --welcome-outline: #ffd08a;
-    --welcome-fill: rgba(86, 54, 24, 0.94);
-    --welcome-hover-fill: rgba(112, 70, 30, 0.98);
-    --welcome-bevel: rgba(0, 0, 0, 0.30);
+    --welcome-border: rgba(255, 208, 138, 0.34);
+    --welcome-accent: rgba(255, 208, 138, 0.28);
+    --welcome-fill: rgba(56, 43, 32, 0.96);
+    --welcome-hover-fill: rgba(70, 52, 38, 0.98);
   }
   body.ui-theme-dark .welcome-play {
     --welcome-outline: #baf38a;
-    --welcome-fill: rgba(44, 74, 28, 0.94);
-    --welcome-hover-fill: rgba(56, 94, 34, 0.98);
-    --welcome-bevel: rgba(0, 0, 0, 0.30);
+    --welcome-border: rgba(186, 243, 138, 0.30);
+    --welcome-accent: rgba(186, 243, 138, 0.24);
+    --welcome-fill: rgba(38, 50, 34, 0.96);
+    --welcome-hover-fill: rgba(48, 62, 42, 0.98);
   }
   body.ui-theme-dark .welcome-credit {
     color: rgba(244, 247, 255, 0.76);
@@ -8845,7 +8947,13 @@
     .minimap-card canvas { width: 105px; height: 105px; }
 
     /* Popups */
-    .topbar-popup { top: 90px; left: 58px; }
+    .topbar-popup {
+      top: auto;
+      bottom: 76px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: calc(100vw - 24px);
+    }
 
     /* Toolbar: bottom center */
     .toolbar {
@@ -8881,7 +8989,12 @@
     .appbar .btn.icon { width: 26px; height: 26px; flex-basis: 26px; }
     .token-corner { top: 18px; right: 8px; font-size: 10px; }
     .minimap-wrap { top: 80px; right: 8px; }
-    .topbar-popup { top: 80px; left: 50px; }
+    .topbar-popup {
+      top: auto;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
     .controls { left: 6px; width: 36px; }
     .toolbar { bottom: 10px; max-width: calc(100vw - 16px); }
     .tool-group-btn { width: 46px; height: 44px; }

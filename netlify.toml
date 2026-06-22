@@ -48,8 +48,8 @@
 
 [[redirects]]
   from = "/community"
-  to = "/community.html"
-  status = 200
+  to = "/news"
+  status = 302
 
 [[redirects]]
   from = "/admin-users"

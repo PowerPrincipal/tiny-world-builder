@@ -8,18 +8,20 @@ export const config = { path: '/api/profile' };
 function validateProfile(body) {
   const username = normalizeUsername(body && body.username);
   const displayName = String((body && body.displayName) || '').trim().slice(0, 80);
+  const email = String((body && body.email) || '').trim().toLowerCase().slice(0, 320);
   const about = String((body && body.about) || '').trim().slice(0, 1000);
   const image = normalizeProfileImageUrl(body && body.image);
   const twitter = normalizeProfileHandle(body && body.twitter);
   const github = normalizeProfileHandle(body && body.github);
   if (!/^[a-z0-9_]{3,24}$/.test(username)) return { error: 'Username must be 3-24 lowercase letters, numbers, underscores' };
   if (!displayName) return { error: 'Display name required' };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Email is not valid' };
   // Reject non-http(s) image URLs so a stored `javascript:`/`data:text/html` value
   // can't become stored XSS if a client ever renders it as an <img src>/anchor.
   if (image && !/^https:\/\/[^\s]+$/i.test(image) && !/^http:\/\/localhost(:\d+)?\//i.test(image)) {
     return { error: 'Image must be an https URL' };
   }
-  return { username, displayName, about, image, twitter, github };
+  return { username, displayName, email, about, image, twitter, github };
 }
 
 export default async function profileFunction(request) {
@@ -44,9 +46,12 @@ export default async function profileFunction(request) {
 
       await ensureProfile(user);
       const sql = getSql();
+      const authEmail = String(user.email || '').trim().toLowerCase();
+      const email = authEmail || input.email;
       const rows = await sql`
         UPDATE profiles
         SET username = ${input.username},
+            email = ${email},
             display_name = ${input.displayName},
             about = ${input.about},
             image = ${input.image},

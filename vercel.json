@@ -3,6 +3,13 @@
   "buildCommand": "./publish.sh",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/community",
+      "destination": "/news",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

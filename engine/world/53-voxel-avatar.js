@@ -823,9 +823,9 @@
         // Rocket pack: show/hide the back-mounted thrusters (on earn) and the flames (on thrust).
         setRocketVisible(on) { rocketPack.visible = !!on; if (!on) for (const f of rocketFlames) f.visible = false; },
         setThrusting(on) { for (const f of rocketFlames) f.visible = !!on; },
-        // First-person: hide the head so the camera (sat at eye height) isn't inside it.
-        // Arms + torso stay visible so they swing into the bottom of view (Minecraft-style).
-        setFirstPerson(on) { head.visible = !on; },
+        // First-person: hide the local body entirely. Leaving arms/torso visible
+        // clipped the camera into the voxel rig when zoomed in.
+        setFirstPerson(on) { body.visible = !on; },
         // World-space eye position (top of the head group) for placing the FP camera.
         getEyeWorldPosition(out) {
           const v = out || new THREE.Vector3();

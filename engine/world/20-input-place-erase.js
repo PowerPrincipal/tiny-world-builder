@@ -2107,8 +2107,8 @@
   const FP_SPRINT_MULT = 2.2;
   const FP_FOV = 55;
   const FP_THIRD_FOV = 42;
-  const FP_THIRD_DIST = 3.2;
-  const FP_THIRD_UP = 1.35;
+  const FP_THIRD_DIST = 4.8;
+  const FP_THIRD_UP = 1.7;
   const FP_NEAR = 0.02;
   const PERS_NEAR_DEFAULT = persCam.near;
   const PERS_FOV_DEFAULT  = persCam.fov;

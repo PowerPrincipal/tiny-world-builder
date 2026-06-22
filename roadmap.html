@@ -439,7 +439,6 @@
       <a href="/docs">Docs</a>
       <a href="/roadmap" aria-current="page">Roadmap</a>
       <a href="/features">Suggest</a>
-      <a href="/community">Community</a>
       <a href="/news">News</a>
       <a href="https://github.com/jasonkneen/tiny-world-builder" rel="noopener noreferrer">GitHub</a>
       <a class="nav-cta" href="/tiny-world-builder">Start building</a>
@@ -549,8 +548,16 @@
 
     // ---- Helpers ----
     const WAVES = ['WAVE1', 'WAVE2', 'WAVE3'];
+    const WAVE1_SHIPPED_AT = Date.parse('2026-06-21T23:59:00Z');
     function esc(s) {
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function wave1HasShipped() {
+      return Number.isFinite(WAVE1_SHIPPED_AT) && Date.now() >= WAVE1_SHIPPED_AT;
+    }
+    function effectiveMilestoneStatus(m) {
+      if (m && m.wave === 'WAVE1' && wave1HasShipped()) return 'done';
+      return m && m.status ? m.status : 'planned';
     }
     // WAVE launch label pill, or '' when the milestone has no wave.
     function waveBadge(w) {
@@ -649,7 +656,10 @@
     function renderBoard() {
       const board = document.getElementById('kanban-board');
       const grouped = { done: [], active: [], planned: [] };
-      for (const m of milestones) if (grouped[m.status]) grouped[m.status].push(m);
+      for (const m of milestones) {
+        const status = effectiveMilestoneStatus(m);
+        if (grouped[status]) grouped[status].push(m);
+      }
 
       const gripIcon = `<svg viewBox="0 0 10 16" width="14" height="18" fill="currentColor" aria-hidden="true">
         <circle cx="3" cy="2.5" r="1.8"/><circle cx="7" cy="2.5" r="1.8"/>
@@ -813,7 +823,7 @@
       const m = milestones.find(m => m.id === id);
       if (!m) return;
       modalState = { id, isNew: false, status: m.status };
-      renderModal(m.title, m.description, m.status, m.wave);
+      renderModal(m.title, m.description, adminMode ? m.status : effectiveMilestoneStatus(m), m.wave);
     }
 
     function openNewCard(status) {
