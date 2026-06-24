@@ -38,6 +38,31 @@
   gap: 28px;
 }
 
+/* Beta Preview banner + pill — marks the economy as in-beta / preview data */
+.beta-banner {
+  background: #1e3a6b;
+  color: #dce8ff;
+  text-align: center;
+  padding: 9px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.beta-banner strong { color: #fff; }
+.beta-pill {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: #3a72c8;
+  color: #fff;
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* Glass card shared idiom — matches leaderboard / badges */
 .rewards-card {
   background: rgba(255, 255, 255, 0.58);
@@ -695,9 +720,10 @@
   </header>
 
   <main>
+    <div class="beta-banner" role="status">The Tinyverse economy is in <strong>Beta Preview</strong> — GOLD, balances, and tokens are preview data while we finish building.</div>
     <section class="page-hero-section" aria-labelledby="page-title">
       <div class="page-hero-copy">
-        <h1 id="page-title">Rewards</h1>
+        <h1 id="page-title">Rewards <span class="beta-pill" title="The Tinyverse economy is in beta. Balances are preview data.">Beta Preview</span></h1>
         <p>Your Earned GOLD balance, referral link, and recent activity.</p>
       </div>
     </section>

@@ -1593,6 +1593,31 @@ svg {
   width: fit-content;
 }
 
+/* Beta Preview banner + pill — marks the Tinyverse economy as in-beta / preview data */
+.beta-banner {
+  background: #1e3a6b;
+  color: #dce8ff;
+  text-align: center;
+  padding: 9px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.beta-banner strong { color: #fff; }
+.beta-pill {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: #3a72c8;
+  color: #fff;
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
