@@ -9,7 +9,15 @@ function cleanTinyverseEmail(value) {
 }
 
 export function tinyverseAccessEmails() {
-  return new Set(TINYVERSE_ACCESS_DEFAULT_EMAILS);
+  // The hard-coded owner accounts, plus any added via the TINYVERSE_ACCESS_EMAILS env
+  // (comma-separated) — lets the owner widen the dark-launch allowlist without a deploy.
+  const set = new Set(TINYVERSE_ACCESS_DEFAULT_EMAILS);
+  const extra = String(process.env.TINYVERSE_ACCESS_EMAILS || '');
+  for (const e of extra.split(',')) {
+    const c = cleanTinyverseEmail(e);
+    if (c) set.add(c);
+  }
+  return set;
 }
 
 export function isTinyverseAccessEmail(email) {
