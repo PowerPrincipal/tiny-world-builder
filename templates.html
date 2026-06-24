@@ -340,19 +340,19 @@
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ worldId: tmpl.id, idempotencyKey: key }),
+        body: JSON.stringify({ shareId: tmpl.id, idempotencyKey: key }),
       })
         .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
         .then(function (res) {
           if (res.data && res.data.ok) {
-            // Success — show link to builder; reset idempotency key for next attempt
+            // Success — show link to original share; reset idempotency key for next attempt
             resetKey(tmpl.id);
             statusEl.hidden = false;
             statusEl.className = 'tmpl-status tmpl-status-ok';
             var msg = document.createTextNode('Remixed! Opening your copy… ');
             statusEl.appendChild(msg);
             var link = document.createElement('a');
-            link.href = '/tiny-world-builder';
+            link.href = '/tiny-world-builder?share=' + encodeURIComponent(tmpl.id);
             link.textContent = 'Open builder';
             statusEl.appendChild(link);
             // Refresh balance
