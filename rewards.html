@@ -575,6 +575,90 @@
 
 .rewards-buy-feedback.err { color: #9a3020; }
 
+/* send gold section */
+.rewards-send-divider {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin: 4px 0 0;
+}
+
+.rewards-send-heading {
+  font-family: var(--body-font);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.rewards-send-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.rewards-send-username {
+  flex: 2;
+  min-width: 100px;
+  padding: 10px 14px;
+  border: 1px solid rgba(120, 130, 150, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+  font: 400 14px/1.4 var(--body-font);
+  color: var(--ink);
+  outline: none;
+}
+
+.rewards-send-username:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(58, 114, 200, 0.14);
+}
+
+.rewards-send-amount {
+  flex: 1;
+  min-width: 70px;
+  padding: 10px 14px;
+  border: 1px solid rgba(120, 130, 150, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+  font: 400 14px/1.4 var(--body-font);
+  color: var(--ink);
+  outline: none;
+}
+
+.rewards-send-amount:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(58, 114, 200, 0.14);
+}
+
+.rewards-send-btn {
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: linear-gradient(180deg, #d4a62a 0%, #b8891e 100%);
+  color: #fff;
+  font: 600 14px/1 var(--body-font);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px -8px rgba(180, 120, 20, 0.5);
+  transition: filter 0.12s;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.rewards-send-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.rewards-send-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+.rewards-send-feedback {
+  font-family: var(--body-font);
+  font-size: 13px;
+  min-height: 18px;
+  width: 100%;
+}
+
+.rewards-send-feedback.ok  { color: #1a6632; }
+.rewards-send-feedback.err { color: #9a3020; }
+
 @media (max-width: 600px) {
   .rewards-balance-num { font-size: 52px; }
   .rewards-referral-link-row { flex-direction: column; }
@@ -583,6 +667,8 @@
   .rewards-claim-btn { align-self: flex-start; }
   .rewards-resources-grid { grid-template-columns: 1fr 1fr; }
   .rewards-packs-grid { grid-template-columns: 1fr 1fr; }
+  .rewards-send-row { flex-direction: column; }
+  .rewards-send-btn { align-self: flex-start; }
 }
 </style>
 </head>
@@ -1077,7 +1163,7 @@
     var RESOURCE_LABELS = ['fish', 'meat', 'plants', 'ore'];
 
     // ---- build economy card (sell resources + buy gold) ----
-    function buildEconomyCard(resourcesData, stripeData, reloadSignedIn) {
+    function buildEconomyCard(resourcesData, stripeData, reloadSignedIn, coinsData) {
       var card = document.createElement('div');
       card.className = 'rewards-card';
 
@@ -1343,6 +1429,135 @@
       }
 
       body.appendChild(buyFeedback);
+
+      // ---- send gold section ----
+      var sendDivider = document.createElement('hr');
+      sendDivider.className = 'rewards-send-divider';
+      body.appendChild(sendDivider);
+
+      var sendHeading = document.createElement('div');
+      sendHeading.className = 'rewards-send-heading';
+      sendHeading.textContent = 'Send GOLD';
+      body.appendChild(sendHeading);
+
+      var sendRow = document.createElement('div');
+      sendRow.className = 'rewards-send-row';
+
+      var usernameInput = document.createElement('input');
+      usernameInput.className = 'rewards-send-username';
+      usernameInput.type = 'text';
+      usernameInput.placeholder = 'Recipient username';
+      usernameInput.setAttribute('autocomplete', 'off');
+      usernameInput.setAttribute('spellcheck', 'false');
+
+      var amountInput = document.createElement('input');
+      amountInput.className = 'rewards-send-amount';
+      amountInput.type = 'number';
+      amountInput.placeholder = 'Amount';
+      amountInput.min = '1';
+      amountInput.step = '1';
+
+      var sendBtn = document.createElement('button');
+      sendBtn.className = 'rewards-send-btn';
+      sendBtn.type = 'button';
+      sendBtn.textContent = 'Send';
+
+      sendRow.appendChild(usernameInput);
+      sendRow.appendChild(amountInput);
+      sendRow.appendChild(sendBtn);
+      body.appendChild(sendRow);
+
+      var sendFeedback = document.createElement('div');
+      sendFeedback.className = 'rewards-send-feedback';
+      sendFeedback.setAttribute('aria-live', 'polite');
+      body.appendChild(sendFeedback);
+
+      // idempotency key — regenerate only after a successful send
+      var sendIdempotencyKey = crypto.randomUUID();
+
+      sendBtn.addEventListener('click', function () {
+        var recipient = usernameInput.value.trim();
+        var rawAmount = amountInput.value.trim();
+        var amount = parseInt(rawAmount, 10);
+
+        // local validation
+        if (!recipient) {
+          sendFeedback.className = 'rewards-send-feedback err';
+          sendFeedback.textContent = 'Enter a recipient username.';
+          return;
+        }
+        if (!rawAmount || isNaN(amount) || amount < 1 || String(amount) !== rawAmount) {
+          sendFeedback.className = 'rewards-send-feedback err';
+          sendFeedback.textContent = 'Enter a positive whole number for the amount.';
+          return;
+        }
+
+        // optional client-side balance check when coinsData is available
+        var currentBalance = (coinsData && coinsData.balance != null) ? Number(coinsData.balance) : null;
+        if (currentBalance !== null && amount > currentBalance) {
+          sendFeedback.className = 'rewards-send-feedback err';
+          sendFeedback.textContent = 'Not enough GOLD.';
+          return;
+        }
+
+        var confirmed = window.confirm('Send ' + amount.toLocaleString() + ' GOLD to ' + recipient + '?');
+        if (!confirmed) return;
+
+        sendBtn.disabled = true;
+        sendFeedback.className = 'rewards-send-feedback';
+        sendFeedback.textContent = 'Sending...';
+
+        fetch('/api/me/coins/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ toUsername: recipient, amount: amount, idempotencyKey: sendIdempotencyKey }),
+        })
+          .then(function (res) {
+            return res.json().then(function (data) { return { status: res.status, data: data }; });
+          })
+          .then(function (r) {
+            if (r.data && r.data.ok) {
+              // Regenerate key after successful send
+              sendIdempotencyKey = crypto.randomUUID();
+              var sent = Number(r.data.sent) || amount;
+              var toUser = String(r.data.to || recipient);
+              sendFeedback.className = 'rewards-send-feedback ok';
+              sendFeedback.textContent = 'Sent ' + sent.toLocaleString() + ' GOLD to ' + toUser + '.';
+              usernameInput.value = '';
+              amountInput.value = '';
+              sendBtn.disabled = false;
+              if (typeof reloadSignedIn === 'function') {
+                setTimeout(reloadSignedIn, 1200);
+              }
+            } else if (r.status === 404 || (r.data && r.data.reason === 'recipient-not-found')) {
+              sendFeedback.className = 'rewards-send-feedback err';
+              sendFeedback.textContent = 'No player with that username.';
+              sendBtn.disabled = false;
+            } else if (r.status === 409 || (r.data && r.data.reason === 'insufficient-coins')) {
+              sendFeedback.className = 'rewards-send-feedback err';
+              sendFeedback.textContent = 'Not enough GOLD.';
+              sendBtn.disabled = false;
+            } else if (r.data && r.data.reason === 'self-transfer') {
+              sendFeedback.className = 'rewards-send-feedback err';
+              sendFeedback.textContent = 'You cannot send GOLD to yourself.';
+              sendBtn.disabled = false;
+            } else if (r.status === 403) {
+              sendFeedback.className = 'rewards-send-feedback err';
+              sendFeedback.textContent = 'GOLD transfers are in private testing.';
+              sendBtn.disabled = false;
+            } else {
+              sendFeedback.className = 'rewards-send-feedback err';
+              sendFeedback.textContent = 'Something went wrong. Please try again.';
+              sendBtn.disabled = false;
+            }
+          })
+          .catch(function () {
+            sendFeedback.className = 'rewards-send-feedback err';
+            sendFeedback.textContent = 'Could not reach the server. Please try again.';
+            sendBtn.disabled = false;
+          });
+      });
+
       card.appendChild(body);
       return card;
     }
@@ -1366,7 +1581,7 @@
 
       // Economy panel: resources + gold (only when resourcesData or stripeData present, or 403)
       if (resourcesData !== null || stripeData !== null) {
-        section.appendChild(buildEconomyCard(resourcesData, stripeData, reloadSignedIn));
+        section.appendChild(buildEconomyCard(resourcesData, stripeData, reloadSignedIn, coinsData));
       }
 
       if (referralData && referralData.code) {
