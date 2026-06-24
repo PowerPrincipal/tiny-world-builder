@@ -68,12 +68,15 @@ function slugFromRequest(request) {
   return s;
 }
 
-function isTinyverseOwnerProfile(profile) {
-  return TINYVERSE_OWNER_EMAILS.has(String((profile && profile.email) || '').trim().toLowerCase());
+// Authorize on the VERIFIED auth-provider email only, NEVER the editable profiles.email
+// (a wallet user can set that to anything via /api/profile — using it for authorization
+// let them self-grant Tinyverse owner/access). See plans/production-line/SECURITY-NOTES.md.
+function isTinyverseOwnerEmail(verifiedEmail) {
+  return TINYVERSE_OWNER_EMAILS.has(String(verifiedEmail || '').trim().toLowerCase());
 }
 
-async function ensureTinyverseStarterOwnership(sql, profile) {
-  if (!profile || !isTinyverseOwnerProfile(profile)) return;
+async function ensureTinyverseStarterOwnership(sql, profile, verifiedEmail) {
+  if (!profile || !isTinyverseOwnerEmail(verifiedEmail)) return;
   await sql`
     UPDATE worlds
     SET owner_profile_id = ${profile.id}, updated_at = NOW()
@@ -106,12 +109,15 @@ export default async function worldsFunction(request) {
     // Browsing the universe is account-gated; writes require auth too.
     const user = await getAuthUser(request);
     const profile = (user && user.id) ? await ensureProfile(user) : null;
-    await ensureTinyverseStarterOwnership(sql, profile);
+    // The verified auth-provider email is the ONLY authorization input — never the
+    // user-editable profiles.email.
+    const verifiedEmail = (user && user.email) ? String(user.email).trim().toLowerCase() : '';
+    await ensureTinyverseStarterOwnership(sql, profile, verifiedEmail);
     const isWorldService = isWorldServiceRequest(request);
     // World admin: a small email allowlist may inspect/administer worlds beyond
     // ownership. Live room editing is intentionally not part of this path.
-    const isWorldAdmin = isWorldAdminEmail(user && user.email);
-    const canAccessTinyverse = isTinyverseAccessEmail(user && (user.email || (profile && profile.email)));
+    const isWorldAdmin = isWorldAdminEmail(verifiedEmail);
+    const canAccessTinyverse = isTinyverseAccessEmail(verifiedEmail);
     const worldId = worldIdFromRequest(request);
     const worldSlug = slugFromRequest(request);
 
