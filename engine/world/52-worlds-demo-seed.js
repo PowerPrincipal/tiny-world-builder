@@ -53,7 +53,20 @@
       const cells = data.cells;
       if (hasResources(cells)) return null;
 
-      const g = world.gridSize || 8;
+      // Pin the home-grid size so the rendered island can't diverge from the minimap.
+      // The builder sizes the 3D board via coerceGridSize(data.gridSize, GRID); when
+      // data.gridSize is missing it falls back to whatever GRID was left over from a
+      // previously-visited world (often a 20x20 one), so the island renders huge while
+      // the minimap still shows the world's real (e.g. 8x8) size — the recurring
+      // "8x8 vs 20x20" mismatch. Coerce ONE valid size and stamp it on both the data
+      // grid and the world hint, then keep every seeded cell inside it.
+      const coerce = (typeof coerceGridSize === 'function')
+        ? (v) => coerceGridSize(v, 8)
+        : (v) => { let g = 8; for (const n of [8, 10, 12, 16, 20]) if (v >= n) g = n; return g; };
+      const g = coerce(Number(world.gridSize) || Number(data.gridSize) || 8);
+      data.gridSize = g;
+      world.gridSize = g;
+
       const used = usedPositions(cells);
       const added = [];
       const cx = Math.floor(g / 2), cz = Math.floor(g / 2);
