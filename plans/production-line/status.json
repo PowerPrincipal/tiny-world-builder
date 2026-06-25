@@ -216,6 +216,11 @@
   ],
   "feed": [
     {
+      "ts": "2026-06-25T23:47:06.606Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-25T23-47-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
       "ts": "2026-06-25T22:47:31.234Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-25T22-47-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
@@ -409,12 +414,7 @@
       "ts": "2026-06-24T10:30:00Z",
       "kind": "build",
       "text": "T3b built by a Sonnet agent in a worktree (parallel to the news ship); shared renderer extracted so carousel + gallery use one module."
-    },
-    {
-      "ts": "2026-06-24T10:28:00Z",
-      "kind": "shipped",
-      "text": "News shipped to prod (PR #76): 'Featured worlds, right on the home page'. Codex review SHIP. The home teaser auto-advances to it."
     }
   ],
-  "lastTick": "2026-06-25T22:47:31.234Z"
+  "lastTick": "2026-06-25T23:47:06.606Z"
 }
