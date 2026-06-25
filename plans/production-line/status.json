@@ -216,6 +216,11 @@
   ],
   "feed": [
     {
+      "ts": "2026-06-25T12:04:58.872Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"Merge branch 'main' of https://github.com/jasonkneen/tiny-world-builder\" -> plans/production-line/drafts/2026-06-25T12-04-merge-branch-main-of-https-github-com-jasonkneen.md. No economy paths touched."
+    },
+    {
       "ts": "2026-06-25T11:12:33.821Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"animal updates\" -> plans/production-line/drafts/2026-06-25T11-12-animal-updates.md. No economy paths touched."
@@ -409,12 +414,7 @@
       "ts": "2026-06-24T08:46:00Z",
       "kind": "review",
       "text": "Codex adversarial review of the announcement diff: well-formed HTML, no financial/returns claims. Verdict SHIP."
-    },
-    {
-      "ts": "2026-06-24T08:30:00Z",
-      "kind": "system",
-      "text": "Tweet drafted for ANNOUNCE; queued in tweets/ (posting blocked until X/Twitter API creds are provided)."
     }
   ],
-  "lastTick": "2026-06-25T11:12:33.821Z"
+  "lastTick": "2026-06-25T12:04:58.872Z"
 }
