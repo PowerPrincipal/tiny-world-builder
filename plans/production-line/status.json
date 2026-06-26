@@ -216,6 +216,11 @@
   ],
   "feed": [
     {
+      "ts": "2026-06-26T13:00:21.575Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"Merge branch 'main' of https://github.com/jasonkneen/tiny-world-builder\" -> plans/production-line/drafts/2026-06-26T13-00-merge-branch-main-of-https-github-com-jasonkneen.md. No economy paths touched."
+    },
+    {
       "ts": "2026-06-26T12:04:45.260Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-26T12-04-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
@@ -409,12 +414,7 @@
       "ts": "2026-06-24T12:40:00Z",
       "kind": "build",
       "text": "G3 achievement badges building (Sonnet agent + Codex for the pixel-art SVG icons): 6-badge showcase at /badges."
-    },
-    {
-      "ts": "2026-06-24T12:25:00Z",
-      "kind": "shipped",
-      "text": "G2 shipped to prod (PR #80): public Top Builders leaderboard at /leaderboard. Codex info-leak/XSS pass: SHIP. Verified in a real browser (rank order + XSS literal). Nav link added."
     }
   ],
-  "lastTick": "2026-06-26T12:04:45.260Z"
+  "lastTick": "2026-06-26T13:00:21.575Z"
 }
