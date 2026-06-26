@@ -732,10 +732,10 @@
     return changed;
   }
 
-  // -------- brush shape preview (single / line / rectangle) --------
-  // Line and rectangle brush modes are preview-first: drag paints only a
-  // holographic footprint, then commits through the normal applyToolToCell path
-  // on pointer-up. Single mode preserves the existing freehand paint behavior.
+  // -------- brush shape preview (single / line / rectangle / fill / scatter) --------
+  // Shape brush modes are preview-first: drag paints only a holographic
+  // footprint, then commits through the normal applyToolToCell path on
+  // pointer-up. Single mode preserves the existing freehand paint behavior.
   const _brushShapePreviewGroup = new THREE.Group();
   _brushShapePreviewGroup.name = 'brush-shape-preview';
   _brushShapePreviewGroup.visible = false;
@@ -744,11 +744,17 @@
   function _brushModeLabel(mode) {
     if (mode === 'line') return 'Line';
     if (mode === 'rect') return 'Rectangle';
+    if (mode === 'fill') return 'Fill';
+    if (mode === 'scatter') return 'Scatter';
     return 'Single';
   }
 
+  function _brushModeValid(mode) {
+    return mode === 'single' || mode === 'line' || mode === 'rect' || mode === 'fill' || mode === 'scatter';
+  }
+
   function _brushSetMode(mode) {
-    if (mode !== 'line' && mode !== 'rect') mode = 'single';
+    if (!_brushModeValid(mode)) mode = 'single';
     _brushMode = mode;
     document.querySelectorAll('[data-brush-mode]').forEach(btn => {
       const on = btn.getAttribute('data-brush-mode') === _brushMode;
@@ -765,16 +771,120 @@
     _brushSetMode(_brushMode);
   }
 
+  function _brushWorldCoordForHit(hit) {
+    if (!hit) return null;
+    return {
+      x: hit.x + (hit.boardX || 0) * GRID,
+      z: hit.z + (hit.boardZ || 0) * GRID,
+    };
+  }
+
+  function _brushCellKey(x, z) {
+    return x + ',' + z;
+  }
+
+  function _brushCellIntent(x, z) {
+    const gx = ((x % GRID) + GRID) % GRID;
+    const gz = ((z % GRID) + GRID) % GRID;
+    const col = world[gx];
+    return col && col[gz] ? col[gz] : null;
+  }
+
+  function _brushCellMatchesSeed(cell, seed) {
+    if (!cell || !seed) return false;
+    const cellKind = cell.kind || null;
+    const seedKind = seed.kind || null;
+    if (cellKind !== seedKind) return false;
+    if ((cell.terrain || 'grass') !== (seed.terrain || 'grass')) return false;
+    if ((cell.floors || 0) !== (seed.floors || 0)) return false;
+    if ((cell.terrainFloors || 0) !== (seed.terrainFloors || 0)) return false;
+    if ((cell.buildingType || '') !== (seed.buildingType || '')) return false;
+    return true;
+  }
+
+  function _brushRectCellsFromHits(a, b) {
+    const ac = _brushWorldCoordForHit(a);
+    const bc = _brushWorldCoordForHit(b);
+    if (!ac || !bc) return [];
+    const cells = [];
+    const seen = new Set();
+    const minX = Math.min(ac.x, bc.x), maxX = Math.max(ac.x, bc.x);
+    const minZ = Math.min(ac.z, bc.z), maxZ = Math.max(ac.z, bc.z);
+    function add(x, z) {
+      const key = _brushCellKey(x, z);
+      if (seen.has(key)) return;
+      seen.add(key);
+      cells.push({ x, z });
+    }
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) add(x, z);
+    }
+    return cells;
+  }
+
+  function _brushScatterCells(a, b) {
+    const rect = _brushRectCellsFromHits(a, b);
+    if (!rect.length) return [];
+    const seed = _brushWorldCoordForHit(a) || rect[0];
+    const out = [];
+    const count = rect.length;
+    const density = count <= 4 ? 1 : count <= 16 ? 0.62 : 0.42;
+    rect.forEach(coord => {
+      const n = Math.sin((coord.x * 127.1 + coord.z * 311.7 + seed.x * 17.3 + seed.z * 41.9) * 0.0174532925) * 43758.5453123;
+      const r = n - Math.floor(n);
+      if (r < density) out.push(coord);
+    });
+    if (!out.length && seed) out.push(seed);
+    return out;
+  }
+
+  function _brushFillCells(startHit) {
+    const start = _brushWorldCoordForHit(startHit);
+    if (!start) return [];
+    const seedIntent = _brushCellIntent(start.x, start.z);
+    if (!seedIntent) return [start];
+    const boardX = Math.floor(start.x / GRID);
+    const boardZ = Math.floor(start.z / GRID);
+    const minX = boardX * GRID;
+    const minZ = boardZ * GRID;
+    const maxX = minX + GRID - 1;
+    const maxZ = minZ + GRID - 1;
+    const cells = [];
+    const seen = new Set();
+    const queue = [start];
+    const maxCells = GRID * GRID;
+    while (queue.length && cells.length < maxCells) {
+      const coord = queue.shift();
+      if (coord.x < minX || coord.x > maxX || coord.z < minZ || coord.z > maxZ) continue;
+      const key = _brushCellKey(coord.x, coord.z);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const intent = _brushCellIntent(coord.x, coord.z);
+      if (!_brushCellMatchesSeed(intent, seedIntent)) continue;
+      cells.push(coord);
+      queue.push({ x: coord.x + 1, z: coord.z });
+      queue.push({ x: coord.x - 1, z: coord.z });
+      queue.push({ x: coord.x, z: coord.z + 1 });
+      queue.push({ x: coord.x, z: coord.z - 1 });
+    }
+    return cells;
+  }
+
   function _brushPathCells(a, b, mode) {
     if (!a || !b) return [];
-    const ax = a.x + (a.boardX || 0) * GRID;
-    const az = a.z + (a.boardZ || 0) * GRID;
-    const bx = b.x + (b.boardX || 0) * GRID;
-    const bz = b.z + (b.boardZ || 0) * GRID;
+    if (mode === 'fill') return _brushFillCells(a);
+    if (mode === 'scatter') return _brushScatterCells(a, b);
+    const ac = _brushWorldCoordForHit(a);
+    const bc = _brushWorldCoordForHit(b);
+    if (!ac || !bc) return [];
+    const ax = ac.x;
+    const az = ac.z;
+    const bx = bc.x;
+    const bz = bc.z;
     const cells = [];
     const seen = new Set();
     function add(x, z) {
-      const key = x + ',' + z;
+      const key = _brushCellKey(x, z);
       if (seen.has(key)) return;
       seen.add(key);
       cells.push({ x, z });

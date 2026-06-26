@@ -1708,26 +1708,48 @@
   .brush-mode-toolbar {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(42, 39, 34, 0.12);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65), 0 8px 22px -16px rgba(42, 39, 34, 0.45);
+    gap: 5px;
+    min-height: 40px;
+    padding: 4px 5px 4px 8px;
+    border-radius: 16px;
+    background: rgba(255, 250, 232, 0.9);
+    border: 2px solid rgba(159, 122, 44, 0.36);
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.78),
+      0 4px 0 rgba(110, 81, 27, 0.28),
+      0 14px 28px -18px rgba(42, 39, 34, 0.55);
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
   }
+  .brush-mode-title {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 4px 0 2px;
+    color: #6e511b;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+  }
   .brush-mode-btn {
-    width: 32px;
+    min-width: 58px;
     height: 32px;
-    display: grid;
-    place-items: center;
+    padding: 0 8px 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     border-radius: 10px;
     border: 2px solid #9f7a2c;
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), 0 3px 0 #6e511b, 0 8px 16px -10px rgba(42, 39, 34, 0.55);
     background: linear-gradient(180deg, #fffdf5, #f4e4b6);
     color: #7a5718;
     cursor: pointer;
+    font: 800 11px/1 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    white-space: nowrap;
     transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
   .brush-mode-btn:hover {
@@ -1742,9 +1764,10 @@
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.95), 0 1px 0 #6e511b, 0 6px 14px -12px rgba(42, 39, 34, 0.45);
   }
   .brush-mode-btn svg {
-    width: 17px;
-    height: 17px;
+    width: 16px;
+    height: 16px;
     display: block;
+    flex: 0 0 auto;
     fill: rgba(255, 255, 255, 0.82);
     stroke: currentColor;
     stroke-width: 2.35;
@@ -1752,8 +1775,33 @@
     stroke-linejoin: round;
     filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.65));
   }
+  .brush-mode-btn span {
+    display: inline-block;
+  }
   body.tw-play-mode .brush-mode-toolbar {
     display: none;
+  }
+  @media (max-width: 980px) {
+    .brush-mode-toolbar {
+      gap: 4px;
+      padding: 4px;
+    }
+    .brush-mode-title {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    .brush-mode-btn {
+      min-width: 32px;
+      width: 32px;
+      padding: 0;
+    }
+    .brush-mode-btn span {
+      display: none;
+    }
   }
   .file-input-proxy {
     position: fixed;
