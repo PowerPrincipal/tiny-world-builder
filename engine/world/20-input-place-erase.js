@@ -756,6 +756,13 @@
   function _brushSetMode(mode) {
     if (!_brushModeValid(mode)) mode = 'single';
     _brushMode = mode;
+    // Brush shapes are paint/build modifiers. If the user picks a drag-shape
+    // while still in Select, make the canvas actually paint instead of orbiting
+    // the island under the cursor.
+    if (_brushMode !== 'single' && selectedTool && selectedTool.select && Array.isArray(TOOLS)) {
+      const fallbackPaintTool = TOOLS.find(t => t.id === 'grass') || TOOLS.find(t => t.terrain || t.kind || t.erase);
+      if (fallbackPaintTool && typeof selectTool === 'function') selectTool(fallbackPaintTool);
+    }
     document.querySelectorAll('[data-brush-mode]').forEach(btn => {
       const on = btn.getAttribute('data-brush-mode') === _brushMode;
       btn.classList.toggle('on', on);

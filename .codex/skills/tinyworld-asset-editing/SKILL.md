@@ -192,3 +192,6 @@ open.
 ## Brush visibility
 
 - Brush modes should be discoverable in the dedicated floating `#brush-mode-dock` as well as any compact appbar copy. Both use `data-brush-mode`, so `_brushInitToolbar()` and `_brushSetMode()` update every visible copy together. If users report not seeing Brush, prioritize the floating dock's position/visibility before adding more hidden appbar controls.
+
+
+- Brush shapes are modifiers for the active paint/build tool, not standalone Select actions. If a user chooses Line/Rect/Fill/Scatter while still in Select, auto-switch to a safe paint tool (Grass) so dragging the board starts a holographic brush preview instead of orbiting/spinning the island.
