@@ -188,3 +188,7 @@ selected default grass tile even when it would otherwise be omitted as an empty
 cell, highlight matching child object rows as well as the terrain parent, force
 the selected branch open, and scroll the selected row into view when the panel is
 open.
+
+## Brush visibility
+
+- Brush modes should be discoverable in the dedicated floating `#brush-mode-dock` as well as any compact appbar copy. Both use `data-brush-mode`, so `_brushInitToolbar()` and `_brushSetMode()` update every visible copy together. If users report not seeing Brush, prioritize the floating dock's position/visibility before adding more hidden appbar controls.

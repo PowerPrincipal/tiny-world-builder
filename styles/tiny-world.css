@@ -1705,6 +1705,65 @@
   body.tw-play-mode .btn.build-play-toggle .ic-build { display: none; }
   body.tw-play-mode .btn.build-play-toggle .ic-play { display: block; }
 
+
+  .brush-mode-dock {
+    position: fixed;
+    left: 24px;
+    bottom: 78px;
+    z-index: 15;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    max-width: min(calc(100vw - 48px), 720px);
+    padding: 8px;
+    border-radius: 20px;
+    border: 3px solid rgba(159, 122, 44, 0.62);
+    background: linear-gradient(180deg, rgba(255, 252, 239, 0.98), rgba(245, 224, 166, 0.96));
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.9),
+      0 5px 0 rgba(110, 81, 27, 0.34),
+      0 20px 38px -22px rgba(42, 39, 34, 0.62);
+    backdrop-filter: blur(18px) saturate(165%);
+    -webkit-backdrop-filter: blur(18px) saturate(165%);
+  }
+  .brush-mode-dock-head {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 112px;
+    padding: 2px 4px 2px 6px;
+    color: #5f4516;
+  }
+  .brush-mode-dock-kicker {
+    font-size: 13px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.82);
+  }
+  .brush-mode-dock-help {
+    margin-top: 4px;
+    max-width: 154px;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.16;
+    color: rgba(95, 69, 22, 0.72);
+  }
+  .brush-mode-dock-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  body.tw-play-mode .brush-mode-dock,
+  body.mp-noedit .brush-mode-dock,
+  body.xr-active .brush-mode-dock,
+  body.welcome-launch-open .brush-mode-dock,
+  body.new-world-reveal-open .brush-mode-dock {
+    display: none !important;
+  }
+
   .brush-mode-toolbar {
     display: inline-flex;
     align-items: center;
@@ -1782,6 +1841,27 @@
     display: none;
   }
   @media (max-width: 980px) {
+    .brush-mode-dock {
+      left: 12px;
+      right: 12px;
+      bottom: 78px;
+      max-width: none;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 7px;
+    }
+    .brush-mode-dock::-webkit-scrollbar { display: none; }
+    .brush-mode-dock-head {
+      min-width: 94px;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(255, 252, 239, 0.98), rgba(255, 252, 239, 0.72));
+    }
+    .brush-mode-dock-help {
+      display: none;
+    }
     .brush-mode-toolbar {
       gap: 4px;
       padding: 4px;
@@ -9816,6 +9896,12 @@
       transform: translateX(-50%);
     }
     .controls { left: 6px; width: 36px; }
+    .brush-mode-dock {
+      left: 8px;
+      right: 8px;
+      bottom: 116px;
+    }
+    .brush-mode-dock-kicker { font-size: 11px; }
     .toolbar { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); max-width: calc(100vw - 16px); }
     .tool-group-btn { width: 46px; height: 44px; }
     .tool { width: 44px; height: 44px; }
