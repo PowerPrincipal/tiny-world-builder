@@ -216,6 +216,11 @@
   ],
   "feed": [
     {
+      "ts": "2026-06-27T03:25:33.757Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-27T03-25-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
       "ts": "2026-06-27T02:04:42.923Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-27T02-04-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
@@ -409,12 +414,7 @@
       "ts": "2026-06-24T22:00:00Z",
       "kind": "shipped",
       "text": "Home carousel FIXED + shipped to prod (PR #91) per owner feedback: now shows USER-BUILT community worlds (world_shares via new /api/home-worlds) as a FULL-WIDTH strip directly under the hero (was tinyverse islands in the hero corner). Verified in a real browser. Seeded 4 demo shares; granted owner 5000 Earned GOLD for preview testing. NEXT: 'Share to home' button in builder + repoint template/remix from tinyverse worlds to builder shares."
-    },
-    {
-      "ts": "2026-06-24T21:00:00Z",
-      "kind": "shipped",
-      "text": "ECONOMY GATED PREVIEW LIVE: owner approved a gated preview. Merged all 9 economy slices into the economy-preview branch (clean, 229 tests pass), applied the 6 economy migrations to the live DB (additive/inert for prod), and Netlify deploy-preview-90 is up + verified (/templates + /rewards 200, public templates API works, /api/me/coins 401). Prod/main untouched. Try: https://deploy-preview-90--tiny-world-builder.netlify.app (PR #90)."
     }
   ],
-  "lastTick": "2026-06-27T02:04:42.923Z"
+  "lastTick": "2026-06-27T03:25:33.757Z"
 }
