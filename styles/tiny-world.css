@@ -10543,3 +10543,137 @@ body.surface-roam-fp { cursor: none; }
   pointer-events: none;
   user-select: none;
 }
+
+/* ---- Driver.js onboarding ---- */
+.driver-popover.tinyworld-driver-popover {
+  min-width: 286px;
+  max-width: min(360px, calc(100vw - 28px));
+  padding: 16px 16px 14px;
+  border-radius: 18px;
+  border: 3px solid rgba(159, 122, 44, 0.68);
+  background: linear-gradient(180deg, rgba(255, 252, 239, 0.98), rgba(245, 224, 166, 0.97));
+  color: #5f4516;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 6px 0 rgba(110, 81, 27, 0.34),
+    0 24px 42px -22px rgba(42, 39, 34, 0.72);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
+}
+.driver-popover.tinyworld-driver-popover * {
+  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-title {
+  padding-right: 32px;
+  color: #4f3812;
+  font-family: 'Pixelify Sans', 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  font-size: 21px;
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-description {
+  margin-top: 10px;
+  color: rgba(95, 69, 22, 0.82);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.42;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-close-btn {
+  top: 11px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  color: #7a5718;
+  background: linear-gradient(180deg, #fffdf5, #f4e4b6);
+  border: 2px solid rgba(159, 122, 44, 0.72);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.86), 0 2px 0 rgba(110, 81, 27, 0.30);
+  font: 900 20px/28px 'Space Grotesk', system-ui, -apple-system, sans-serif;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-close-btn:hover,
+.driver-popover.tinyworld-driver-popover .driver-popover-close-btn:focus {
+  color: #3b2b12;
+  background: linear-gradient(180deg, #ffffff, #f8edc9);
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-footer {
+  margin-top: 16px;
+  align-items: center;
+  gap: 10px;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-progress-text {
+  color: rgba(95, 69, 22, 0.66);
+  font-size: 13px;
+  font-weight: 850;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-navigation-btns {
+  gap: 7px;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-footer-btn {
+  min-width: 72px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 2px solid #9f7a2c;
+  background: linear-gradient(180deg, #fffdf5, #f4e4b6);
+  color: #7a5718;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), 0 3px 0 #6e511b, 0 8px 16px -10px rgba(42, 39, 34, 0.55);
+  font: 850 13px/1 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  text-align: center;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-footer-btn:hover,
+.driver-popover.tinyworld-driver-popover .driver-popover-footer-btn:focus {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #ffffff, #f8edc9);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.95), 0 4px 0 #6e511b, 0 12px 18px -12px rgba(42, 39, 34, 0.58);
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-next-btn,
+.driver-popover.tinyworld-driver-popover .driver-popover-done-btn {
+  background: linear-gradient(180deg, #fff3c1, #e8b94d);
+  color: #3b2b12;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-btn-disabled {
+  color: rgba(95, 69, 22, 0.42);
+  filter: saturate(0.72);
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-arrow {
+  border-color: rgba(245, 224, 166, 0.97);
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-arrow-side-left {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-arrow-side-right {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-arrow-side-top {
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.driver-popover.tinyworld-driver-popover .driver-popover-arrow-side-bottom {
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+@media (max-width: 560px) {
+  .driver-popover.tinyworld-driver-popover {
+    min-width: 0;
+    max-width: calc(100vw - 24px);
+    padding: 14px;
+  }
+  .driver-popover.tinyworld-driver-popover .driver-popover-title {
+    font-size: 18px;
+  }
+  .driver-popover.tinyworld-driver-popover .driver-popover-description {
+    font-size: 13px;
+  }
+}
