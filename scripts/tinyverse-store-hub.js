@@ -354,6 +354,7 @@
             '<img class="tv-pack-art" src="' + esc(PACK_ART_URL) + '" alt="" width="280" height="360" decoding="async">' +
             '<span class="tv-pack-title tv-pack-title-top" aria-hidden="true">????</span>' +
             '<span class="tv-pack-title tv-pack-title-mid" aria-hidden="true">????</span>' +
+            '<span class="tv-pack-title tv-pack-title-bot" aria-hidden="true">????</span>' +
           '</div>' +
           '<span class="tv-pack-badge">' + esc(pack.badge) + '</span>' +
           '<span class="tv-pack-cards-label">' + esc(pack.cardsLabel) + '</span>' +
