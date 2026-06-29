@@ -44,7 +44,7 @@ the user is signed in **and** `/api/admin-users?action=tinyverse-access` returns
 Canon Tinyverse entry. Loads:
 
 - `scripts/island-viewer-sequential-generator.js` — one-shot island pull per card
-- `engine/world/26b-random-island-economy-profile.js` — canonical Food/Materials/Commerce/Defense/Charm stats (pack card + island reveal share this module via `window.__buildRandomIslandEconomyProfile`)
+- `engine/world/26b-random-island-economy-profile.js` — canonical Raw Yield economy (`window.__buildIslandRawYieldEconomy`) and Raw Yield-only generated island profile (`window.__buildRandomIslandEconomyProfile`). Pack cards, collection labels, island viewer, and builder reveal all recompute Raw Yield from `world + seed`; card labels read like `Common - Raw Yield 169`, never `gold/day`, and do not append archetype.
 - `scripts/world-preview.js` — isometric preview painted on island card faces
 - `scripts/tinyverse-collectibles.js` — preview GOLD, pack purchase, immutable snapshots
 
@@ -64,7 +64,15 @@ Hub layout (`scripts/tinyverse-store-hub.js`): two-column on wide screens — ma
 pack/collection card left, **Live opens** activity rail right with simulated
 player names + island pulls (preview placeholder until real multiplayer opens).
 Catalog is a single `island-pack` SKU in `scripts/tinyverse-store-catalog.js`.
-Preview GOLD / artifact shop are paused for this release.
+Generated-island card rarity/score/copy is Raw Yield only. Card-facing stats
+and reveal resource rows omit zero values; the economy object can still retain
+zero counts internally, but UI should not print empty resources. Do not put
+archetype, best-use, Food/Materials/Commerce/Defense/Charm stats, `potential`,
+or `gold/day` on card-facing records or reveal UI. Preview GOLD / artifact shop
+are paused for this release.
+Fish is a derived Raw Yield resource: every `terrain: "water"` cell rolls
+`seed + '|fish|' + x + ',' + z` at 25%. Do not write Fish as a generated cell
+kind or persist fish markers into `v:4` saves.
 
 Preview GOLD lives in `tinyworld:tinyverse-gold.v1` (starts at 500). Server GOLD
 can replace this later; do not delete the local path when wiring API spend.
@@ -88,6 +96,9 @@ calls `enter()` after `applyState` is ready.
 
 - Forces play mode; locks build/play toggle (`body.tinyverse-collectible`)
 - Recomputes economy profile from the applied world (`recomputeRandomIslandProfile` in `30-ui-boot-wiring.js`) before `openNewWorldReveal(profile)` so card stats match the rendered island
+- The first visit reveal shows a compact Raw Yield resource card: only nonzero
+  resource rows/groups and nonzero score tiles render, so the card does not need
+  an internal scrollbar.
 - Blocks autosave onto the freeform build slot while active
 - One-way fork: `importToBuildCopy(name)` → new editable draft in My Worlds; never
   write back to the collectible canonical snapshot
