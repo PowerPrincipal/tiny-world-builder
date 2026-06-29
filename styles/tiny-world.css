@@ -3632,8 +3632,9 @@
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type],
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type] {
     border-width: 1px;
+    border-color: color-mix(in srgb, var(--block-outline) 34%, transparent);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.48),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.10),
       inset 0 -2px 0 var(--block-bevel),
       0 2px 5px -3px rgba(0, 0, 0, 0.74);
   }
@@ -3641,8 +3642,9 @@
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type]:hover,
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type]:hover,
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type]:hover {
+    border-color: color-mix(in srgb, var(--block-outline) 44%, transparent);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.56),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.14),
       inset 0 -2px 0 var(--block-bevel),
       0 3px 7px -4px rgba(0, 0, 0, 0.78);
   }
@@ -8490,17 +8492,17 @@
   body.ui-theme-dark .toolbar .tool-group-btn.active,
   body.ui-theme-dark .tool-palette .tool.active,
   body.ui-theme-dark .flyout .tool.flyout-tool.active {
-    --active-outline: #dcecff;
+    --active-outline: rgba(220, 236, 255, 0.38);
     --active-fill: rgba(70, 88, 126, 0.92);
     --active-fill-low: rgba(38, 46, 66, 0.94);
-    --active-ring: rgba(152, 185, 255, 0.58);
+    --active-ring: rgba(152, 185, 255, 0.16);
     --active-bevel: rgba(0, 0, 0, 0.34);
     color: #f4f9ff !important;
     background: linear-gradient(180deg, var(--active-fill), var(--active-fill-low)) !important;
     border-color: var(--active-outline) !important;
     border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.36),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.12),
       inset 0 -3px 0 var(--active-bevel),
       0 0 0 1px var(--active-ring),
       0 10px 20px -12px rgba(0, 0, 0, 0.92) !important;
@@ -8511,7 +8513,8 @@
   body.ui-theme-dark .flyout .tool.flyout-tool.active[data-pos-type="terrain"] {
     --active-fill: rgba(70, 94, 62, 0.92);
     --active-fill-low: rgba(42, 58, 38, 0.96);
-    --active-ring: rgba(164, 225, 112, 0.48);
+    --active-ring: rgba(164, 225, 112, 0.18);
+    --active-outline: rgba(168, 223, 114, 0.36);
   }
   body.ui-theme-dark .toolbar .tool.active[data-pos-type="primary"],
   body.ui-theme-dark .toolbar .tool[aria-pressed="true"][data-pos-type="primary"],
@@ -8520,7 +8523,8 @@
   body.ui-theme-dark .flyout .tool.flyout-tool.active[data-pos-type="primary"] {
     --active-fill: rgba(48, 70, 118, 0.94);
     --active-fill-low: rgba(27, 38, 68, 0.98);
-    --active-ring: rgba(118, 164, 255, 0.54);
+    --active-ring: rgba(118, 164, 255, 0.18);
+    --active-outline: rgba(159, 193, 255, 0.36);
   }
   body.ui-theme-dark .toolbar .tool.active[data-pos-type="tertiary"],
   body.ui-theme-dark .toolbar .tool-group-btn.active[data-pos-type="tertiary"],
@@ -8528,7 +8532,8 @@
   body.ui-theme-dark .flyout .tool.flyout-tool.active[data-pos-type="tertiary"] {
     --active-fill: rgba(112, 72, 35, 0.94);
     --active-fill-low: rgba(66, 41, 24, 0.98);
-    --active-ring: rgba(255, 169, 76, 0.50);
+    --active-ring: rgba(255, 169, 76, 0.18);
+    --active-outline: rgba(255, 194, 110, 0.38);
   }
   body.ui-theme-dark .toolbar .tool.active[data-pos-type="shield"],
   body.ui-theme-dark .toolbar .tool[aria-pressed="true"][data-pos-type="shield"],
@@ -8537,7 +8542,8 @@
   body.ui-theme-dark .flyout .tool.flyout-tool.active[data-pos-type="shield"] {
     --active-fill: rgba(36, 92, 115, 0.94);
     --active-fill-low: rgba(24, 54, 72, 0.98);
-    --active-ring: rgba(77, 218, 255, 0.50);
+    --active-ring: rgba(77, 218, 255, 0.18);
+    --active-outline: rgba(117, 221, 255, 0.36);
   }
   body.ui-theme-dark .toolbar .tool.active .tool-glyph,
   body.ui-theme-dark .toolbar .tool[aria-pressed="true"] .tool-glyph,
@@ -8557,10 +8563,10 @@
   body.ui-theme-dark .flyout .tool.flyout-tool,
   body.ui-theme-dark .tool-palette .tool.flyout-tool {
     color: rgba(230, 237, 249, 0.86) !important;
-    border-color: rgba(220, 232, 255, 0.42) !important;
+    border-color: rgba(220, 232, 255, 0.24) !important;
     border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08),
       inset 0 -2px 0 rgba(0, 0, 0, 0.24),
       0 2px 5px -2px rgba(0, 0, 0, 0.58) !important;
   }
@@ -8571,14 +8577,14 @@
   body.ui-theme-dark .flyout .tool.flyout-tool:hover,
   body.ui-theme-dark .tool-palette .tool.flyout-tool:hover {
     color: #fff !important;
-    border-color: rgba(244, 248, 255, 0.62) !important;
+    border-color: rgba(244, 248, 255, 0.34) !important;
     filter: brightness(1.08);
   }
   body.ui-theme-dark .toolbar .tool[data-pos-type]:not(.active):not([aria-pressed="true"]),
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type]:not(.active) {
-    --block-outline: #dcecff;
+    --block-outline: rgba(220, 236, 255, 0.24);
     --block-dark-bg: rgba(34, 41, 58, 0.88);
     --block-dark-hover-bg: rgba(48, 58, 80, 0.92);
     --block-dark-bevel: rgba(0, 0, 0, 0.24);
@@ -8587,7 +8593,7 @@
     border-color: var(--block-outline) !important;
     border-width: 1px !important;
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.07),
       inset 0 -2px 0 var(--block-dark-bevel),
       0 2px 5px -2px rgba(0, 0, 0, 0.58) !important;
   }
@@ -8596,13 +8602,13 @@
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type]:not(.active):hover,
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type]:not(.active):hover {
     background: var(--block-dark-hover-bg) !important;
-    border-color: var(--block-outline) !important;
+    border-color: color-mix(in srgb, var(--block-outline) 145%, rgba(255, 255, 255, 0.34)) !important;
   }
   body.ui-theme-dark .toolbar .tool[data-pos-type="terrain"]:not(.active):not([aria-pressed="true"]),
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type="terrain"]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type="terrain"]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type="terrain"]:not(.active) {
-    --block-outline: #a8df72;
+    --block-outline: rgba(168, 223, 114, 0.28);
     --block-dark-bg: rgba(51, 72, 42, 0.88);
     --block-dark-hover-bg: rgba(64, 90, 50, 0.92);
   }
@@ -8610,7 +8616,7 @@
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type="primary"]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type="primary"]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type="primary"]:not(.active) {
-    --block-outline: #9fc1ff;
+    --block-outline: rgba(159, 193, 255, 0.28);
     --block-dark-bg: rgba(40, 54, 92, 0.88);
     --block-dark-hover-bg: rgba(50, 70, 118, 0.92);
   }
@@ -8618,7 +8624,7 @@
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type="tertiary"]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type="tertiary"]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type="tertiary"]:not(.active) {
-    --block-outline: #ffc26e;
+    --block-outline: rgba(255, 194, 110, 0.30);
     --block-dark-bg: rgba(88, 56, 30, 0.88);
     --block-dark-hover-bg: rgba(112, 72, 36, 0.92);
   }
@@ -8626,7 +8632,7 @@
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type="shield"]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type="shield"]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type="shield"]:not(.active) {
-    --block-outline: #75ddff;
+    --block-outline: rgba(117, 221, 255, 0.28);
     --block-dark-bg: rgba(30, 72, 92, 0.88);
     --block-dark-hover-bg: rgba(36, 92, 115, 0.92);
   }
@@ -8634,7 +8640,7 @@
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type="neutral"]:not(.active),
   body.ui-theme-dark .tool-palette .tool.flyout-tool[data-pos-type="neutral"]:not(.active),
   body.ui-theme-dark .flyout .tool.flyout-tool[data-pos-type="neutral"]:not(.active) {
-    --block-outline: #dcecff;
+    --block-outline: rgba(220, 236, 255, 0.22);
   }
   body.ui-theme-dark .toolbar .tool[data-pos-type]:not(.active):not([aria-pressed="true"]) .tool-icon,
   body.ui-theme-dark .toolbar .tool-group-btn[data-pos-type]:not(.active) .group-icon,
