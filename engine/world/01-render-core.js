@@ -240,7 +240,7 @@
     saturation: '1.10',
     contrast: '1.08',
     brightness: '1.18',
-    uiTheme: 'auto',
+    uiTheme: 'light',
     shadow: 'balanced',
     lighting: '0.78',
     directionalSun: '1',
@@ -385,7 +385,9 @@
   }
 
   let renderBrightness = storedNumber(RENDER_LS.brightness, parseFloat(RENDER_DEFAULTS.brightness), 0.75, 1.3);
-  let uiThemeMode = ['auto', 'light', 'dark'].includes(localStorage.getItem(RENDER_LS.uiTheme)) ? localStorage.getItem(RENDER_LS.uiTheme) : 'auto';
+  // UI theme is locked to light for now (no auto/dark, no time-of-day flip).
+  let uiThemeMode = 'light';
+  try { localStorage.setItem(RENDER_LS.uiTheme, 'light'); } catch (_) {}
   let renderSaturation = storedNumber(RENDER_LS.saturation, parseFloat(RENDER_DEFAULTS.saturation), 0.8, 1.3);
   let renderContrast = storedNumber(RENDER_LS.contrast, parseFloat(RENDER_DEFAULTS.contrast), 0.85, 1.25);
   let renderShadowQuality = localStorage.getItem(RENDER_LS.shadow) || 'balanced';

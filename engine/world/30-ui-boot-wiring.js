@@ -2920,13 +2920,11 @@ syncTinyworldOwnerToolControls();
       return min >= 1080 || min < 480;
     }
     function applyUiThemeMode() {
-      const mode = ['auto', 'light', 'dark'].includes(uiThemeMode) ? uiThemeMode : 'auto';
-      const afterHours = isUiAfterHours(currentTodMinutes);
-      const dark = mode === 'dark' || (mode === 'auto' && afterHours);
-      document.body.dataset.uiThemeMode = mode;
-      document.body.classList.toggle('ui-theme-dark', dark);
-      document.body.classList.toggle('ui-theme-light', !dark);
-      document.body.classList.toggle('ui-theme-after-hours', afterHours);
+      uiThemeMode = 'light';
+      try { localStorage.setItem(RENDER_LS.uiTheme, 'light'); } catch (_) {}
+      document.body.dataset.uiThemeMode = 'light';
+      document.body.classList.remove('ui-theme-dark', 'ui-theme-after-hours');
+      document.body.classList.add('ui-theme-light');
     }
     window.__applyUiThemeMode = applyUiThemeMode;
     function applyTod(min) {
@@ -3193,12 +3191,10 @@ syncTinyworldOwnerToolControls();
     }, TOD_UK_SYNC_INTERVAL_MS);
     const uiThemeSelect = document.getElementById('ui-theme-mode');
     if (uiThemeSelect) {
-      uiThemeSelect.value = ['auto', 'light', 'dark'].includes(uiThemeMode) ? uiThemeMode : 'auto';
-      uiThemeSelect.addEventListener('change', () => {
-        uiThemeMode = ['auto', 'light', 'dark'].includes(uiThemeSelect.value) ? uiThemeSelect.value : 'auto';
-        try { localStorage.setItem(RENDER_LS.uiTheme, uiThemeMode); } catch (_) {}
-        applyUiThemeMode();
-      });
+      const themeLabel = uiThemeSelect.closest('label');
+      if (themeLabel) themeLabel.hidden = true;
+      uiThemeSelect.disabled = true;
+      uiThemeSelect.value = 'light';
     }
 
     // Invert look (Y axis). A single global boolean read by every mouse-look
