@@ -3179,6 +3179,16 @@ syncTinyworldOwnerToolControls();
       if (window.__tinyworldMode && typeof window.__tinyworldMode.isBuild === 'function') return window.__tinyworldMode.isBuild();
       return !document.body.classList.contains('tw-play-mode');
     }
+    function isTimeElapsingActive() {
+      if (window.__tinyworldIslandViewTimeCycle
+        && typeof window.__tinyworldIslandViewTimeCycle.isIslandViewTimeCycleContext === 'function'
+        && window.__tinyworldIslandViewTimeCycle.isIslandViewTimeCycleContext()) {
+        return true;
+      }
+      if (window.__tinyworldElapsingTimeEnabled === false) return false;
+      if (isBuildTimeEditable() && buildTodManual) return false;
+      return true;
+    }
     function applyTodMinutes(min) {
       todMinutes = clampTodMinutes(min);
       applyTod(todMinutes);
@@ -3217,8 +3227,10 @@ syncTinyworldOwnerToolControls();
       islandViewLastTodTickMs = tNow;
       const elapsed = tNow - islandViewCycleStartMs;
       applyTodMinutes(cycle.islandViewTodMinutesFromElapsed(elapsed));
+      repaintTimeWeatherPopup();
     }
     window.__tinyworldTickIslandViewTime = tickIslandViewTime;
+    window.__tinyworldIsTimeElapsingActive = isTimeElapsingActive;
     function restoreBuildTodIfNeeded() {
       if (!isBuildTimeEditable() || !buildTodManual) return false;
       applyTodMinutes(buildTodMinutes);
@@ -3392,6 +3404,8 @@ syncTinyworldOwnerToolControls();
     if (timeBtn && timePopup) {
       const range = document.getElementById('time-range');
       const readout = document.getElementById('time-readout');
+      const liveClock = document.getElementById('live-time-clock');
+      const liveClockVal = document.getElementById('live-time-clock-val');
       const seasonPills = document.getElementById('season-pills');
       const weatherPills = document.getElementById('weather-pills');
       const intensityRange = document.getElementById('weather-intensity');
@@ -3416,7 +3430,10 @@ syncTinyworldOwnerToolControls();
           && typeof window.__tinyworldIslandViewTimeCycle.isIslandViewTimeCycleContext === 'function'
           && window.__tinyworldIslandViewTimeCycle.isIslandViewTimeCycleContext();
         const liveSuffix = inIslandCycle ? '' : ((!isBuildTimeEditable() || !buildTodManual) ? ' BST' : '');
-        if (readout) readout.textContent = formatTime(todMinutes) + liveSuffix;
+        const clockText = formatTime(todMinutes) + liveSuffix;
+        if (readout) readout.textContent = clockText;
+        if (liveClockVal) liveClockVal.textContent = clockText;
+        if (liveClock) liveClock.hidden = !isTimeElapsingActive();
         if (intensityRange) intensityRange.value = String(Math.round(weatherIntensity * 100));
         if (intensityReadout) intensityReadout.textContent = Math.round(weatherIntensity * 100) + '%';
         if (splashesRange) splashesRange.value = String(Math.round(weatherSplashIntensity * 100));
@@ -3425,6 +3442,7 @@ syncTinyworldOwnerToolControls();
         if (directionalLightReadout) directionalLightReadout.textContent = Math.round(renderDirectionalSun * 100) + '%';
       }
       repaintTimeWeatherPopup = paintReadout;
+      window.__tinyworldSyncLiveTimeClock = paintReadout;
       syncTimeRangeEditability = function () {
         if (!range) return;
         const editable = isBuildTimeEditable();
@@ -3433,6 +3451,7 @@ syncTinyworldOwnerToolControls();
         range.setAttribute('title', editable ? 'Drag to preview a build-mode time' : 'Synced live to UK/BST time in play mode');
       };
       paintPills(); paintReadout();
+      window.addEventListener('tinyworld:feature-flags', paintReadout);
 
       timeBtn.addEventListener('click', e => {
         e.stopPropagation();

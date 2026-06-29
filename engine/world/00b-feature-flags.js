@@ -311,6 +311,9 @@
     twApplyFeatureFlagTools(enabled);
     twApplySettingsSectionFlags(enabled);
     window.__tinyworldElapsingTimeEnabled = !!enabled.elapsingTime;
+    if (typeof window.__tinyworldSyncLiveTimeClock === 'function') {
+      try { window.__tinyworldSyncLiveTimeClock(); } catch (_) {}
+    }
 
     if (enabled.movableMap) {
       const wrap = document.getElementById('minimap-wrap');

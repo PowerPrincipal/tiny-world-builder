@@ -117,6 +117,13 @@
     </button>
   </div>
 
+  <div class="live-time-clock" id="live-time-clock" hidden aria-live="polite" aria-label="Time of day">
+    <span class="live-time-clock-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+    </span>
+    <span class="live-time-clock-val" id="live-time-clock-val">12:00</span>
+  </div>
+
   <label class="sun-strength-control" data-feature-flag="sun-slider" aria-label="Directional sun strength">
     <span>Sun</span>
     <input id="directional-light-strength" type="range" min="0" max="1000" step="5" value="100" />

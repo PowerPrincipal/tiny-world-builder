@@ -19,6 +19,8 @@ test('time of day is editable in Build mode and live UK/BST in Play mode', () =>
   assert.match(bootJs, /range\.disabled = !editable/);
   assert.match(bootJs, /const inIslandCycle = window\.__tinyworldIslandViewTimeCycle/);
   assert.match(bootJs, /const liveSuffix = inIslandCycle \? '' : \(\(!isBuildTimeEditable\(\) \|\| !buildTodManual\) \? ' BST' : ''\)/);
+  assert.match(bootJs, /__tinyworldSyncLiveTimeClock/);
+  assert.match(html, /id="live-time-clock-val"/);
   assert.doesNotMatch(bootJs, /tinyworld:tod\.v1/);
   assert.doesNotMatch(bootJs, /localStorage\.(?:getItem|setItem)\(TOD_LS/);
   assert.match(html, /Time of day/);

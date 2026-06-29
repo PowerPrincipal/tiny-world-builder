@@ -55,3 +55,10 @@ test('builder wires island view cycle module and tick hook', () => {
   assert.match(bootJs, /__tinyworldTickIslandViewTime/);
   assert.match(animateJs, /__tinyworldTickIslandViewTime/);
 });
+
+test('live time clock shows while time is elapsing', () => {
+  assert.match(html, /id="live-time-clock"/);
+  assert.match(bootJs, /function isTimeElapsingActive\(\)/);
+  assert.match(bootJs, /liveClock\.hidden = !isTimeElapsingActive\(\)/);
+  assert.match(bootJs, /repaintTimeWeatherPopup\(\);\s*\n\s*\}\s*\n\s*window\.__tinyworldTickIslandViewTime/);
+});
