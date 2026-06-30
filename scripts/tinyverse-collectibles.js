@@ -186,6 +186,96 @@
     }
   }
 
+  // -------- server persistence (DB-of-record) --------
+  // localStorage stays the fast local mirror; the DB is authoritative. Every
+  // save pushes to /api/collectibles, and on load we hydrate any island the
+  // server has that this device is missing. All of it degrades silently: a
+  // logged-out visitor, a local dev session with no DB, or an offline browser
+  // keeps working entirely against localStorage.
+  const COLLECTIBLES_API = '/api/collectibles';
+  let serverHydrated = false;
+
+  async function accessToken() {
+    const Auth = window.TinyWorldAuth;
+    if (Auth && typeof Auth.getUser === 'function') {
+      try {
+        const user = await Auth.getUser();
+        if (user) {
+          if (typeof user.jwt === 'function') {
+            try { return await user.jwt(); } catch (_) {}
+          }
+          if (user.token && user.token.access_token) return user.token.access_token;
+        }
+      } catch (_) {}
+    }
+    return '';
+  }
+
+  async function authHeaders(extra) {
+    const headers = Object.assign({}, extra || {});
+    const token = await accessToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
+    return { headers, hasToken: !!token };
+  }
+
+  function pushRecordsToServer(records) {
+    const list = (records || []).filter(rec => rec && rec.id && rec.world && Array.isArray(rec.world.cells));
+    if (!list.length) return Promise.resolve(false);
+    return authHeaders({ 'Content-Type': 'application/json' }).then(({ headers, hasToken }) => {
+      if (!hasToken) return false; // not signed in — localStorage only
+      return fetch(COLLECTIBLES_API, {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+        body: JSON.stringify(list.length === 1 ? list[0] : { records: list }),
+      }).then(res => res.ok).catch(() => false);
+    }).catch(() => false);
+  }
+
+  // Pull the server's collection and merge any rows missing locally, then push
+  // any local-only rows up (covers islands opened before sign-in / on another
+  // device). Returns true if the local mirror changed.
+  async function hydrateFromServer(opts) {
+    const force = !!(opts && opts.force);
+    if (serverHydrated && !force) return false;
+    serverHydrated = true;
+    const { headers, hasToken } = await authHeaders();
+    if (!hasToken) return false;
+    let serverRows = [];
+    try {
+      const res = await fetch(COLLECTIBLES_API, { headers, credentials: 'same-origin' });
+      if (!res.ok) return false;
+      serverRows = await res.json();
+    } catch (_) {
+      return false;
+    }
+    if (!Array.isArray(serverRows)) return false;
+
+    const local = list();
+    const localById = new Set(local.map(row => row && row.id));
+    const serverById = new Set(serverRows.map(row => row && row.id));
+
+    // Merge server-only islands into the local mirror.
+    let changed = false;
+    const merged = local.slice();
+    serverRows.forEach(row => {
+      if (row && row.id && !localById.has(row.id) && row.world && Array.isArray(row.world.cells)) {
+        merged.unshift(row);
+        changed = true;
+      }
+    });
+    if (changed) writeJson(COLLECTIBLES_KEY, merged.slice(0, 200));
+
+    // Push local-only islands the server has never seen.
+    const localOnly = local.filter(row => row && row.id && !serverById.has(row.id));
+    if (localOnly.length) pushRecordsToServer(localOnly);
+
+    if (changed && window.TinyverseStoreHub && typeof window.TinyverseStoreHub.refresh === 'function') {
+      try { window.TinyverseStoreHub.refresh(); } catch (_) {}
+    }
+    return changed;
+  }
+
   function getGold() {
     const stored = readJson(GOLD_KEY, null);
     if (stored === null || !Number.isFinite(Number(stored))) {
@@ -271,6 +361,7 @@
     if (idx >= 0) rows[idx] = frozen;
     else rows.unshift(frozen);
     writeJson(COLLECTIBLES_KEY, rows.slice(0, 200));
+    pushRecordsToServer([frozen]);
     return frozen;
   }
 
@@ -558,5 +649,18 @@
     handoffToBuilder,
     consumePendingHandoff,
     randomPackSeed,
+    hydrateFromServer,
+    pushRecordsToServer,
   };
+
+  // Hydrate from the DB once auth is ready, with a fallback poll in case the
+  // auth bootstrap promise is unavailable. Failures are swallowed inside
+  // hydrateFromServer, so this never blocks the local-only experience.
+  function kickoffHydrate() {
+    hydrateFromServer().catch(() => {});
+  }
+  if (window.__tinyworldAuthReady && typeof window.__tinyworldAuthReady.then === 'function') {
+    window.__tinyworldAuthReady.then(kickoffHydrate, kickoffHydrate);
+  }
+  setTimeout(kickoffHydrate, 2500);
 })();
