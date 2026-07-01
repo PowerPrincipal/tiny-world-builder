@@ -73,6 +73,20 @@
     return g;
   }
 
+  function getCylinderGeometryX(radius, height, segments = 12) {
+    const qr = Math.round(radius * 1000) / 1000;
+    const qh = Math.round(height * 100) / 100;
+    const qs = Math.max(6, Math.min(18, Math.round(segments || 12)));
+    const key = 'cylinderX|' + qr + '|' + qh + '|' + qs;
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    const g = new THREE.CylinderGeometry(qr, qr, qh, qs);
+    g.rotateZ(Math.PI / 2);
+    g.userData.cached = true;
+    geomCache.set(key, g);
+    return g;
+  }
+
   function getConeGeometry(radius, height, segments = 8, openEnded = false) {
     const qr = Math.round(radius * 1000) / 1000;
     const qh = Math.round(height * 1000) / 1000;

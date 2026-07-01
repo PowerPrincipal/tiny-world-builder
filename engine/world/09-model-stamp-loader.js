@@ -1312,7 +1312,7 @@
     const topMat = new THREE.MeshLambertMaterial({ color: asset && asset.format === 'obj' ? 0x8aa4b8 : 0x9b8bb8 });
     const base = new THREE.Mesh(getBoxGeometry(0.54, 0.12, 0.54), baseMat);
     base.position.y = 0.06;
-    const body = new THREE.Mesh(new THREE.DodecahedronGeometry(0.30, 0), topMat);
+    const body = new THREE.Mesh(getDodecahedronGeometry(0.30), topMat);
     body.position.y = 0.34;
     body.scale.set(1.06, 0.72, 0.92);
     const cap = new THREE.Mesh(getBoxGeometry(0.34, 0.04, 0.18), M.wallTrim);

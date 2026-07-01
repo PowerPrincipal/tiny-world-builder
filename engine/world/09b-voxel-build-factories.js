@@ -416,7 +416,7 @@
       if (part.kind === 'cylinder') {
         vcylinder(g, Math.max(w, d) / 2, h, x, y, z, mat, part.segments || 8);
       } else if (part.kind === 'cone') {
-        const mesh = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) / 2, h, part.segments || 4), mat);
+        const mesh = new THREE.Mesh(getConeGeometry(Math.max(w, d) / 2, h, part.segments || 4), mat);
         mesh.position.set(x, y, z);
         g.add(mesh);
       } else if (part.kind === 'sphere' || part.kind === 'ellipsoid') {
@@ -2534,7 +2534,7 @@
   }
 
   function makeVoxelLightDecal(width, length, mat, x, y, z, rotationZ = 0) {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, length), mat);
+    const mesh = new THREE.Mesh(getPlaneGeometry(width, length), mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.rotation.z = rotationZ;
     mesh.position.set(x || 0, y || 0.026, z || 0);
@@ -2560,7 +2560,7 @@
       head.position.set(0.02, 0.23, 0.03);
       vbox(head, 0.26, 0.16, 0.22, 0.03, 0.05, 0.04, M.lampMetal, { rx: -0.34 });
       vbox(head, 0.18, 0.10, 0.08, 0.07, 0.04, 0.17, M.lampGlass, { rx: -0.34, noShadow: true });
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.92, 14, 1, true), M.lampCone);
+      const cone = new THREE.Mesh(getConeGeometry(0.34, 0.92, 14, true), M.lampCone);
       cone.position.set(0.08, -0.05, 0.55);
       // ConeGeometry points toward +Y; rotate so the tip sits at the lamp
       // and the wide haze opens forward/down onto the ground.
@@ -2820,7 +2820,7 @@
     const BODY_UPPER_H = 0.17;
     const BODY_Y0 = 0.04;
 
-    const lower = new THREE.Mesh(new THREE.BoxGeometry(BODY_W, BODY_LOWER_H, BODY_L), M_VEHICLE.shell);
+    const lower = new THREE.Mesh(getBoxGeometry(BODY_W, BODY_LOWER_H, BODY_L), M_VEHICLE.shell);
     lower.position.y = BODY_Y0 + BODY_LOWER_H / 2;
     g.add(lower);
 
@@ -2831,19 +2831,19 @@
     upper.position.y = BODY_Y0 + BODY_LOWER_H;
     g.add(upper);
 
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.24, BODY_LOWER_H * 0.52, 0.024), M_VEHICLE.dark);
+    const strip = new THREE.Mesh(getBoxGeometry(0.24, BODY_LOWER_H * 0.52, 0.024), M_VEHICLE.dark);
     strip.position.set(0, BODY_Y0 + BODY_LOWER_H * 0.60, BODY_L / 2 + 0.006);
     g.add(strip);
 
     function addHeadlight(x) {
-      const light = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.045, 0.024), M_VEHICLE.light);
+      const light = new THREE.Mesh(getBoxGeometry(0.10, 0.045, 0.024), M_VEHICLE.light);
       light.position.set(x, BODY_Y0 + 0.07, BODY_L / 2 + 0.012);
       g.add(light);
     }
     addHeadlight(-0.19);
     addHeadlight(0.19);
 
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(BODY_W * 0.96, 0.04, 0.026), M_VEHICLE.dark);
+    const bumper = new THREE.Mesh(getBoxGeometry(BODY_W * 0.96, 0.04, 0.026), M_VEHICLE.dark);
     bumper.position.set(0, BODY_Y0 + 0.02, BODY_L / 2 + 0.012);
     g.add(bumper);
 
@@ -2855,10 +2855,8 @@
     addSideAccent(-1);
     addSideAccent(1);
 
-    const wheelGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.11, 10);
-    wheelGeo.rotateZ(Math.PI / 2);
-    const hubGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.115, 8);
-    hubGeo.rotateZ(Math.PI / 2);
+    const wheelGeo = getCylinderGeometryX(WHEEL_R, 0.11, 10);
+    const hubGeo = getCylinderGeometryX(0.055, 0.115, 8);
     const wx = BODY_W / 2 + 0.035;
     const wz = BODY_L / 2 - 0.20;
 
@@ -2880,7 +2878,7 @@
     const poleX = BODY_W * 0.30;
     const poleZ = -BODY_L * 0.26;
     const poleH = 0.52;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, poleH, 6), M_VEHICLE.pole);
+    const pole = new THREE.Mesh(getCylinderGeometry(0.012, poleH, 6), M_VEHICLE.pole);
     pole.position.set(poleX, poleBaseY + poleH / 2, poleZ);
     g.add(pole);
 
@@ -2900,7 +2898,7 @@
     const flag = new THREE.Mesh(flagGeo, M_VEHICLE.flag);
     flagPivot.add(flag);
 
-    const beacon = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.010, 8, 28), M_VEHICLE.beacon);
+    const beacon = new THREE.Mesh(getTorusGeometry(0.36, 0.010, 8, 28), M_VEHICLE.beacon);
     beacon.position.set(0, BODY_Y0 + BODY_LOWER_H + 0.02, 0);
     beacon.rotation.x = Math.PI / 2;
     g.add(beacon);

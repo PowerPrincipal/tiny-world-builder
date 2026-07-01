@@ -903,7 +903,7 @@
     _brushShapePreviewGroup.userData.previewMaterials = [];
     while (_brushShapePreviewGroup.children.length) {
       const child = _brushShapePreviewGroup.children.pop();
-      if (child.geometry) child.geometry.dispose();
+      if (child.geometry && !(child.userData && child.userData.sharedGeometry)) child.geometry.dispose();
       if (child.parent) child.parent.remove(child);
     }
     mats.forEach(mat => { if (mat && mat.dispose) mat.dispose(); });
@@ -925,11 +925,12 @@
     _brushShapePreviewGroup.userData.previewMaterials = [mat];
     cells.forEach(coord => {
       const display = _brushDisplayPointForWorldCell(coord.x, coord.z, endHit);
-      const geom = new THREE.BoxGeometry(0.92, 0.1, 0.92);
+      const geom = getBoxGeometry(0.92, 0.1, 0.92);
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.copy(display.point);
       mesh.position.y += 0.08;
       mesh.userData.placementPreviewGeometry = true;
+      mesh.userData.sharedGeometry = true;
       _brushShapePreviewGroup.add(mesh);
     });
     _brushShapePreviewGroup.visible = cells.length > 0;

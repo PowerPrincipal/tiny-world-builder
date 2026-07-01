@@ -47,7 +47,7 @@
     const effects = [];
 
     const length = Math.max(0.82, Math.min(1.45, windowH * 4.2));
-    const spill = new THREE.Mesh(new THREE.PlaneGeometry(windowW * 2.8, length), M.windowGroundGlow);
+    const spill = new THREE.Mesh(getPlaneGeometry(windowW * 2.8, length), M.windowGroundGlow);
     spill.rotation.x = -Math.PI / 2;
     spill.rotation.z = Math.atan2(normal.x, normal.z);
     spill.position.set(local.x + normal.x * length * 0.38, 0.032, local.z + normal.z * length * 0.38);

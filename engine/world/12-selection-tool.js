@@ -31,9 +31,10 @@
   function addEdgeStrip(p, y, length, thickness, axis, rotationY = 0) {
     // axis 'x' = aligned along x; 'z' = along z.
     const g = axis === 'x'
-      ? new THREE.BoxGeometry(length, 0.02, thickness)
-      : new THREE.BoxGeometry(thickness, 0.02, length);
+      ? getBoxGeometry(length, 0.02, thickness)
+      : getBoxGeometry(thickness, 0.02, length);
     const m = new THREE.Mesh(g, selectionEdgeMat);
+    m.userData.sharedGeometry = true;
     m.position.set(p.x, y, p.z);
     if (rotationY) m.rotation.y = rotationY;
     m.renderOrder = 999;
@@ -87,35 +88,43 @@
         if (node.geometry) node.geometry.dispose();
       });
     }
-    const shaftGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.58, 10);
-    const coneGeo = new THREE.ConeGeometry(0.075, 0.18, 14);
-    const xShaft = new THREE.Mesh(shaftGeo.clone(), transformGizmoMats.x);
+    const shaftGeo = getCylinderGeometry(0.025, 0.58, 10);
+    const coneGeo = getConeGeometry(0.075, 0.18, 14);
+    const xShaft = new THREE.Mesh(shaftGeo, transformGizmoMats.x);
+    xShaft.userData.sharedGeometry = true;
     xShaft.rotation.z = -Math.PI / 2;
     xShaft.position.x = 0.34;
-    const xCone = new THREE.Mesh(coneGeo.clone(), transformGizmoMats.x);
+    const xCone = new THREE.Mesh(coneGeo, transformGizmoMats.x);
+    xCone.userData.sharedGeometry = true;
     xCone.rotation.z = -Math.PI / 2;
     xCone.position.x = 0.72;
     makeTransformGizmoHandle('move-x', transformGizmoMats.x, [xShaft, xCone]);
 
-    const yShaft = new THREE.Mesh(shaftGeo.clone(), transformGizmoMats.y);
+    const yShaft = new THREE.Mesh(shaftGeo, transformGizmoMats.y);
+    yShaft.userData.sharedGeometry = true;
     yShaft.position.y = 0.34;
-    const yCone = new THREE.Mesh(coneGeo.clone(), transformGizmoMats.y);
+    const yCone = new THREE.Mesh(coneGeo, transformGizmoMats.y);
+    yCone.userData.sharedGeometry = true;
     yCone.position.y = 0.72;
     makeTransformGizmoHandle('move-y', transformGizmoMats.y, [yShaft, yCone]);
 
-    const zShaft = new THREE.Mesh(shaftGeo.clone(), transformGizmoMats.z);
+    const zShaft = new THREE.Mesh(shaftGeo, transformGizmoMats.z);
+    zShaft.userData.sharedGeometry = true;
     zShaft.rotation.x = Math.PI / 2;
     zShaft.position.z = 0.34;
-    const zCone = new THREE.Mesh(coneGeo.clone(), transformGizmoMats.z);
+    const zCone = new THREE.Mesh(coneGeo, transformGizmoMats.z);
+    zCone.userData.sharedGeometry = true;
     zCone.rotation.x = Math.PI / 2;
     zCone.position.z = 0.72;
     makeTransformGizmoHandle('move-z', transformGizmoMats.z, [zShaft, zCone]);
 
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.018, 10, 56), transformGizmoMats.rotate);
+    const ring = new THREE.Mesh(getTorusGeometry(0.62, 0.018, 10, 56), transformGizmoMats.rotate);
+    ring.userData.sharedGeometry = true;
     ring.rotation.x = Math.PI / 2;
     makeTransformGizmoHandle('rotate-y', transformGizmoMats.rotate, [ring]);
 
-    const cube = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), transformGizmoMats.scale);
+    const cube = new THREE.Mesh(getBoxGeometry(0.16, 0.16, 0.16), transformGizmoMats.scale);
+    cube.userData.sharedGeometry = true;
     cube.position.set(0, 0.96, 0);
     makeTransformGizmoHandle('scale', transformGizmoMats.scale, [cube]);
   }
@@ -328,7 +337,8 @@
       const p = island ? editableIslandCellDisplayPoint(island, x, z) : ((bx || bz) ? ghostCellPos(bx, bz, x, z) : tilePos(x, z));
       const selectionRotationY = island ? (island.rotationY || 0) : 0;
       // Translucent fill
-      const fill = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.02, 0.96), selectionMat);
+      const fill = new THREE.Mesh(getBoxGeometry(0.96, 0.02, 0.96), selectionMat);
+      fill.userData.sharedGeometry = true;
       fill.position.set(p.x, y, p.z);
       if (selectionRotationY) fill.rotation.y = selectionRotationY;
       fill.renderOrder = 998;

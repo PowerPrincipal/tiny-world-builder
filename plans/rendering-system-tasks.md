@@ -7,7 +7,7 @@ Source: high-level rendering review, 3D-modeling guidance, and `.codex/skills/ti
 - [x] Document render-layer ownership: parent group, culling, shadows, disposal, picking.
 - [x] Add a shared disposal path for explicitly owned per-instance materials/textures.
 - [x] Add a lightweight static/report check for fresh geometry constructors in hot render factories (`node tools/render-audit.mjs`).
-- [ ] Add a model-stamp import diagnostics overlay/report for triangle count, mesh count, material count, texture count, bounds, and animations.
+- [x] Add a model-stamp import diagnostics report for triangle count, mesh count, material count, texture count, bounds, and animations (`node tools/model-stamp-diagnostics.mjs`).
 
 ## Phase 2 — Terrain and batching
 
@@ -27,6 +27,7 @@ Source: high-level rendering review, 3D-modeling guidance, and `.codex/skills/ti
 
 - Started with low-risk guardrails first: documentation and explicit owned-resource disposal.
 - Added `tools/render-audit.mjs` to report direct `new THREE.*Geometry(...)` usage and flag hot factory candidates.
-- Converted the rock/bridge hot path in `06-history-object-factories.js` to cached geometry helpers.
-- Added cached cone/plane/torus geometry helpers in `03-geometry-materials.js` for future cleanup passes.
+- Converted the rock/bridge hot path in `06-history-object-factories.js`, vehicle/light paths in `09b-voxel-build-factories.js`, and selection/brush preview paths to cached geometry helpers.
+- Added cached cone/plane/torus/X-cylinder geometry helpers in `03-geometry-materials.js` for future cleanup passes.
+- Added `tools/model-stamp-diagnostics.mjs`; current scan flags very heavy people GLBs and the stunt-plane authored bounds.
 - Terrain-bake defaulting is intentionally deferred until the merge path is chunked; the existing synchronous path can warn above 50ms.
