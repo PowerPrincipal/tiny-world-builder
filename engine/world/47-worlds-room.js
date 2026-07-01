@@ -772,7 +772,7 @@ function computeTaxCooldown(lastTaxChangeAt) {
 
     let lastStepAt = 0;
     function step(dx, dz) {
-      if (selfEnt && (selfEnt._traveling || selfEnt._climb || selfEnt._skyfall || selfEnt._srActive)) return;   // no grid move mid-portal/climb/freefall/surface-roam
+      if (selfEnt && (selfEnt._traveling || selfEnt._climb || selfEnt._srActive)) return;   // no grid move mid-portal/climb/surface-roam
       const now = Date.now();
       // Pace hold-to-move to the GLIDE, not a magic number. The avatar tweens one
       // tile (1 unit) at VOXEL_WALK_SPEED u/s, so a tile takes ~1000/VOXEL_WALK_SPEED ms.
@@ -939,223 +939,9 @@ function tryEnterGate() {
       if (!ok) selfEnt._traveling = false;
     }
 
-    // ---- skyfall: walk off the floating-island edge -> freefall -> fly through rings -> earn
-    // a parachute. The PURE physics/course sim lives in 60-skyfall.js; THIS wires it to the
-    // live avatar: posture (53 skydive/parachute + setBodyPitch — 47 owns pitch+Y, the rig
-    // state poses limbs), torus ring meshes, continuous WASD steering, camera Y-follow, a small
-    // HUD, and a safe landing back on the lobby. LOCAL-SELF only (peers see your grid cell
-    // freeze until you land; full peer-sync of the fall is a follow-up — `move` carries x,z).
-    // Feel knobs (fall speed, steer, ring spacing, earn threshold) live in 60-skyfall CFG.
-    const skyKeys = { up: 0, down: 0, left: 0, right: 0, thrust: 0 };
-    let skyRingMeshes = [];
-    let skyHudEl = null;
-    let skyYaw = 0;                          // chase-cam + steering frame = the launch heading
-    const SKY_DIVE_BODY_PITCH = -1.52;       // belly-to-earth, readable from the chase cam
-    const skySteerVec = { x: 0, z: 0, thrust: false };
-    function resetSkyKeys() { skyKeys.up = 0; skyKeys.down = 0; skyKeys.left = 0; skyKeys.right = 0; skyKeys.thrust = 0; }
-    function skyAngleLerp(a, b, t) {
-      const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
-      return a + d * Math.max(0, Math.min(1, t));
-    }
-    function skyActiveRing(sim, st) {
-      if (!sim || !sim.rings || !sim.rings.length) return null;
-      const y = st && typeof st.y === 'number' ? st.y : 9999;
-      for (const rg of sim.rings) {
-        if (rg.passed || rg.missed) continue;
-        if (y >= rg.y - Math.max(1.0, rg.r * 0.6)) return rg;
-      }
-      for (const rg of sim.rings) {
-        if (!rg.passed && !rg.missed) return rg;
-      }
-      return null;
-    }
-    function skyDesiredYaw(sim, st) {
-      st = st || (sim && sim.state);
-      if (!st) return skyYaw;
-      const rg = skyActiveRing(sim, st);
-      if (rg) {
-        const dx = rg.x - st.x, dz = rg.z - st.z;
-        if (Math.hypot(dx, dz) > 0.08) return Math.atan2(dx, dz);
-      }
-      const hs = Math.hypot(st.vx || 0, st.vz || 0);
-      return hs > 0.12 ? Math.atan2(st.vx, st.vz) : skyYaw;
-    }
-    // Steering is CAMERA-RELATIVE (the 3rd-person cam sits behind skyYaw): W/up = forward
-    // (away from the camera, toward the active ring), S = back toward camera, A/D = strafe.
-    // The avatar faces skyYaw so the camera always sees its back. Reuses skySteerVec.
-    function skySteer() {
-      const fx = Math.sin(skyYaw), fz = Math.cos(skyYaw);    // forward (heading convention)
-      const rxp = Math.cos(skyYaw), rzp = -Math.sin(skyYaw); // right = forward rotated -90deg
-      let f = 0, s = 0;
-      if (skyKeys.up) f += 1;
-      if (skyKeys.down) f -= 1;
-      if (skyKeys.right) s += 1;
-      if (skyKeys.left) s -= 1;
-      let x = fx * f + rxp * s, z = fz * f + rzp * s;
-      const d = Math.hypot(x, z); if (d > 1) { x /= d; z /= d; }
-      skySteerVec.x = x; skySteerVec.z = z;
-      return skySteerVec;
-    }
-    // 3rd-person chase camera: sit BEHIND + above the falling avatar, looking forward+down so
-    // the rings below stay in frame. Bypasses the orbit updateCamera while _skyfall is active.
-    function updateSkyfallCamera() {
-      if (!selfEnt || !selfEnt.sprite || typeof camera === 'undefined' || !camera) return;
-      const sp = selfEnt.sprite.position;
-      const sim = selfEnt._skyfall;
-      const st = sim && sim.state;
-      const rg = skyActiveRing(sim, st);
-      const fx = Math.sin(skyYaw), fz = Math.cos(skyYaw);
-      // A falling chase cam must look DOWN from ABOVE (not horizontally), or it buries in the
-      // island's edge wall and the void/rings below never show. Sit high + slightly behind and
-      // aim steeply down past the avatar to the rings below; the island recedes up out of frame
-      // as you drop. (Tunables: BACK behind, UP height, AHEAD/DOWN where the gaze lands.)
-      const BACK = 5.4, UP = 6.0, AHEAD = 1.5, DOWN = 7.0;
-      let lx = sp.x + fx * AHEAD, ly = sp.y - DOWN, lz = sp.z + fz * AHEAD;
-      if (rg) {
-        lx = sp.x * 0.35 + rg.x * 0.65;
-        ly = Math.min(sp.y - 4.0, rg.y);
-        lz = sp.z * 0.35 + rg.z * 0.65;
-      }
-      camera.up.set(0, 1, 0);
-      camera.position.set(sp.x - fx * BACK, sp.y + UP, sp.z - fz * BACK);
-      camera.lookAt(lx, ly, lz);
-      camera.updateMatrixWorld();
-    }
-    function startSkyfall(dx, dz) {
-      // RETIRED: the walk-off-the-edge freefall (and its rings) is disabled — islands have
-      // solid edges now and descent is via stargate. Sim/ring code below is kept but unreachable.
-      return false;
-      // eslint-disable-next-line no-unreachable
-      const SF = window.__tinyworldSkyfall;
-      if (!SF || typeof SF.createSim !== 'function') return false;
-      if (!selfEnt || !selfEnt.sprite || selfEnt._skyfall) return false;
-      const p = selfEnt.sprite.position;
-      // Launch OFF the edge: aim along the step direction and start the fall already pushed
-      // ~1.3 cells PAST the rim so the body clears the island and drops in open air (was
-      // starting on the edge tile and dropping straight down -> "falls through the island").
-      skyYaw = (dx || dz) ? Math.atan2(dx, dz) : ((selfEnt.voxel && selfEnt.voxel._heading) || 0);
-      resetSkyKeys();
-      const OUT = 1.3;
-      const sx = p.x + dx * OUT, sz = p.z + dz * OUT;
-      const seed = ((you.x * 73856093) ^ (you.z * 19349663) ^ (Date.now() & 0xffff)) >>> 0;
-      const sim = SF.createSim({ x: sx, y: p.y, z: sz, seed, dirX: dx, dirZ: dz });
-      if (sim.rings && sim.rings[0]) skyYaw = Math.atan2(sim.rings[0].x - sx, sim.rings[0].z - sz);
-      selfEnt._skyfall = sim;
-      if (selfEnt.voxel) {
-        selfEnt.voxel.setBodyPitch(SKY_DIVE_BODY_PITCH);  // belly-to-earth (controller owns pitch)
-        selfEnt.voxel.setHeading(skyYaw);                 // face forward; the chase cam sees the back
-        selfEnt.voxel.setState('skydive');
-      }
-      // Reveal the LANDSCAPE below (the poser-surface islands attach to the shared worldGroup
-      // at y=-60) so the player falls toward real terrain, not empty void.
-      const PS = window.__tinyworldPoserSurface;
-      if (PS) { try { if (typeof PS.build === 'function') PS.build(); if (typeof PS.show === 'function') PS.show(); } catch (_) {} }
-      buildSkyRings(sim);
-      skyHud(0, sim.cfg.ringCount, false, false);
-      toast('Freefall! Fly through the rings to earn a rocket pack.');
-      return true;
-    }
-    function buildSkyRings(sim) {
-      disposeSkyRings();
-      const parent = selfEnt && selfEnt.sprite && selfEnt.sprite.parent;
-      if (!parent || typeof THREE === 'undefined') return;
-      for (const rg of sim.rings) {
-        const geo = new THREE.TorusGeometry(rg.r, sim.cfg.ringTube, 8, 28);
-        const mat = new THREE.MeshStandardMaterial({ color: 0x49d6ff, emissive: 0x113344, roughness: 0.5, metalness: 0.1 });
-        const m = new THREE.Mesh(geo, mat);
-        m.position.set(rg.x, rg.y, rg.z);
-        m.rotation.x = Math.PI / 2;            // lay the ring flat so you fall through the hole
-        m.userData.ring = rg;
-        m.userData.skyState = 'live';
-        parent.add(m);
-        skyRingMeshes.push(m);
-      }
-    }
-    function refreshSkyRings() {
-      for (const m of skyRingMeshes) {
-        const rg = m.userData.ring;
-        const next = rg && rg.passed ? 'passed' : (rg && rg.missed ? 'missed' : 'live');
-        if (next === m.userData.skyState || !m.material || !m.material.color) continue;
-        m.userData.skyState = next;
-        if (next === 'passed') {
-          m.material.color.setHex(0x46e36b); m.material.emissive.setHex(0x0a3315);   // passed -> green
-        } else if (next === 'missed') {
-          m.material.color.setHex(0xff8d4a); m.material.emissive.setHex(0x331206);   // missed -> orange
-        } else {
-          m.material.color.setHex(0x49d6ff); m.material.emissive.setHex(0x113344);
-        }
-      }
-    }
-    function disposeSkyRings() {
-      for (const m of skyRingMeshes) {
-        if (m.parent) m.parent.remove(m);
-        try { m.geometry.dispose(); m.material.dispose(); } catch (_) {}
-      }
-      skyRingMeshes = [];
-    }
-    function stepSkyfall(ent, dt) {
-      const sim = ent._skyfall; if (!sim) return;
-      skyYaw = skyAngleLerp(skyYaw, skyDesiredYaw(sim, sim.state), (dt || 0) * 3.2);
-      const steer = skySteer(); steer.thrust = !!skyKeys.thrust;   // SPACE fires the rocket pack
-      const st = sim.tick(dt, steer);
-      skyYaw = skyAngleLerp(skyYaw, skyDesiredYaw(sim, st), (dt || 0) * 4.0);
-      ent.sprite.position.set(st.x, st.y, st.z);
-      if (ent.voxel) {
-        if (st.rocket && typeof ent.voxel.getState === 'function' && ent.voxel.getState() !== 'rocket') {
-          ent.voxel.setBodyPitch(0); ent.voxel.setState('rocket');   // rocket pack: upright stance
-          if (typeof ent.voxel.setRocketVisible === 'function') ent.voxel.setRocketVisible(true);  // show the pack
-        }
-        if (typeof ent.voxel.setThrusting === 'function') ent.voxel.setThrusting(!!st.thrusting);  // flames on thrust
-        ent.voxel.setHeading(skyYaw);                     // stay facing forward (back to the chase cam)
-      }
-      refreshSkyRings();
-      skyHud(st.ringsPassed, sim.cfg.ringCount, st.rocket, st.thrusting, st.fuel / sim.cfg.fuel);
-      if (st.done) endSkyfall(ent);
-    }
-    function endSkyfall(ent) {
-      const sim = ent._skyfall; ent._skyfall = null;
-      resetSkyKeys();
-      disposeSkyRings();
-      const PS = window.__tinyworldPoserSurface;
-      if (PS && typeof PS.hide === 'function') { try { PS.hide(); } catch (_) {} }   // hide the landscape again
-      if (ent.voxel) {
-        ent.voxel.setBodyPitch(0); ent.voxel.setState('idle');
-        if (typeof ent.voxel.setThrusting === 'function') ent.voxel.setThrusting(false);
-        if (typeof ent.voxel.setRocketVisible === 'function') ent.voxel.setRocketVisible(false);
-      }
-      // settle back onto the lobby: clamp to the nearest standable cell to the step-off point.
-      let cx = Math.max(0, Math.min(gridSize - 1, you.x));
-      let cz = Math.max(0, Math.min(gridSize - 1, you.z));
-      if (!standable(cx, cz)) { cx = (gridSize / 2) | 0; cz = (gridSize / 2) | 0; }
-      you.x = cx; you.z = cz;
-      moveEntity(ent, cx, cz);
-      try { send({ type: 'move', x: cx, z: cz }); } catch (_) {}
-      emit('you', you); if (typeof drawMinimap === 'function') drawMinimap();
-      const earned = sim && sim.state && sim.state.rocket;
-      toast(earned ? 'Landed with a rocket pack!' : 'Landed.');
-      skyHudHide();
-    }
-    function skyHud(passed, total, rocket, thrusting, fuelFrac) {
-      if (typeof document === 'undefined') return;
-      if (!skyHudEl) {
-        skyHudEl = document.createElement('div');
-        skyHudEl.id = 'tw-skyfall-hud';
-        skyHudEl.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:96;' +
-          "font:700 13px 'Pixelify Sans',ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#eaf4ff;" +
-          'background:rgba(8,14,26,.72);padding:8px 14px;border-radius:8px;box-shadow:inset 0 0 0 2px #2b59d6;text-transform:uppercase';
-        document.body.appendChild(skyHudEl);
-      }
-      skyHudEl.style.display = '';
-      if (rocket) {
-        const pct = Math.max(0, Math.round((fuelFrac || 0) * 100));
-        skyHudEl.textContent = pct > 0
-          ? ('ROCKET PACK  ·  HOLD SPACE TO THRUST  ·  FUEL ' + pct + '%' + (thrusting ? '  ·  THRUSTING' : ''))
-          : 'ROCKET PACK  ·  FUEL EMPTY';
-      } else {
-        skyHudEl.textContent = 'RINGS ' + passed + '/' + total + '  ·  ' + Math.max(0, total - passed) + ' MORE FOR A ROCKET PACK';
-      }
-    }
-    function skyHudHide() { if (skyHudEl) skyHudEl.style.display = 'none'; }
+    // ---- skyfall (RETIRED): walk-off-edge freefall was disabled — islands
+    // have solid edges and descent is via stargate. All skyfall code removed.
+
 
     // ---- surface roam: descended free movement on the poser surface --------
     // Activated when fly-down (54) is fully descended and not in skyfall.
@@ -1830,7 +1616,7 @@ function tryEnterGate() {
     let _focusRaf = null;
     WS.focusPlayer = function (id) {
       if (!connected || !window.__tinyworldInWorldRoom) { toast('Enter a world to focus a player'); return false; }
-      if (selfEnt && (selfEnt._skyfall || selfEnt._srActive || selfEnt._traveling)) { toast('Cannot focus a player right now'); return false; }
+      if (selfEnt && (selfEnt._srActive || selfEnt._traveling)) { toast('Cannot focus a player right now'); return false; }
       const ent = (id != null && id === myId) ? selfEnt : peerEnts.get(id);
       if (!ent || !ent.sprite || !_focusTmp || typeof target === 'undefined' || !target) { toast('That player is not in view'); return false; }
       if (_focusRaf) { cancelAnimationFrame(_focusRaf); _focusRaf = null; }
@@ -1880,16 +1666,6 @@ function tryEnterGate() {
         const L = findLadder();
         if (L && ladderEnterable(L) && enterClimb(L)) { climbDir = 1; e.preventDefault(); return; }
       }
-      // ---- freefall steering (LOCAL-SELF): WASD/arrows steer the skydive; no grid steps ----
-      if (selfEnt && selfEnt._skyfall) {
-        if (k === 'arrowup' || k === 'w') skyKeys.up = 1;
-        else if (k === 'arrowdown' || k === 's') skyKeys.down = 1;
-        else if (k === 'arrowleft' || k === 'a') skyKeys.left = 1;
-        else if (k === 'arrowright' || k === 'd') skyKeys.right = 1;
-        else if (k === ' ' || k === 'spacebar') skyKeys.thrust = 1;   // fire the rocket pack (once earned)
-        else return;
-        e.preventDefault(); return;
-      }
       // Movement is relative to the camera/player view (his up/down/left/right).
       if (k === 'arrowup' || k === 'w') { cancelWalk(); const [x, z] = worldStepFromScreen(0, 1); step(x, z); }
       else if (k === 'arrowdown' || k === 's') { cancelWalk(); const [x, z] = worldStepFromScreen(0, -1); step(x, z); }
@@ -1915,13 +1691,6 @@ function tryEnterGate() {
       // releasing the climb keys stops vertical motion -> the rig holds a static hang pose.
       const ku = e.key.toLowerCase();
       if (selfEnt && selfEnt._climb && (ku === 'w' || ku === 's' || ku === 'arrowup' || ku === 'arrowdown')) climbDir = 0;
-      if (selfEnt && selfEnt._skyfall) {
-        if (ku === 'arrowup' || ku === 'w') skyKeys.up = 0;
-        else if (ku === 'arrowdown' || ku === 's') skyKeys.down = 0;
-        else if (ku === 'arrowleft' || ku === 'a') skyKeys.left = 0;
-        else if (ku === 'arrowright' || ku === 'd') skyKeys.right = 0;
-        else if (ku === ' ' || ku === 'spacebar') skyKeys.thrust = 0;
-      }
     }
     function bindInput() { window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKeyUp); }
     function unbindInput() { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp); }
@@ -2722,7 +2491,6 @@ function tryEnterGate() {
       // ---- climb mode (LOCAL-SELF only): owns position.y + the 'climb' rig pose, and
       // short-circuits the grid tween/state logic below so it can't yank the avatar back
       // to its base tile while it's on the ladder. ----
-      if (ent === selfEnt && ent._skyfall) { stepSkyfall(ent, dt); updateBubble(ent); return; }
       if (ent === selfEnt && ent._srActive) { _srStep(dt); updateBubble(ent); return; }
       if (ent === selfEnt && ent._climb) { stepClimb(ent, dt); updateBubble(ent); return; }
       // portal travel (LOCAL-SELF): 56's travel() owns the avatar's position + pose during
@@ -2791,8 +2559,6 @@ function tryEnterGate() {
       // Freefall takes over the local avatar regardless of render type (voxel/sprite/strip),
       // so dispatch it HERE — not inside animVoxel, which only runs for voxel avatars and
       // would leave a sprite-avatar skyfall frozen (HUD up, no fall). Posture is voxel-only
-      // (stepSkyfall guards on ent.voxel); a sprite avatar still falls + threads rings.
-      if (ent === selfEnt && ent._skyfall) { stepSkyfall(ent, dt); updateBubble(ent); return; }
       if (ent === selfEnt && ent._srActive) { _srStep(dt); updateBubble(ent); return; }
       if (ent.voxel) { animVoxel(ent, dt); return; }
       if (ent.strip) { animStrip(ent, dt); return; }
@@ -2823,14 +2589,6 @@ function tryEnterGate() {
     function updateAvatarCameraOrbit(dt) {
       if (!selfEnt || !selfEnt.sprite) return;
       if (window.__flightActive) return;
-      // Freefall: hand the camera to the 3rd-person chase rig (behind + above the avatar).
-      if (selfEnt._skyfall) {
-        if (typeof target !== 'undefined' && target) {     // keep the orbit target sane for landing
-          target.x = selfEnt.sprite.position.x; target.z = selfEnt.sprite.position.z; target.y = 0;
-        }
-        updateSkyfallCamera();
-        return;
-      }
       // Surface roam: use the drag-look chase cam.
       if (selfEnt._srActive) {
         _srUpdateCamera();
@@ -2959,9 +2717,7 @@ function tryEnterGate() {
     }
     function stopAvatars() {
       if (avatarRaf) { cancelAnimationFrame(avatarRaf); avatarRaf = null; }
-      disposeSkyRings(); skyHudHide();
       try { const PS = window.__tinyworldPoserSurface; if (PS && PS.hide) PS.hide(); } catch (_) {}
-      skyKeys.up = skyKeys.down = skyKeys.left = skyKeys.right = skyKeys.thrust = 0;
       if (_srActive) { _srUnbindInput(); _srHideHud(); _srActive = false; window.__tinyworldSurfaceRoamActive = false; document.body.classList.remove('surface-roam-active'); }
       disposeEntity(selfEnt); selfEnt = null;
       peerEnts.forEach((e) => disposeEntity(e)); peerEnts.clear();
