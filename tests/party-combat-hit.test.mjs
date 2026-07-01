@@ -34,14 +34,19 @@ function worldSetup() {
   );
   // onConnect auto-admits as observer in a world room
   const connect = (id) => { const c = room.addConn(id); party.onConnect(c); return c; };
-  return { room, party, connect };
+  // combat.hit only relays between peers who are actually flying (a fresh
+  // entity active:true), so tests mark both parties airborne first.
+  const fly = (conn) => party.onWorldMessage(
+    { type: 'entity', kind: 'plane', active: true, p: { x: 0, y: 10, z: 0 }, r: { x: 0, y: 0, z: 0 } }, conn);
+  return { room, party, connect, fly };
 }
 
 test('combat.hit routes to only the targeted peer via world path, stamped from sender', () => {
-  const { party, connect } = worldSetup();
+  const { party, connect, fly } = worldSetup();
   const a = connect('a');
   const b = connect('b');
   const c = connect('c');
+  fly(a); fly(b);
   a.received.length = 0; b.received.length = 0; c.received.length = 0;
 
   party.onWorldMessage({
@@ -62,9 +67,10 @@ test('combat.hit routes to only the targeted peer via world path, stamped from s
 });
 
 test('combat.hit damage is clamped to a sane non-negative range', () => {
-  const { party, connect } = worldSetup();
+  const { party, connect, fly } = worldSetup();
   const a = connect('a');
   const b = connect('b');
+  fly(a); fly(b);
   b.received.length = 0;
 
   party.onWorldMessage({ type: 'combat.hit', to: 'b', damage: -50, source: 'gun' }, a);
@@ -73,13 +79,40 @@ test('combat.hit damage is clamped to a sane non-negative range', () => {
   const hits = b.received.filter(m => m.type === 'combat.hit');
   assert.equal(hits.length, 2);
   assert.equal(hits[0].damage, 0, 'negative damage clamps to 0');
-  assert.equal(hits[1].damage, 10000, 'damage is capped');
+  assert.equal(hits[1].damage, 50, 'damage is capped near the strongest legit weapon (~35), not 10000');
+});
+
+test('combat.hit from or to a peer who is not flying is dropped', () => {
+  const { party, connect, fly } = worldSetup();
+  const a = connect('a');
+  const b = connect('b');
+  b.received.length = 0;
+
+  // Neither flying: a drive-by socket cannot damage anyone.
+  party.onWorldMessage({ type: 'combat.hit', to: 'b', damage: 8, source: 'gun' }, a);
+  assert.equal(b.received.filter(m => m.type === 'combat.hit').length, 0, 'grounded shooter is dropped');
+
+  // Shooter flying, victim grounded: still dropped (no strafing walkers).
+  fly(a);
+  party.onWorldMessage({ type: 'combat.hit', to: 'b', damage: 8, source: 'gun' }, a);
+  assert.equal(b.received.filter(m => m.type === 'combat.hit').length, 0, 'grounded victim is dropped');
+
+  // Both flying: relayed.
+  fly(b);
+  party.onWorldMessage({ type: 'combat.hit', to: 'b', damage: 8, source: 'gun' }, a);
+  assert.equal(b.received.filter(m => m.type === 'combat.hit').length, 1, 'airborne pair relays');
+
+  // Shooter lands (entity active:false): dropped again.
+  party.onWorldMessage({ type: 'entity', kind: 'plane', active: false, p: { x: 0, y: 0, z: 0 }, r: { x: 0, y: 0, z: 0 } }, a);
+  party.onWorldMessage({ type: 'combat.hit', to: 'b', damage: 8, source: 'gun' }, a);
+  assert.equal(b.received.filter(m => m.type === 'combat.hit').length, 1, 'landing revokes combat eligibility');
 });
 
 test('combat.hit to a non-admitted target is dropped', () => {
-  const { party, connect } = worldSetup();
+  const { party, connect, fly } = worldSetup();
   const a = connect('a');
   const b = connect('b');
+  fly(a); fly(b);
   b.received.length = 0;
 
   party.onWorldMessage({ type: 'combat.hit', to: 'ghost-peer', damage: 8, source: 'gun' }, a);
@@ -102,9 +135,10 @@ test('non-admitted sender combat.hit is ignored', () => {
 // room actually reaches this handler through the real entry point, the same regression
 // shape as the 'entity' relay fix.
 test('combat.hit sent through onMessage routes into the world relay (regression: handler must be reachable)', () => {
-  const { party, connect } = worldSetup();
+  const { party, connect, fly } = worldSetup();
   const a = connect('a');
   const b = connect('b');
+  fly(a); fly(b);
   a.received.length = 0; b.received.length = 0;
 
   party.onMessage(JSON.stringify({ type: 'combat.hit', to: 'b', damage: 8, source: 'gun' }), a);

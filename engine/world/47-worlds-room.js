@@ -473,6 +473,14 @@ function computeTaxCooldown(lastTaxChangeAt) {
           // world-room onWorldMessage entity branch (added to party/index.js).
           _applyRemoteEntity(d);
           break;
+        case 'combat.hit':
+          // Damage relayed to us as the victim (server delivers only to the
+          // target's socket, but keep the d.to guard as defense-in-depth to
+          // match 38-multiplayer-partykit's handling of the same message).
+          if (d.to === myId && window.__flightCombat && typeof window.__flightCombat.onIncomingHit === 'function') {
+            window.__flightCombat.onIncomingHit(d);
+          }
+          break;
         default: break;
       }
     }

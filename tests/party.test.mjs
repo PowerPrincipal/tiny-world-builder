@@ -443,6 +443,9 @@ test('combat.hit routes only to the targeted peer, stamped with shooter id', () 
   const b = connect('peerB');
   send(host, { type: 'setRole', id: 'peerA', role: 'player' });
   send(host, { type: 'setRole', id: 'peerB', role: 'player' });
+  // Both must be airborne: combat.hit only relays between actively flying peers.
+  send(a, { type: 'entity', kind: 'plane', active: true, p: { x: 0, y: 10, z: 0 }, r: { x: 0, y: 0, z: 0 } });
+  send(b, { type: 'entity', kind: 'plane', active: true, p: { x: 4, y: 10, z: 4 }, r: { x: 0, y: 0, z: 0 } });
   // peerA shoots peerB
   a.received.length = 0; b.received.length = 0; host.received.length = 0;
   send(a, { type: 'combat.hit', to: 'peerB', damage: 8, source: 'gun' });

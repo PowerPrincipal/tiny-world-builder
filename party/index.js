@@ -75,6 +75,9 @@ const RATE_LIMITS = {
   // Combat hit reports: gun bursts ~9/s, two muzzles, plus missiles. Generous
   // sustained cap, bounded burst, so a socket cannot flood a victim.
   'combat.hit': { refill: 30, burst: 60 },
+  // Owner-lock HMAC claim: a one-shot handshake per connection, but verifying
+  // runs WebCrypto — bucket it so a raw socket cannot use it as CPU DoS.
+  'control.claim': { refill: 1, burst: 3 },
   // Worlds MMO: one-cell movement (human walking cadence), harvest actions, and
   // the one-shot join handshake. A raw socket cannot flood past these.
   move: { refill: 8, burst: 12 },
@@ -89,6 +92,13 @@ const RATE_LIMITS = {
 // Server-side allowlist for chat emotes (client EMOTES table in 47-worlds-room.js
 // must stay in sync). Anything not in this set is rejected — no spoofed states.
 export const EMOTE_CMDS = new Set(['wave', 'dance', 'jump', 'sit', 'crouch', 'attack']);
+
+// Server-side ceiling on a single combat.hit damage claim. The strongest
+// legit weapon (missile) deals ~35; anything above this is a spoofed client.
+const COMBAT_MAX_DAMAGE = 50;
+// A peer counts as "flying" for combat routing if an entity active:true frame
+// arrived within this window (client streams ~15/s while airborne).
+const COMBAT_FLIGHT_FRESH_MS = 10000;
 
 function takeToken(buckets, type, now) {
   const cfg = RATE_LIMITS[type];
@@ -729,6 +739,10 @@ export default class TinyWorldParty {
     this.interestVisible = new Map(); // connId -> Set of visible peer ids (for buildInterestSnapshot)
     // sender.id -> Map(type -> token bucket). Per-connection rate limit state.
     this.rateLimits = new Map();
+    // id -> last ms an entity active:true frame arrived. combat.hit is only
+    // relayed between peers who are actually flying (fresh entry here), so a
+    // drive-by socket cannot damage pilots without flying itself.
+    this.flightActive = new Map();
     // The first connection becomes host. Only host messages (admit/decline/
     // kick/setRole) are honored.
     this.hostId = null;
@@ -1062,11 +1076,14 @@ export default class TinyWorldParty {
       if (!this.admitted.has(sender.id)) return;
       const kind = cleanText(data.kind, 24);
       if (kind !== 'plane') return;
+      const active = data.active !== false;
+      if (active) this.flightActive.set(sender.id, Date.now());
+      else this.flightActive.delete(sender.id);
       this.broadcastToAdmitted({
         type: 'entity',
         kind: 'plane',
         id: sender.id,
-        active: data.active !== false,
+        active,
         p: cleanVec3(data.p),
         r: cleanVec3(data.r),
       }, sender.id);
@@ -1132,7 +1149,11 @@ export default class TinyWorldParty {
       if (!this.admitted.has(sender.id)) return;
       const to = cleanText(data.to, 96);
       if (!to || !this.admitted.has(to)) return;
-      const damage = Math.max(0, Math.min(10000, cleanNumber(data.damage, 0)));
+      // Both shooter and victim must be actively flying (fresh entity
+      // active:true). Legit weapons deal <= ~35 (missile), so cap at 50 —
+      // the previous 10000 cap let one spoofed message insta-kill.
+      if (!this.combatEligible(sender.id) || !this.combatEligible(to)) return;
+      const damage = Math.max(0, Math.min(COMBAT_MAX_DAMAGE, cleanNumber(data.damage, 0)));
       const source = cleanText(data.source, 24) || 'gun';
       this.sendTo(to, { type: 'combat.hit', to, by: sender.id, damage, source });
       return;
@@ -1272,7 +1293,15 @@ export default class TinyWorldParty {
     }
   }
 
+  // True when this peer has streamed a fresh entity active:true frame — i.e.
+  // they are actually flying. Gates combat.hit relays in both room paths.
+  combatEligible(id) {
+    const at = this.flightActive.get(id);
+    return typeof at === 'number' && (Date.now() - at) < COMBAT_FLIGHT_FRESH_MS;
+  }
+
   onClose(conn) {
+    this.flightActive.delete(conn.id);
     if (this.isWorldRoom) {
       // Release any node this player was working, drop presence, tell the room.
       const p = this.players.get(conn.id);
@@ -1653,11 +1682,14 @@ export default class TinyWorldParty {
       if (!this.admitted.has(id)) return;
       const kind = cleanText(data.kind, 24);
       if (kind !== 'plane') return;
+      const active = data.active !== false;
+      if (active) this.flightActive.set(id, Date.now());
+      else this.flightActive.delete(id);
       this.broadcastToAdmitted({
         type: 'entity',
         kind: 'plane',
         id,
-        active: data.active !== false,
+        active,
         p: cleanVec3(data.p),
         r: cleanVec3(data.r),
       }, id);
@@ -1672,7 +1704,11 @@ export default class TinyWorldParty {
       if (!this.admitted.has(id)) return;
       const to = cleanText(data.to, 96);
       if (!to || !this.admitted.has(to)) return;
-      const damage = Math.max(0, Math.min(10000, cleanNumber(data.damage, 0)));
+      // Both shooter and victim must be actively flying (fresh entity
+      // active:true). Legit weapons deal <= ~35 (missile), so cap at 50 —
+      // the previous 10000 cap let one spoofed message insta-kill.
+      if (!this.combatEligible(id) || !this.combatEligible(to)) return;
+      const damage = Math.max(0, Math.min(COMBAT_MAX_DAMAGE, cleanNumber(data.damage, 0)));
       const source = cleanText(data.source, 24) || 'gun';
       this.sendTo(to, { type: 'combat.hit', to, by: id, damage, source });
       return;
