@@ -77,6 +77,12 @@ GPU caches (introduced for low-end GPU + visible-distance scaling):
   fresh `SphereGeometry` for every generated rounded part; repeated domes,
   balloons, canopies, and tanks should share cached VBOs and be skipped by
   `safeDisposeGeometry`.
+- `disposeGroup(group)` disposes geometries by default, but materials remain
+  shared unless a mesh explicitly opts in with `userData.ownMaterial`,
+  `userData.ownedMaterial`, or `userData.disposeMaterial`. Use those flags only
+  for true per-instance material/texture ownership (scratch FX clones, imported
+  unique assets, temporary previews). Never set them on shared `M.*`, cached
+  fade materials, or cached shader/material singletons.
 - Async texture/resource callbacks must repaint through `renderSceneIfReady()`,
   not direct `renderScene()` calls. These callbacks can fire while classic
   scripts are still loading; `bootApp()` flips `setRenderSceneReady(true)` only

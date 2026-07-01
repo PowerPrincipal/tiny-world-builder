@@ -73,8 +73,49 @@
     return g;
   }
 
+  function getConeGeometry(radius, height, segments = 8, openEnded = false) {
+    const qr = Math.round(radius * 1000) / 1000;
+    const qh = Math.round(height * 1000) / 1000;
+    const qs = Math.max(4, Math.min(24, Math.round(segments || 8)));
+    const key = 'cone|' + qr + '|' + qh + '|' + qs + '|' + (openEnded ? 'open' : 'closed');
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    const g = new THREE.ConeGeometry(qr, qh, qs, 1, !!openEnded);
+    g.userData.cached = true;
+    geomCache.set(key, g);
+    return g;
+  }
+
+  function getPlaneGeometry(w, h, sw = 1, sh = 1) {
+    const qw = Math.round(w * 1000) / 1000;
+    const qh = Math.round(h * 1000) / 1000;
+    const qsw = Math.max(1, Math.min(96, Math.round(sw || 1)));
+    const qsh = Math.max(1, Math.min(96, Math.round(sh || 1)));
+    const key = 'plane|' + qw + '|' + qh + '|' + qsw + '|' + qsh;
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    const g = new THREE.PlaneGeometry(qw, qh, qsw, qsh);
+    g.userData.cached = true;
+    geomCache.set(key, g);
+    return g;
+  }
+
+  function getTorusGeometry(radius, tube, radialSegments = 8, tubularSegments = 24) {
+    const qr = Math.round(radius * 1000) / 1000;
+    const qt = Math.round(tube * 1000) / 1000;
+    const qrs = Math.max(3, Math.min(24, Math.round(radialSegments || 8)));
+    const qts = Math.max(6, Math.min(64, Math.round(tubularSegments || 24)));
+    const key = 'torus|' + qr + '|' + qt + '|' + qrs + '|' + qts;
+    const hit = geomCache.get(key);
+    if (hit) return hit;
+    const g = new THREE.TorusGeometry(qr, qt, qrs, qts);
+    g.userData.cached = true;
+    geomCache.set(key, g);
+    return g;
+  }
+
   function getDodecahedronGeometry(r) {
-    const qr = Math.round(r * 20) / 20;
+    const qr = Math.round(r * 1000) / 1000;
     const key = 'dodecahedron|' + qr;
     const hit = geomCache.get(key);
     if (hit) return hit;

@@ -932,17 +932,40 @@
     }
   }
 
+  function disposeOwnedMaterialResource(resource, seen) {
+    if (!resource || seen.has(resource)) return;
+    seen.add(resource);
+    try { if (resource.map && resource.map.dispose) resource.map.dispose(); } catch (_) {}
+    try { if (resource.alphaMap && resource.alphaMap.dispose) resource.alphaMap.dispose(); } catch (_) {}
+    try { if (resource.normalMap && resource.normalMap.dispose) resource.normalMap.dispose(); } catch (_) {}
+    try { if (resource.roughnessMap && resource.roughnessMap.dispose) resource.roughnessMap.dispose(); } catch (_) {}
+    try { if (resource.metalnessMap && resource.metalnessMap.dispose) resource.metalnessMap.dispose(); } catch (_) {}
+    try { if (resource.emissiveMap && resource.emissiveMap.dispose) resource.emissiveMap.dispose(); } catch (_) {}
+    try { if (resource.aoMap && resource.aoMap.dispose) resource.aoMap.dispose(); } catch (_) {}
+    try { if (resource.dispose) resource.dispose(); } catch (_) {}
+  }
+
+  function disposeOwnedObjectMaterials(object, seen) {
+    if (!object || !object.userData || !object.material) return;
+    const owned = object.userData.ownMaterial || object.userData.ownedMaterial || object.userData.disposeMaterial;
+    if (!owned) return;
+    const mats = Array.isArray(object.material) ? object.material : [object.material];
+    for (const mat of mats) disposeOwnedMaterialResource(mat, seen);
+  }
+
   function disposeGroup(group) {
     const profileStart = repaintProfileBegin();
+    const disposedOwnedMaterials = new Set();
     opacityRoots.delete(group);
     unregisterRuntimeObject(group);
     group.traverse(o => {
       if (o.userData && o.userData.waterfall) waterfallEffectMeshes.delete(o);
       if (o.userData && (o.userData.rocketPlumeSheet || o.userData.rocketFlame)) islandRocketFlames.delete(o);
       safeDisposeGeometry(o.geometry);
-      // Materials are shared (M.* and the fadeMatCache buckets), so we never
-      // dispose them here — same contract as before, just enforced via the
-      // cachedFade flag now that prepareFadeable no longer clones.
+      // Materials are shared (M.* and the fadeMatCache buckets), so the default
+      // is still "do not dispose materials here". Per-instance material owners
+      // can opt in with userData.ownMaterial / ownedMaterial / disposeMaterial.
+      disposeOwnedObjectMaterials(o, disposedOwnedMaterials);
     });
     repaintProfileEnd('dispose.traverse', profileStart);
   }

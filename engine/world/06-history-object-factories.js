@@ -514,7 +514,7 @@
       { x:  0.02 + jitter(7) * 0.14, z:  0.23 + jitter(8) * 0.12, r: 0.13 + links * 0.008 + extra * 0.014, sy: 0.54 + links * 0.020 + extra * 0.025, mat: M.rockHi, ry: 2.4 + jitter(9) * 0.9 },
     ];
     stones.forEach(s => {
-      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s.r, 0), s.mat);
+      const m = new THREE.Mesh(getDodecahedronGeometry(s.r), s.mat);
       m.scale.set(1.05 + jitter(10) * 0.10, s.sy, 0.86 + jitter(11) * 0.12);
       m.position.set(s.x, s.r * s.sy, s.z);
       m.rotation.set(-0.12 + jitter(12) * 0.18, s.ry, 0.08 + jitter(13) * 0.16);
@@ -542,7 +542,7 @@
       g.add(foot);
 
       const shelf = new THREE.Mesh(
-        new THREE.BoxGeometry((alongX ? 0.48 : 0.34) * sideGrow, 0.16 + (extra + sideExtra) * 0.010, (alongX ? 0.36 : 0.48) * sideGrow),
+        getBoxGeometry((alongX ? 0.48 : 0.34) * sideGrow, 0.16 + (extra + sideExtra) * 0.010, (alongX ? 0.36 : 0.48) * sideGrow),
         dir === 'n' || dir === 'w' ? M.rockDk : M.rock
       );
       shelf.position.set(
@@ -554,7 +554,7 @@
       g.add(shelf);
 
       if (showCrowns) {
-        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12 + (extra + sideExtra) * 0.007, 0), dir === 'e' || dir === 'n' ? M.rockHi : M.rockDk);
+        const crown = new THREE.Mesh(getDodecahedronGeometry(0.12 + (extra + sideExtra) * 0.007), dir === 'e' || dir === 'n' ? M.rockHi : M.rockDk);
         crown.scale.set(1.10 + jitter(30) * 0.18, 0.60 + (extra + sideExtra) * 0.024, 0.90 + jitter(31) * 0.18);
         crown.position.set(
           dir === 'w' ? -0.39 : dir === 'e' ? 0.39 : (dir === 'n' ? -0.10 : 0.10),
@@ -571,14 +571,14 @@
     if (n.w) addOutcrop('w');
 
     if (links >= 2) {
-      const spine = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18 + links * 0.018, 0), M.rockDk);
+      const spine = new THREE.Mesh(getDodecahedronGeometry(0.18 + links * 0.018), M.rockDk);
       spine.scale.set(n.e || n.w ? 1.25 + extra * 0.05 : 0.90, 1.00 + links * 0.08 + extra * 0.08, n.n || n.s ? 1.25 + extra * 0.05 : 0.90);
       spine.position.set(0.02 + jitter(40) * 0.08, 0.32 + links * 0.030 + extra * 0.030, -0.02 + jitter(41) * 0.08);
       spine.rotation.set(-0.18, 0.7, 0.10);
       g.add(spine);
     }
     if (links >= 3) {
-      const shard = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.38, 5), M.rockHi);
+      const shard = new THREE.Mesh(getConeGeometry(0.14, 0.38, 5), M.rockHi);
       shard.position.set(-0.08, 0.62, 0.06);
       shard.rotation.set(0.18, 0.55, -0.10);
       g.add(shard);
@@ -593,7 +593,7 @@
       const a = i * 1.73 + cellRand(seedX, seedZ, 460 + i) * 0.8;
       const radius = 0.24 + cellRand(seedX, seedZ, 480 + i) * (0.18 + extra * 0.015);
       const chip = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(0.055 + cellRand(seedX, seedZ, 500 + i) * 0.045 + extra * 0.004, 0),
+        getDodecahedronGeometry(0.055 + cellRand(seedX, seedZ, 500 + i) * 0.045 + extra * 0.004),
         i % 3 === 0 ? M.rockHi : (i % 3 === 1 ? M.rockDk : M.rock)
       );
       chip.scale.set(1.10 + jitter(520 + i) * 0.35, 0.45 + jitter(540 + i) * 0.18, 0.85 + jitter(560 + i) * 0.30);
@@ -624,7 +624,7 @@
     const g = new THREE.Group();
     const deckY = 0.09;
     for (let i = -2; i <= 2; i++) {
-      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.06, 0.08), M.bridgeWood);
+      const plank = new THREE.Mesh(getBoxGeometry(0.92, 0.06, 0.08), M.bridgeWood);
       plank.position.set(0, deckY, i * 0.10);
       plank.rotation.z = i % 2 === 0 ? 0.018 : -0.012;
       g.add(plank);
@@ -640,7 +640,7 @@
         g.add(post);
       }
     }
-    const shadow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.035, 0.50), M.bridgeWoodD);
+    const shadow = new THREE.Mesh(getBoxGeometry(0.86, 0.035, 0.50), M.bridgeWoodD);
     shadow.position.y = 0.025;
     g.add(shadow);
     return g;
@@ -651,13 +651,13 @@
     const deckY = 0.09;
     // Deck planks
     for (let i = -2; i <= 2; i++) {
-      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.06, 0.08), M.bridgeWood);
+      const plank = new THREE.Mesh(getBoxGeometry(0.92, 0.06, 0.08), M.bridgeWood);
       plank.position.set(0, deckY, i * 0.10);
       g.add(plank);
     }
     // Low side walls
     for (const z of [-0.32, 0.32]) {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.28, 0.05), M.bridgeWoodD);
+      const wall = new THREE.Mesh(getBoxGeometry(0.96, 0.28, 0.05), M.bridgeWoodD);
       wall.position.set(0, deckY + 0.17, z);
       g.add(wall);
     }
@@ -678,17 +678,17 @@
     const ridgeY = deckY + 0.52;
     const eaveY  = deckY + 0.42;
     for (const side of [-1, 1]) {
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.05, 0.42), M.bridgeWood);
+      const panel = new THREE.Mesh(getBoxGeometry(1.04, 0.05, 0.42), M.bridgeWood);
       panel.position.set(0, (ridgeY + eaveY) / 2, side * 0.17);
       panel.rotation.x = side * 0.42;
       g.add(panel);
     }
     // Ridge cap sits along the apex line where the panels meet.
-    const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.06, 0.07), M.bridgeWoodD);
+    const ridge = new THREE.Mesh(getBoxGeometry(1.08, 0.06, 0.07), M.bridgeWoodD);
     ridge.position.set(0, ridgeY + 0.02, 0);
     g.add(ridge);
     // Cast shadow on the water
-    const shadow = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.035, 0.62), M.bridgeWoodD);
+    const shadow = new THREE.Mesh(getBoxGeometry(0.92, 0.035, 0.62), M.bridgeWoodD);
     shadow.position.y = 0.025;
     g.add(shadow);
     return g;
@@ -698,19 +698,19 @@
     const g = new THREE.Group();
     const deckY = 0.11;
     // Stone deck slab
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.10, 0.64), M.castleStone);
+    const deck = new THREE.Mesh(getBoxGeometry(0.98, 0.10, 0.64), M.castleStone);
     deck.position.set(0, deckY, 0);
     g.add(deck);
     // Darker trim along the underside
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.00, 0.06, 0.66), M.castleStoneD);
+    const trim = new THREE.Mesh(getBoxGeometry(1.00, 0.06, 0.66), M.castleStoneD);
     trim.position.set(0, deckY - 0.07, 0);
     g.add(trim);
     // Stone parapets along both long edges
     for (const z of [-0.30, 0.30]) {
-      const parapet = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.20, 0.08), M.castleStone);
+      const parapet = new THREE.Mesh(getBoxGeometry(0.94, 0.20, 0.08), M.castleStone);
       parapet.position.set(0, deckY + 0.16, z);
       g.add(parapet);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.04, 0.10), M.castleStoneD);
+      const cap = new THREE.Mesh(getBoxGeometry(0.96, 0.04, 0.10), M.castleStoneD);
       cap.position.set(0, deckY + 0.28, z);
       g.add(cap);
       // Small repeated balusters baked in as box pattern
@@ -726,7 +726,7 @@
       abut.position.set(x, deckY - 0.04, 0);
       g.add(abut);
     }
-    const shadow = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.035, 0.64), M.castleStoneD);
+    const shadow = new THREE.Mesh(getBoxGeometry(0.98, 0.035, 0.64), M.castleStoneD);
     shadow.position.y = 0.025;
     g.add(shadow);
     return g;
@@ -744,15 +744,15 @@
       const arch = arcHeight * 4 * (t - t * t); // parabola peaking at t=0.5
       const y = baseDeckY + arch;
       const segW = 0.84 / SEGS + 0.02;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.10, 0.62), M.castleStone);
+      const seg = new THREE.Mesh(getBoxGeometry(segW, 0.10, 0.62), M.castleStone);
       seg.position.set(x, y, 0);
       g.add(seg);
       // Parapet segments tracking the deck height
       for (const sz of [-0.30, 0.30]) {
-        const para = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.16, 0.07), M.castleStone);
+        const para = new THREE.Mesh(getBoxGeometry(segW, 0.16, 0.07), M.castleStone);
         para.position.set(x, y + 0.13, sz);
         g.add(para);
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(segW + 0.02, 0.03, 0.09), M.castleStoneD);
+        const cap = new THREE.Mesh(getBoxGeometry(segW + 0.02, 0.03, 0.09), M.castleStoneD);
         cap.position.set(x, y + 0.23, sz);
         g.add(cap);
       }
@@ -764,17 +764,17 @@
       const x = -0.34 + t * 0.68;
       const arch = arcHeight * 4 * (t - t * t) * 0.55;
       const y = 0.04 + arch;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.60), M.castleStoneD);
+      const seg = new THREE.Mesh(getBoxGeometry(0.18, 0.08, 0.60), M.castleStoneD);
       seg.position.set(x, y, 0);
       g.add(seg);
     }
     // Chunky end piers anchoring the arch
     for (const x of [-0.46, 0.46]) {
-      const pier = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.30, 0.68), M.castleStoneD);
+      const pier = new THREE.Mesh(getBoxGeometry(0.10, 0.30, 0.68), M.castleStoneD);
       pier.position.set(x, 0.07, 0);
       g.add(pier);
     }
-    const shadow = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.035, 0.62), M.castleStoneD);
+    const shadow = new THREE.Mesh(getBoxGeometry(0.94, 0.035, 0.62), M.castleStoneD);
     shadow.position.y = 0.025;
     g.add(shadow);
     return g;
@@ -815,7 +815,7 @@
       const s = 1 + extra * 0.045;
       g.scale.set(s, 1 + extra * 0.035, s);
       for (let i = 0; i < Math.min(extra, 4); i++) {
-        const pebble = new THREE.Mesh(new THREE.DodecahedronGeometry(0.055 + i * 0.008, 0), i % 2 ? M.rockDk : M.rockHi);
+        const pebble = new THREE.Mesh(getDodecahedronGeometry(0.055 + i * 0.008), i % 2 ? M.rockDk : M.rockHi);
         const a = i * 1.7 + 0.4;
         pebble.scale.y = 0.55;
         pebble.position.set(Math.cos(a) * 0.34, 0.035, Math.sin(a) * 0.30);

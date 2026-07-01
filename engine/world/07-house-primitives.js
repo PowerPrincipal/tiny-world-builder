@@ -671,7 +671,7 @@
     // Front columns plus wall-side pilasters make the portico read as attached.
     for (const u of [-0.5, 0.5]) {
       const col = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.045, porticoH, 8),
+        getCylinderGeometry(0.045, porticoH, 8),
         M.manorTrim
       );
       col.position.set(u * (porticoW - 0.10), 0.06 + porticoH / 2, halfD + porticoD - 0.06);
@@ -808,10 +808,12 @@
 
     // Broad foundation keeps the tower grounded on one tile.
     const base = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.12, radius + 0.15, 0.16, 16), matStoneD);
+    base.geometry.userData.ownReason = 'tapered-cylinder';
     base.position.y = 0.08;
     g.add(base);
 
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.07, radius + 0.10, 0.10, 16), matStone);
+    plinth.geometry.userData.ownReason = 'tapered-cylinder';
     plinth.position.y = 0.21;
     g.add(plinth);
 
@@ -820,13 +822,14 @@
       new THREE.CylinderGeometry(radius, radius * 1.08, wallH, 16),
       matStone
     );
+    shaft.geometry.userData.ownReason = 'tapered-cylinder';
     shaft.position.y = wallH / 2 + 0.14;
     g.add(shaft);
 
     // Balcony walkway just below the roof.
     const balconyY = wallH + 0.10;
     const balcony = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius + 0.12, radius + 0.12, 0.07, 16),
+      getCylinderGeometry(radius + 0.12, 0.07, 16),
       matStoneD
     );
     balcony.position.y = balconyY;
@@ -843,6 +846,7 @@
       new THREE.CylinderGeometry(railR + 0.005, railR + 0.005, 0.025, 14, 1, true),
       matStoneD
     );
+    railTop.geometry.userData.ownReason = 'open-cylinder';
     railTop.position.y = balconyY + 0.16;
     g.add(railTop);
 
@@ -851,10 +855,11 @@
       new THREE.CylinderGeometry(radius + 0.17, radius + 0.20, 0.10, 16),
       matRoofD
     );
+    roofBase.geometry.userData.ownReason = 'tapered-cylinder';
     roofBase.position.y = wallH + 0.24;
     g.add(roofBase);
     const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(radius + 0.16, 0.58, 16),
+      getConeGeometry(radius + 0.16, 0.58, 16),
       matRoof
     );
     cone.position.y = wallH + 0.58;
@@ -863,13 +868,14 @@
       new THREE.CylinderGeometry(0.12, 0.18, 0.08, 8),
       matRoofD
     );
+    roofCap.geometry.userData.ownReason = 'tapered-cylinder';
     roofCap.position.y = wallH + 0.86;
     g.add(roofCap);
 
     const finialBall = new THREE.Mesh(getSphereGeometry(0.05, 8, 8), M.knob);
     finialBall.position.y = wallH + 0.95;
     g.add(finialBall);
-    const finialSpike = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 6), matStoneD);
+    const finialSpike = new THREE.Mesh(getConeGeometry(0.025, 0.18, 6), matStoneD);
     finialSpike.position.y = wallH + 1.09;
     g.add(finialSpike);
 
@@ -881,6 +887,7 @@
       new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10, 1, false, 0, Math.PI),
       matStoneD
     );
+    archTop.geometry.userData.ownReason = 'partial-cylinder';
     archTop.rotation.z = Math.PI / 2;
     archTop.rotation.y = Math.PI / 2;
     archTop.position.set(0, 0.62, radius + 0.03);
@@ -910,6 +917,7 @@
     flag.position.set(0.11, wallH + 1.26, 0);
     g.add(flag);
     const beaconCup = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.055, 8), matRoofD);
+    beaconCup.geometry.userData.ownReason = 'tapered-cylinder';
     beaconCup.position.y = wallH + 1.40;
     g.add(beaconCup);
     const beacon = new THREE.Mesh(getSphereGeometry(0.065, 8, 8), M.windowLit);
@@ -1386,7 +1394,7 @@
     g.add(finialTop);
 
     // Four wheels (axle along x, so cylinder lies on its side via z-rotation).
-    const wheelGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.045, 14);
+    const wheelGeo = getCylinderGeometry(0.10, 0.045, 14);
     const wheelOffsets = [
       [ 0.22, -0.20], [ 0.22,  0.20],
       [-0.22, -0.20], [-0.22,  0.20],
@@ -1463,12 +1471,12 @@
       leaf.rotation.z = -0.3;
       g.add(leaf);
       // yellow petal disc (cylinder, thin), tilted slightly to face viewer
-      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.025, 12), M.sunflowerPetal);
+      const disc = new THREE.Mesh(getCylinderGeometry(0.11, 0.025, 12), M.sunflowerPetal);
       disc.position.set(p.x, p.h + 0.02, p.z);
       disc.rotation.x = -0.25;
       g.add(disc);
       // brown center
-      const center = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.03, 10), M.sunflowerCenter);
+      const center = new THREE.Mesh(getCylinderGeometry(0.055, 0.03, 10), M.sunflowerCenter);
       center.position.set(p.x, p.h + 0.04, p.z + 0.005);
       center.rotation.x = -0.25;
       g.add(center);
