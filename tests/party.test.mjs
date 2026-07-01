@@ -656,7 +656,7 @@ test('signed world join loads the full 20x20 world through the service token', a
   try {
     const token = signJoinToken({ w: 77, slug: 'big-island', p: 7, r: 'play' }, 'sekret', 60_000);
     await party.onWorldMessage({ type: 'world.join', token, worldId: 77, gridSize: 20, cells: [[1, 1, 'grass']] }, player);
-    assert.equal(fetched.url, 'https://tinyworld.test/api/worlds?id=77');
+    assert.equal(fetched.url, 'https://tinyworld.test/api/worlds?slug=big-island');
     assert.equal(fetched.headers['x-worlds-token'], 'service-token');
     assert.equal(party.worldState.gridSize, 20);
     assert.ok(party.worldState.grassCells.includes('18,18'), '20x20 walk grid includes cells beyond 8x8');

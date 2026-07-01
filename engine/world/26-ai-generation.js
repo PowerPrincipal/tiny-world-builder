@@ -109,30 +109,10 @@
   };
 
   function snapshotCells() {
-    const cells = [];
-    for (let x = 0; x < GRID; x++) {
-      if (!world[x]) continue;
-      for (let z = 0; z < GRID; z++) {
-        const c = world[x][z];
-        if (c) {
-          const entry = serializeCell(x, z, c);
-          if (entry) cells.push(entry);
-        }
-      }
-    }
-    // Also save any cells outside the 8x8 home board
-    for (let x = -GRID; x < GRID * 2; x++) {
-      if (x >= 0 && x < GRID) continue; // already saved above
-      if (!world[x]) continue;
-      for (let z = -GRID; z < GRID * 2; z++) {
-        const c = world[x][z];
-        if (c) {
-          const entry = serializeCell(x, z, c);
-          if (entry) cells.push(entry);
-        }
-      }
-    }
-    return cells;
+    // Derive from the canonical persistence serializer so the AI prompt sees
+    // the same cells saveState does. The old hand-rolled walk here silently
+    // dropped boards directly north/south of home.
+    return buildWorldStateObject().cells;
   }
 
   const PRIMITIVE_ASSEMBLY_PROMPT = [
@@ -568,7 +548,9 @@
       },
       body: JSON.stringify({
         model,
-        max_tokens: 4096,
+        // Match the 8000-token output budget the other providers get; 4096
+        // truncated large worlds mid-JSON.
+        max_tokens: 8000,
         system,
         tools: [{
           name: toolName,

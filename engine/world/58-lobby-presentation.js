@@ -421,12 +421,17 @@
       const pick = list[camCursor];
       if (!pick || !showFeed(pick.id)) showDeckAt(0);
     }
+    // One screen material per feed, reused across cuts. monitorMaterialFor()
+    // registers each material it creates in feed.materials (for uniform updates),
+    // so re-creating one per cut would grow that array — and recompile the
+    // shader — unboundedly.
+    const feedMats = {};
     function showFeed(feedId) {
       const cc = window.__tinyworldCCTV;
       if (!cc || !screenMesh) return false;
-      const mat = cc.monitorMaterialFor(feedId, { tint: 1 });
+      let mat = feedMats[feedId];
+      if (!mat) { mat = cc.monitorMaterialFor(feedId, { tint: 1 }); if (mat) feedMats[feedId] = mat; }
       if (!mat) return false;
-      if (liveMat) { try { liveMat.dispose(); } catch (_) {} }
       liveMat = mat;
       screenMesh.material = mat;
       liveFeedId = feedId;

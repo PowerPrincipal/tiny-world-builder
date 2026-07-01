@@ -1041,6 +1041,12 @@
       console.warn("LandscapeEngine.js is not loaded.");
       return null;
     }
+    // Release the previous instance's GPU resources (shader materials, flora
+    // geometry, chunks) before replacing it — repeated landscape loads leaked
+    // them. dispose() lives on the LandscapeEngine class.
+    if (landscapeEngineInstance && typeof landscapeEngineInstance.dispose === 'function') {
+      try { landscapeEngineInstance.dispose(); } catch (_) {}
+    }
     const dummyScene = new THREE.Scene();
     const numericSeed = typeof seed === 'number' ? seed : seedHash(String(seed || ''));
     landscapeEngineInstance = new window.LandscapeEngine({
@@ -1293,7 +1299,9 @@
     if (!autoSuggestionQueue.length ||
         autoPlacementsSinceRefresh >= AUTO_REFRESH_EVERY ||
         !autoSuggestionSnapshot) {
-      autoSuggestionQueue = await generateAutoSuggestions(snapshot);
+      // generateAutoSuggestions returns null when superseded — never let a
+      // null queue brick the Auto tool's next .length check.
+      autoSuggestionQueue = (await generateAutoSuggestions(snapshot)) || [];
       autoSuggestionSnapshot = snapshot;
       autoPlacementsSinceRefresh = 0;
     }

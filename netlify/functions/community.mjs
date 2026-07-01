@@ -5,6 +5,7 @@ import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGua
 import { ensureProfile, normalizeProfileImageUrl, PROFILE_AVATAR_KEYS, profileDto } from './lib/profiles.mjs';
 import { emitCommunityEvent, screenMessage, suspendMember, activeSuspension, ensureSuspensionTable, unsuspendMember, deleteMessage, hideMessage, unhideMessage, SUSPENSION_HOURS, POLICY_NOTICE } from './lib/community-moderation.mjs';
 import { issueChallenge, verifySubmission, HONEYPOT_FIELD } from './lib/human-verification.mjs';
+import { requestHasAdminSecret } from './lib/admin-secret.mjs';
 
 export const config = { path: '/api/community' };
 
@@ -502,24 +503,12 @@ async function touchPresence(sql, profileId) {
 }
 
 // -------- admin gate (LOCAL-DEV ONLY, mirrors features.mjs / roadmap.mjs) --------
-function envValue(name) {
-  try {
-    if (globalThis.Netlify && Netlify.env && typeof Netlify.env.get === 'function') {
-      const value = Netlify.env.get(name);
-      if (value) return value;
-    }
-  } catch (_) {}
-  return process.env[name] || '';
-}
-
 function isAdmin(request) {
   try {
     const host = (request.headers.get('host') || '').toLowerCase();
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return false;
   } catch (_) { return false; }
-  const secret = envValue('TINYWORLD_ADMIN_SECRET');
-  if (!secret) return false;
-  return (request.headers.get('x-admin-secret') || '') === secret;
+  return requestHasAdminSecret(request);
 }
 
 // True when this profile is community staff (super-owner or a configured staff

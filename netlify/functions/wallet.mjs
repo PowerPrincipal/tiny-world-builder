@@ -287,6 +287,24 @@ export default async function walletFunction(request) {
       if (!user) return errorResponse('Invalid Solana public key', 400, origin);
       const sql = getSql();
       const profile = await ensureProfile(user);
+      // Consume the stateless challenge nonce so a captured signature can't be
+      // replayed for the rest of the token's 10-minute TTL. The signed token itself
+      // is stateless, so consumption is recorded in the same wallet_auth_challenges
+      // table the DB-backed connect path consumes via consumed_at: insert a
+      // consumed marker row unless one already exists for this (key, nonce).
+      // No unique index on (public_key, nonce) exists, so two truly concurrent
+      // replays can race past the NOT EXISTS check — but that shrinks the replay
+      // window from 10 minutes to same-millisecond timing.
+      const consumed = await sql`
+        INSERT INTO wallet_auth_challenges (profile_id, public_key, nonce, message, expires_at, consumed_at)
+        SELECT ${profile.id}, ${publicKey}, ${challenge.nonce}, ${message}, NOW(), NOW()
+        WHERE NOT EXISTS (
+          SELECT 1 FROM wallet_auth_challenges
+          WHERE public_key = ${publicKey} AND nonce = ${challenge.nonce} AND consumed_at IS NOT NULL
+        )
+        RETURNING id
+      `;
+      if (!consumed.length) return errorResponse('Wallet challenge expired', 401, origin);
       await linkWalletToProfile(sql, profile, publicKey);
       const sessionToken = createWalletSessionToken(publicKey);
       const payload = await walletPayload(sql, profile);

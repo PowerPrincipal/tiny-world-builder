@@ -84,27 +84,31 @@ export default async function worldResourcesFunction(request) {
         if (!Number.isInteger(profileId) || profileId < 1) continue;
         const delta = cleanDelta(raw);
         if (hasAny(delta)) await addResources(sql, profileId, delta);
-// ---- GOLD ledger events from authoritative room (mmo-core) ----
-    const goldEvents = (body && body.goldEvents) || {};
-    for (const [wallet, events] of Object.entries(goldEvents)) {
-      if (!Array.isArray(events)) continue;
-      for (const ev of events) {
-        if (!ev || !ev.type || !ev.amount) continue;
-        // SECURITY: this generic service-token ingest may ONLY write allowance recalcs.
-        // GOLD debits/refunds must go through the locked, idempotent endpoints
-        // (/api/me/gold/spend, refund) so a service-token leak or room bug can never
-        // mint or move spendable GOLD here. Reject any non-allowance type.
-        if (ev.type !== 'ALLOWANCE_RECALCULATED') continue;
-        try {
-          await sql`
-            INSERT INTO gold_ledger_events (wallet, cycle_id, type, amount, reason, reference_id)
-            VALUES (${wallet}, ${ev.cycleId || "weekly:0"}, ${ev.type}, ${ev.amount}, ${ev.reason || null}, ${ev.referenceId || null})
-            ON CONFLICT DO NOTHING
-          `;
-        } catch (e) { /* table may not exist in all envs */ }
       }
-    }
 
+      // ---- GOLD ledger events from authoritative room (mmo-core) ----
+      const goldEvents = (body && body.goldEvents) || {};
+      for (const [wallet, events] of Object.entries(goldEvents).slice(0, MAX_GRANT_ENTRIES)) {
+        // Only real profile wallets: the room derives keys as 'profile:<id>'.
+        if (!/^profile:\d+$/.test(wallet) || !Array.isArray(events)) continue;
+        for (const ev of events.slice(0, MAX_GRANT_ENTRIES)) {
+          if (!ev || !ev.type) continue;
+          // SECURITY: this generic service-token ingest may ONLY write allowance recalcs.
+          // GOLD debits/refunds must go through the locked, idempotent endpoints
+          // (/api/me/gold/spend, refund) so a service-token leak or room bug can never
+          // mint or move spendable GOLD here. Reject any non-allowance type.
+          if (ev.type !== 'ALLOWANCE_RECALCULATED') continue;
+          // Ledger amounts are bounded non-negative integers, never verbatim input.
+          const amount = Math.floor(Number(ev.amount));
+          if (!Number.isFinite(amount) || amount < 0 || amount > 10_000) continue;
+          try {
+            await sql`
+              INSERT INTO gold_ledger_events (wallet, cycle_id, type, amount, reason, reference_id)
+              VALUES (${wallet}, ${ev.cycleId || "weekly:0"}, ${ev.type}, ${amount}, ${ev.reason || null}, ${ev.referenceId || null})
+              ON CONFLICT DO NOTHING
+            `;
+          } catch (e) { /* table may not exist in all envs */ }
+        }
       }
 
       // Owner tax payouts: credit the owner's balance AND record tax history.

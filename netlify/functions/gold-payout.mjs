@@ -1,6 +1,6 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { getSql, isDatabaseUnavailable, isMissingRelations } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse } from './lib/http.mjs';
+import { requestHasAdminSecret } from './lib/admin-secret.mjs';
 import { computeWeeklyPayoutPlan } from '../../packages/tinyworld-mmo-core/src/index.js';
 
 export const config = { path: '/api/admin/gold-payout' };
@@ -35,19 +35,9 @@ const HOLDER_CAP = 5000;
 // payout; staler rows are treated as 0 (fail closed) — defense-in-depth vs stacking.
 const FRESHNESS_HOURS = Math.max(1, Number(process.env.GOLD_PAYOUT_FRESHNESS_HOURS) || 26);
 
-function adminSecret() {
-  return process.env.TINYWORLD_ADMIN_SECRET || '';
-}
-
-// Hash both sides to a fixed 32 bytes so the compare never leaks length and is always
-// constant-time. Requires a configured, reasonably-long secret.
+// Shared hash + timing-safe compare; fails closed on an unset or weak secret.
 function isAdmin(request) {
-  const secret = adminSecret();
-  if (!secret || secret.length < 16) return false; // never run unguarded / weak
-  const provided = request.headers.get('x-admin-secret') || '';
-  const a = createHash('sha256').update(provided).digest();
-  const b = createHash('sha256').update(secret).digest();
-  return timingSafeEqual(a, b);
+  return requestHasAdminSecret(request);
 }
 
 // Atomic token units -> whole tokens (floored), BigInt throughout. Independent of any

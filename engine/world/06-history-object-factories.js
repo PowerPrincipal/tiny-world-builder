@@ -120,20 +120,27 @@
     if (!worldUndoStack.length || worldHistoryApplying) return false;
     const current = snapshotWorldStateForHistory();
     const currentSig = worldHistorySignature(current);
-    const previous = worldUndoStack.pop();
+    // Only pop once the restore is accepted — a rejected snapshot must not
+    // destroy that undo level.
+    const previous = worldUndoStack[worldUndoStack.length - 1];
+    if (!restoreWorldHistorySnapshot(previous)) return false;
+    worldUndoStack.pop();
     worldRedoStack.push({ snapshot: current, sig: currentSig });
     if (worldRedoStack.length > WORLD_HISTORY_LIMIT) worldRedoStack.shift();
-    return restoreWorldHistorySnapshot(previous);
+    return true;
   }
 
   function redoWorldEdit() {
     if (!worldRedoStack.length || worldHistoryApplying) return false;
     const current = snapshotWorldStateForHistory();
     const currentSig = worldHistorySignature(current);
-    const next = worldRedoStack.pop();
+    // Mirror undoWorldEdit: keep the redo level if the restore is rejected.
+    const next = worldRedoStack[worldRedoStack.length - 1];
+    if (!restoreWorldHistorySnapshot(next)) return false;
+    worldRedoStack.pop();
     worldUndoStack.push({ snapshot: current, sig: currentSig });
     if (worldUndoStack.length > WORLD_HISTORY_LIMIT) worldUndoStack.shift();
-    return restoreWorldHistorySnapshot(next);
+    return true;
   }
 
   function makeTile(terrain, neighbors, x = 0, z = 0, level = 1, opts = {}) {

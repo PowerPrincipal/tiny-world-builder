@@ -7,6 +7,9 @@
   const STORAGE_VERSION = 4;
   let saveTimer = null;
   let suppressSave = false;
+  // Bumped at every applyState start; chunked rAF callbacks capture the value
+  // and bail if a newer load started, so overlapping loads can't interleave.
+  let applyGeneration = 0;
 
   // One-shot migration — strips terrainFloors > 1 from any cell whose
   // kind requires flat ground (everything except rock). Touches the live
@@ -137,6 +140,9 @@
     if (suppressSave) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      // A load may have started (and set suppressSave) after this timer was
+      // scheduled — never persist a half-applied world.
+      if (suppressSave) return;
       try {
         const data = JSON.stringify(buildWorldStateObject());
         twSafeSetItem(STORAGE_KEY, data, 'World');
@@ -323,6 +329,8 @@
       return false;
     }
     if (data.v !== 1 && data.v !== 2 && data.v !== 3 && data.v !== 4) return false;
+    // Invalidate any in-flight chunked load from a previous applyState call.
+    const applyGen = ++applyGeneration;
     hasUserPanned = false;
     if (vehicleFleet.size) clearVehicleRuntime();
     // Planet land is OFF by default — strip any persisted planet-underlay
@@ -365,6 +373,7 @@
       disposePlanetLandscape();
     }
     suppressSave = true;
+    clearTimeout(saveTimer);
     clearMooringCables();
     clearEditableIslands();
     if (Array.isArray(data.islands)) {
@@ -628,6 +637,8 @@
     }
 
     function finishApplyState() {
+      // A newer applyState took over — leave its state and suppressSave alone.
+      if (applyGen !== applyGeneration) return;
       // Final pass: settle only adjacency-aware terrain. Rebuilding every
       // default grass tile doubles generation cost even though most cells
       // cannot gain path trims, shore lips, or bridge re-orientation.
@@ -717,6 +728,8 @@
     }
 
     function buildOneChunk(start) {
+      // Stale chunk from a superseded load — bail without touching state.
+      if (applyGen !== applyGeneration) return;
       const end = Math.min(buildItems.length, start + CHUNK);
       for (let i = start; i < end; i++) {
         paintBuildItem(buildItems[i], i);
@@ -791,6 +804,7 @@
     }
     let applied = 0;
     suppressSave = true;
+    clearTimeout(saveTimer);
     try {
       for (const entry of data.cells) {
         const c = cellPatchFromEntry(entry);

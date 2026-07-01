@@ -13,6 +13,8 @@
   const cropDusterMaterials = [];
   let cropDusterModel = null;
   let cropDusterLoadStarted = false;
+  let cropDusterLoadAttempts = 0;
+  const CROP_DUSTER_LOAD_MAX_ATTEMPTS = 3;
   let cropDusterTime = 0;
   const cropDustParticles = [];
   const cropDustGeo = new THREE.SphereGeometry(0.055, 6, 6);
@@ -565,8 +567,9 @@
   function loadCropDuster() {
     if (cropDusterLoadStarted || cropDusterModel || !THREE.GLTFLoader) return;
     cropDusterLoadStarted = true;
+    cropDusterLoadAttempts++;
     const texLoader = new THREE.TextureLoader();
-    CROP_DUSTER_TEXTURES.forEach(src => {
+    if (!cropDusterMaterials.length) CROP_DUSTER_TEXTURES.forEach(src => {
       const tex = texLoader.load(src);
       tex.flipY = false;
       twSetTextureSRGB(tex);
@@ -619,7 +622,10 @@
       if (renderPlanesEnabled) cropDusterRoot.visible = true;
       else stopCropDusterRuntime({ clearDust: true });
     }, undefined, err => {
-      cropDusterLoadStarted = false;
+      // Allow a couple of retries (the per-frame updater re-calls
+      // loadCropDuster), then keep the started flag set so a persistent
+      // failure doesn't re-trigger the load every frame for the session.
+      if (cropDusterLoadAttempts < CROP_DUSTER_LOAD_MAX_ATTEMPTS) cropDusterLoadStarted = false;
       console.warn('[crop-duster] failed to load model', err);
     });
   }

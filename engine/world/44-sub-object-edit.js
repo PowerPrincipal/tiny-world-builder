@@ -467,7 +467,15 @@
   }
   function isExploded() { return explodeTarget > 0.5; }
   function tickSubEditExplode(dt) {
-    if (!subEditActive()) { if (explodeProgress > 0) { explodeProgress = 0; } return; }
+    if (!subEditActive()) {
+      // Deactivating mid-explode (e.g. entering play mode) must snap the parts
+      // home, not just zero the progress — otherwise the exploded layout freezes.
+      if (explodeParts.length) applyExplode(0);
+      if (explodeProgress > 0 || explodeTarget > 0 || explodeParts.length) {
+        explodeProgress = 0; explodeTarget = 0; explodeParts = [];
+      }
+      return;
+    }
     if (Math.abs(explodeProgress - explodeTarget) < 0.001) {
       if (explodeTarget === 0 && explodeParts.length) { applyExplode(0); explodeParts = []; }
       return;

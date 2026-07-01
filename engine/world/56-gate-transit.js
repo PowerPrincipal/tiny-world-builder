@@ -202,17 +202,26 @@
 
     function startTick() {
       if (raf) return;
+      let last = null;
       const tick = (now) => {
+        // self-cancel once every driven object is gone (remove()/removeLobby() both
+        // tear down without touching the loop), so the rAF never runs forever idle
+        if (!gate && !landGate && !walker && !landWalker && !lobbyGates.length && !lobbyWalker && !travelStep) {
+          raf = null; t0 = null;
+          return;
+        }
         if (t0 == null) t0 = now;
         const t = (now - t0) / 1000;
+        const dt = last == null ? 0.016 : Math.min(0.05, (now - last) / 1000);
+        last = now;
         if (gate) gate.update(t);
         if (landGate) landGate.update(t);
-        if (walker) walker.update(0.016);
-        if (landWalker) landWalker.update(0.016);
+        if (walker) walker.update(dt);
+        if (landWalker) landWalker.update(dt);
         for (let i = 0; i < lobbyGates.length; i++) lobbyGates[i].update(t);
-        if (lobbyWalker) lobbyWalker.update(0.016);
-        if (!manualDrive && travelStep) travelStep(0.016);
-        if (!manualDrive && window.__tinyworldGateTravelFX) window.__tinyworldGateTravelFX._tick(0.016);
+        if (lobbyWalker) lobbyWalker.update(dt);
+        if (!manualDrive && travelStep) travelStep(dt);
+        if (!manualDrive && window.__tinyworldGateTravelFX) window.__tinyworldGateTravelFX._tick(dt);
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -702,8 +711,11 @@
     }
 
     // 'h' = place the gate (first press) / walk through it to swap layers.
+    // Like the parked auto-place above, only live in a worlds-room/lobby context —
+    // the plain home builder should not sprout gates on a stray keypress.
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'h' && e.key !== 'H') return;
+      if (!window.__tinyworldInWorldRoom) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const el = document.activeElement; if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       if (!gate) placeGate(); else enter();
@@ -712,6 +724,7 @@
     // 'g' = run the gate-to-gate lobby travel effect on the demo walker.
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'g' && e.key !== 'G') return;
+      if (!window.__tinyworldInWorldRoom) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const el = document.activeElement; if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       travelDemo();

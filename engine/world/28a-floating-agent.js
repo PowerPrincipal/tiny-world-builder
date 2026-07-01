@@ -2185,7 +2185,11 @@
           };
         }
 
-        const ok = intent.mode === 'add' ? applyStatePatch(data) : applyState(data);
+        // With a selection mask active the cells are a region patch — never
+        // route through full applyState, which would wipe everything outside
+        // the selection even when the prompt says replace/rebuild/reset.
+        const usePatch = intent.mode === 'add' || !!selectionBounds;
+        const ok = usePatch ? applyStatePatch(data) : applyState(data);
         if (!ok) {
           throw new Error(intent.mode === 'add'
             ? 'The generated additions were rejected by the renderer.'

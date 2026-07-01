@@ -736,7 +736,6 @@ export default class TinyWorldParty {
   constructor(room) {
     this.room = room;
     this.presence = new Map();
-    this.interestVisible = new Map(); // connId -> Set of visible peer ids (for buildInterestSnapshot)
     // sender.id -> Map(type -> token bucket). Per-connection rate limit state.
     this.rateLimits = new Map();
     // id -> last ms an entity active:true frame arrived. combat.hit is only
@@ -1395,22 +1394,32 @@ export default class TinyWorldParty {
   }
 
   // Load + derive authoritative world state once (published worlds are public).
-  ensureWorldLoaded(worldId) {
+  // The world is resolved by THIS room's slug ('world-<slug>'), never by a
+  // client-supplied worldId: the load is once-per-warm-room, so trusting the
+  // first joiner's worldId would let them permanently bind a different world's
+  // ownerProfileId/taxPercent to this room and route durable harvest tax to
+  // the wrong owner.
+  ensureWorldLoaded() {
     if (this.worldState) return Promise.resolve(this.worldState);
     if (this.worldLoading) return this.worldLoading;
     this.worldLoading = (async () => {
       let data = { v: 4, gridSize: 8, cells: [] };
+      let loaded = false;
       const base = this.siteBase();
-      if (base && typeof fetch === 'function') {
+      const slug = String(this.room.id || '').slice(WORLD_ROOM_PREFIX.length);
+      if (base && slug && typeof fetch === 'function') {
         try {
           const token = this.env.WORLDS_SERVICE_TOKEN || '';
           const res = await fetch(
-            base + '/api/worlds?id=' + encodeURIComponent(worldId),
+            base + '/api/worlds?slug=' + encodeURIComponent(slug),
             token ? { headers: { 'x-worlds-token': token } } : undefined,
           );
           if (res.ok) {
             const body = await res.json();
-            if (body && body.world) {
+            // Belt and braces: refuse a world whose slug does not match the room,
+            // so a misrouted/misbehaving API response can never poison the room.
+            if (body && body.world && body.world.slug === slug) {
+              loaded = true;
               this.world = body.world;
       if (this.world && this.world.taxPercent != null) {
         const rate = this.world.taxPercent > 1 ? this.world.taxPercent / 100 : this.world.taxPercent;
@@ -1425,6 +1434,10 @@ export default class TinyWorldParty {
           }
         } catch (_) { /* fall back to an empty walkable world */ }
       }
+      // Open mode with no durable world behind this slug: leave worldState null
+      // so world.join's client-seeded board (the accepted local-dev trust model)
+      // still applies. Secret mode fails closed to an empty walkable world.
+      if (!loaded && this.openMode) return null;
       this.worldState = deriveWorldState(data);
       this.lastTickAt = Date.now();
       this.seedWorldAnimals();
@@ -1475,34 +1488,6 @@ export default class TinyWorldParty {
     return p;
   }
 
-  
-// Interest-scoped peers using mmo-core (ClaudeCraft pattern starter)
-  interestPeersFor(viewerId) {
-    const viewer = this.getPlayer(viewerId);
-    if (!viewer) return [];
-    const entities = Array.from(this.players.entries()).map(([id, p]) => ({
-      id,
-      x: p.x, z: p.z,
-      identity: { kind: "player", name: p.name || "", role: p.role },
-      dynamic: { x: p.x, z: p.z }
-    }));
-    const prev = this.interestVisible.get(viewerId) || new Set();
-    const hashes = new Map(); // simple for first pass
-    try {
-      const snap = buildInterestSnapshot({
-        viewer: { id: viewerId, x: viewer.x, z: viewer.z },
-        entities,
-        previousVisibleIds: prev,
-        config: { visibleRadius: 18, dropRadius: 22 }
-      });
-      this.interestVisible.set(viewerId, snap.nextVisibleIds || new Set());
-      return snap.entities || [];
-    } catch (e) {
-      // fallback to full list
-      return entities.map(e => ({ id: e.id, x: e.x, z: e.z }));
-    }
-  }
-
   presenceFor(id) {
     const p = this.getPlayer(id);
     return { id, name: p.name, color: p.color, cursor: { x: p.x, y: 0, z: p.z }, hearts: p.hearts, role: p.role, avatar: p.avatar || null };
@@ -1526,7 +1511,9 @@ export default class TinyWorldParty {
       you: { x: p.x, z: p.z, hearts: p.hearts, role: p.role, avatar: p.avatar || null },
       nodes,
       animals: this.animals,
-      peers: this.interestPeersFor(id),
+      // Full presence (name/color/hearts/avatar) for every other player, so a
+      // fresh joiner can render everyone already in the room immediately.
+      peers: Array.from(this.presence.values()).filter(pr => pr.id !== id),
       // Standable cells, so any joiner (incl. the AI bot-runner) knows where it can
       // walk without trial-and-error against the move validator. Bounded by grid size.
       grassCells: this.worldState ? this.worldState.grassCells : [],
@@ -1554,9 +1541,10 @@ export default class TinyWorldParty {
           // play surfaces, and island editing/version publishing lives elsewhere.
           role = (payload.r === 'play' || payload.r === 'build') ? 'play' : 'observe';
           profileId = role === 'play' ? (payload.p || null) : null;
-          if (payload.w) await this.ensureWorldLoaded(payload.w);
         }
-        if (!this.worldState && data.worldId) await this.ensureWorldLoaded(data.worldId);
+        // Load by room slug regardless of token validity: even a rejected joiner
+        // is an observer of THIS room's world, and worldId is never trusted.
+        await this.ensureWorldLoaded();
       } else {
         // Open testing mode (no WORLDS_JOIN_SECRET configured): trust the client's
         // declared role so a plain `partykit deploy` is playable with zero env.
@@ -1570,7 +1558,7 @@ export default class TinyWorldParty {
         if (this.pendingGold) this.pendingGold.clear();
         role = data.role === 'observe' ? 'observe' : 'play';
         profileId = data.profileId != null ? data.profileId : ('guest:' + id);
-        if (this.siteBase() && data.worldId) await this.ensureWorldLoaded(data.worldId);
+        if (this.siteBase()) await this.ensureWorldLoaded();
         if (!this.worldState) {
           // In open mode, don't seed durable economy meta (ownerProfileId/taxPercent)
           // from untrusted client data — those fields drive taxSplit math even in open mode.
@@ -1595,21 +1583,12 @@ export default class TinyWorldParty {
       // so the lobby always renders a visible player avatar immediately.
       const av = cleanAvatar(data.avatar);
       p.avatar = av || p.avatar || defaultAvatarForId(profileId || id);
-      // Weekly payout based on token holding (called on join)
-      const held = Number(data.tinyworldHeld) || 0;
-      if (role === "play" && profileId && typeof this.grantWeeklyGoldPayout === "function") {
-        this.grantWeeklyGoldPayout(profileId, held, 1); // 1 island demo
-      }
       const spawn = this.safeSpawn();
       p.x = spawn.x; p.z = spawn.z;
       this.presence.set(id, this.presenceFor(id));
       this.sendTo(id, this.worldSnapshotFor(id));
       this.broadcastToAdmitted({ type: 'presence', presence: this.presenceFor(id) }, id);
       this.scheduleTick();
-    // Interest tick: push scoped updates to all admitted (mmo-core buildInterestSnapshot)
-    for (const pid of this.players.keys()) {
-      try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(pid); } catch(e){}
-    }
       return;
     }
 
@@ -1837,13 +1816,20 @@ export default class TinyWorldParty {
     const split = taxSplit(GROSS_REWARD, taxPercent, isOwner);
     this.accrueResource(p.profileId, resource, split.harvester);
     if (split.owner > 0 && ownerId != null) this.accrueTax(this.world.id, ownerId, resource, split.owner);
-    // GOLD via mmo-core (real)
-    try {
-      if (!this.pendingGold) this.pendingGold = new Map();
-      const wkey = "profile:" + (p.profileId || id);
-      const ev = {type:"ALLOWANCE_RECALCULATED", wallet:wkey, cycleId:"weekly:"+Math.floor(Date.now()/(7*86400000)), amount:10, reason:"harvest", referenceId:"h"+Date.now()};
-      const arr = this.pendingGold.get(wkey)||[]; arr.push(ev); this.pendingGold.set(wkey, arr);
-    } catch(e){}
+    // GOLD via mmo-core (real). Skipped entirely in open mode: flushPending()
+    // never runs there, so accumulating would just grow unbounded per harvest.
+    if (!this.openMode) {
+      try {
+        if (!this.pendingGold) this.pendingGold = new Map();
+        const wkey = "profile:" + (p.profileId || id);
+        const ev = {type:"ALLOWANCE_RECALCULATED", wallet:wkey, cycleId:"weekly:"+Math.floor(Date.now()/(7*86400000)), amount:10, reason:"harvest", referenceId:"h"+Date.now()};
+        const arr = this.pendingGold.get(wkey)||[]; arr.push(ev);
+        // Bound the buffer even when the flush target is unconfigured (no
+        // SITE_URL / service token keeps events queued forever): drop oldest.
+        if (arr.length > 500) arr.splice(0, arr.length - 500);
+        this.pendingGold.set(wkey, arr);
+      } catch(e){}
+    }
 
 
     // Cooldown + clear busy.
@@ -1857,10 +1843,6 @@ export default class TinyWorldParty {
       cooldownMs: ACTION_COOLDOWN_MS, hearts: p.hearts,
     });
     this.scheduleTick();
-    // Interest tick: push scoped updates to all admitted (mmo-core buildInterestSnapshot)
-    for (const pid of this.players.keys()) {
-      try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(pid); } catch(e){}
-    }
   }
 
   accrueResource(profileId, resource, milli) {
@@ -1898,18 +1880,33 @@ export default class TinyWorldParty {
     return this.pendingResources.size > 0 || this.pendingTax.size > 0 || (this.pendingGold && this.pendingGold.size > 0);
   }
 
-  // Flush whole-unit resource + tax deltas to the durable bank. Cleared only on
-  // a 2xx so a transient failure never loses grants.
+  // Flush whole-unit resource + tax deltas to the durable bank. The batch is
+  // snapshotted and cleared BEFORE the POST so an overlapping alarm can never
+  // double-send the same grants; on failure it is merged back (grants accrued
+  // during the in-flight POST land in the fresh maps and are never lost).
   async flushPending() {
     if (this.openMode) return;          // testing mode never touches the durable bank
     if (!this.hasPending()) return;
     const base = this.siteBase();
     const token = this.env.WORLDS_SERVICE_TOKEN || '';
     if (!base || !token || typeof fetch !== 'function') return; // keep buffered until configured
+    const resourcesBatch = this.pendingResources; this.pendingResources = new Map();
+    const taxBatch = this.pendingTax; this.pendingTax = new Map();
+    const goldBatch = this.pendingGold || new Map(); this.pendingGold = new Map();
+    const restore = () => {
+      const mergeDelta = (map, key, d) => {
+        const cur = map.get(key) || { fish: 0, meat: 0, plants: 0, ore: 0 };
+        for (const r of Object.keys(d)) cur[r] = (cur[r] || 0) + d[r];
+        map.set(key, cur);
+      };
+      for (const [pid, d] of resourcesBatch) mergeDelta(this.pendingResources, pid, d);
+      for (const [key, d] of taxBatch) mergeDelta(this.pendingTax, key, d);
+      for (const [wkey, evs] of goldBatch) this.pendingGold.set(wkey, evs.concat(this.pendingGold.get(wkey) || []));
+    };
     const resources = {};
-    for (const [pid, d] of this.pendingResources) resources[pid] = d;
+    for (const [pid, d] of resourcesBatch) resources[pid] = d;
     const taxPayouts = {};
-    for (const [key, d] of this.pendingTax) {
+    for (const [key, d] of taxBatch) {
       const [wid, oid] = key.split(':');
       taxPayouts[wid] = taxPayouts[wid] || {};
       taxPayouts[wid][oid] = d;
@@ -1918,10 +1915,10 @@ export default class TinyWorldParty {
       const res = await fetch(base + '/api/worlds/resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-worlds-token': token },
-        body: JSON.stringify({ resources, taxPayouts, goldEvents: Object.fromEntries(this.pendingGold || new Map()) }),
+        body: JSON.stringify({ resources, taxPayouts, goldEvents: Object.fromEntries(goldBatch) }),
       });
-      if (res.ok) { this.pendingResources.clear(); this.pendingTax.clear(); this.pendingGold?.clear(); }
-    } catch (_) { /* keep buffered for the next flush */ }
+      if (!res.ok) restore();
+    } catch (_) { restore(); /* keep buffered for the next flush */ }
   }
 
   // Lazy time-delta regrowth: bring nodes/animals forward by elapsed time in one
@@ -1982,16 +1979,6 @@ export default class TinyWorldParty {
     this.broadcastToAdmitted({ type: 'animal.spawn', animal });
   }
 
-  
-  sendInterestUpdate(toId) {
-    try {
-      const scoped = this.interestPeersFor(toId);
-      if (scoped && scoped.length) {
-        this.sendTo(toId, { type: "world.interest", peers: scoped });
-      }
-    } catch (e) {}
-  }
-
   scheduleTick() {
     if (this.tickArmed) return;
     const storage = this.room && this.room.storage;
@@ -2008,14 +1995,6 @@ export default class TinyWorldParty {
     await this.flushPending();
     // Keep ticking while anyone is connected.
     if (this.presence.size > 0) this.scheduleTick();
-    // demo weekly payout tick for all (real cycle check inside grant)
-    for (const [pid, seat] of this.admitted) {
-      if (seat.profileId && typeof this.grantWeeklyGoldPayout === "function") this.grantWeeklyGoldPayout(seat.profileId, 10000, 1);
-    }
-    // Interest tick: push scoped updates to all admitted (mmo-core buildInterestSnapshot)
-    for (const pid of this.players.keys()) {
-      try { if (typeof this.sendInterestUpdate === "function") this.sendInterestUpdate(pid); } catch(e){}
-    }
   }
 
   onError(conn) {

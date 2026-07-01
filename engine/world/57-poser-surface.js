@@ -439,7 +439,8 @@
       group.name = 'poserSurface';
       group.visible = false;
 
-      const sandTex = sandTexture();   // (kept for parity; vertex colors carry the sand)
+      // sandTexture() is currently unused (vertex colors carry the sand); not called
+      // here so the 512x512 canvas texture isn't allocated and leaked per build.
       const grassTex = grassTexture();
 
       // voxel-finish heightfield: raised meadow heart, sloping sand, and a true seabed.

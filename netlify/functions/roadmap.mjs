@@ -2,6 +2,7 @@ import { getSql, isDatabaseUnavailable, isMissingRelation } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { getAuthUser } from './lib/auth.mjs';
 import { isWorldAdminEmail } from './lib/worlds.mjs';
+import { requestHasAdminSecret } from './lib/admin-secret.mjs';
 
 export const config = { path: '/api/roadmap' };
 
@@ -29,16 +30,6 @@ const FALLBACK_MILESTONES = [
   { id: 20, status: 'planned', title: 'Voice chat',          description: 'Proximity and party voice chat inside world rooms, built on the existing LiveKit token infrastructure.', sort_order: 180 },
   { id: 21, status: 'planned', title: 'Multi-agentic NPCs',  description: 'AI-driven agents inhabiting settlements and worlds as first-class voxel actors with their own behaviour, via the existing agent-generation seam.', sort_order: 190 },
 ];
-
-function envValue(name) {
-  try {
-    if (globalThis.Netlify && Netlify.env && typeof Netlify.env.get === 'function') {
-      const value = Netlify.env.get(name);
-      if (value) return value;
-    }
-  } catch (_) {}
-  return process.env[name] || '';
-}
 
 // WAVE launch taxonomy: constrain the label server-side to a small known set so
 // arbitrary client strings can never be stored. Anything else (incl. 'none'/'')
@@ -70,10 +61,7 @@ function isLocalSecretAdmin(request) {
     const host = (request.headers.get('host') || '').toLowerCase();
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return false;
   } catch (_) { return false; }
-  const secret = envValue('TINYWORLD_ADMIN_SECRET');
-  if (!secret) return false;
-  const provided = request.headers.get('x-admin-secret') || '';
-  return provided === secret;
+  return requestHasAdminSecret(request);
 }
 
 async function ensureTable(sql) {

@@ -115,14 +115,22 @@ const types = {
   '.vdb': 'application/octet-stream',
 };
 
+// Only ever reflect localhost origins. A wildcard here let ANY web page open
+// in the developer's browser fetch responses cross-origin — and this server
+// can serve real local config. Non-localhost origins get no CORS header at all.
+function corsOriginFor(req) {
+  const origin = (req && req.headers && req.headers.origin) || '';
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin) ? origin : '';
+}
+
 function send(res, status, body, headers = {}) {
-  res.writeHead(status, {
+  const base = {
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    ...headers,
-  });
+  };
+  if (res.__corsOrigin) base['Access-Control-Allow-Origin'] = res.__corsOrigin;
+  res.writeHead(status, { ...base, ...headers });
   res.end(body);
 }
 
@@ -847,6 +855,10 @@ function routeForRequest(reqUrl) {
   const parsed = new URL(reqUrl, 'http://localhost');
   const pathname = decodeURIComponent(parsed.pathname);
 
+  // Never serve dotfiles or dot-directories (.env, .git/, .netlify/...):
+  // they hold real local secrets and repo internals.
+  if (pathname.split('/').some((seg) => seg.startsWith('.'))) return null;
+
   // Normal access: show the temporary landing page. The editor remains at
   // /tiny-world-builder for direct testing and production parity.
   if (pathname === '/') return { file: path.resolve(root, 'index.html') };
@@ -863,6 +875,7 @@ function routeForRequest(reqUrl) {
 }
 
 const server = http.createServer((req, res) => {
+  res.__corsOrigin = corsOriginFor(req);
   const parsedUrl = new URL(req.url, 'http://localhost');
   if (req.method === 'OPTIONS') {
     send(res, 204, '');
@@ -871,12 +884,13 @@ const server = http.createServer((req, res) => {
 
   // Live reload SSE endpoint
   if (parsedUrl.pathname === '/__dev_reload') {
-    res.writeHead(200, {
+    const sseHeaders = {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
+    };
+    if (res.__corsOrigin) sseHeaders['Access-Control-Allow-Origin'] = res.__corsOrigin;
+    res.writeHead(200, sseHeaders);
     res.write(':connected\n\n');
     reloadClients.add(res);
     req.on('close', () => reloadClients.delete(res));

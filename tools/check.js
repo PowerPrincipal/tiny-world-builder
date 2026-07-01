@@ -747,7 +747,7 @@ if (!/#account-modal \.modal-card/.test(cssRaw) || !/#profile-photo-file::file-s
 if (!/(?:var|const|let) CLOUD_OCCLUSION_RENDER_ORDER = 18/.test(html) || !/mesh\.renderOrder = CLOUD_OCCLUSION_RENDER_ORDER/.test(html) || !/foreground clouds veil full-opacity terrain/.test(html)) {
   fail('foreground clouds must render late enough to obscure terrain while keeping depth testing');
 }
-if (!/function queueActiveSnapshotUpdate/.test(html) || !/window\.addEventListener\('tinyworld:world-changed', queueActiveSnapshotUpdate\)/.test(html) || !/setInterval\(updateActiveSnapshot, 5000\)/.test(html)) {
+if (!/function queueActiveSnapshotUpdate/.test(html) || !/'tinyworld:world-changed'[\s\S]{0,120}?queueActiveSnapshotUpdate\(\)/.test(html) || !/setInterval\([\s\S]{0,200}?updateActiveSnapshot\(\)[\s\S]{0,40}?\}, 5000\)/.test(html)) {
   fail('cloud-backed world slots must queue autosave snapshots on world changes');
 }
 if (!/btn\.dataset\.posType = posType/.test(html) || !/close\.dataset\.posType = 'neutral'/.test(html) || !/btn\.dataset\.posType = 'tertiary'/.test(html)) {
@@ -1081,7 +1081,7 @@ if (!/wasm-unsafe-eval/.test(JSON.stringify(headers)) || !/worker-src 'self' blo
 if (!/function twCloudSyncLocalWorldsToCloud/.test(html) || !/function twCloudSyncAssetsBothWays/.test(html) || !/\/api\/assets/.test(html)) {
   fail('local worlds and asset libraries must sync to the authenticated DB APIs');
 }
-if (!/function queueActiveSnapshotUpdate/.test(html) || !/window\.addEventListener\('tinyworld:world-changed', queueActiveSnapshotUpdate\)/.test(html) || !/setInterval\(updateActiveSnapshot, 5000\)/.test(html)) {
+if (!/function queueActiveSnapshotUpdate/.test(html) || !/'tinyworld:world-changed'[\s\S]{0,120}?queueActiveSnapshotUpdate\(\)/.test(html) || !/setInterval\([\s\S]{0,200}?updateActiveSnapshot\(\)[\s\S]{0,40}?\}, 5000\)/.test(html)) {
   fail('cloud-backed worlds must regularly and edit-trigger sync their active snapshot');
 }
 if (!/engine\/world\/38-multiplayer-partykit\.js/.test(htmlRaw) || !/function wirePartyKitMultiplayer/.test(html)) {

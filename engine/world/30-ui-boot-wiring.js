@@ -1235,7 +1235,13 @@ syncTinyworldOwnerToolControls();
   window.__tinyworldSyncAssetsToCloud = twCloudQueueAssetsSync;
 
   // -------- profile + saves --------
+  // Wire the account modal's DOM listeners exactly once — enterApp() calls
+  // this on every sign-in, and re-wiring stacked duplicate handlers (e.g.
+  // double cloud saves after a sign-out/sign-in cycle). Repeat calls only
+  // refresh the per-session state (profile/builds).
+  let accountModalRefresh = null;
   function initAccountModal() {
+    if (accountModalRefresh) { accountModalRefresh(); return; }
     const Auth = window.TinyWorldAuth;
     const modal = document.getElementById('account-modal');
     const closeBtn = document.getElementById('account-close');
@@ -1626,8 +1632,14 @@ syncTinyworldOwnerToolControls();
     window.__tinyworldAccountWorldsRefresh = loadBuilds;
     // Proactively load profile on first initialisation so the real display name
     // is available immediately (e.g. for world-room name labels) without requiring
-    // the user to open the account modal first.
-    loadProfile().catch(() => {});
+    // the user to open the account modal first. Repeat enterApp() calls reuse
+    // this refresh instead of re-wiring the listeners above.
+    accountModalRefresh = function () {
+      userProfile = null;
+      userBuilds = [];
+      loadProfile().catch(() => {});
+    };
+    accountModalRefresh();
   }
 
   // -------- auth --------
@@ -2173,9 +2185,16 @@ syncTinyworldOwnerToolControls();
       // ?world=<same-origin-url>: show a placeholder scene now, then swap in the
       // fetched world when it arrives (fetch can't resolve synchronously here).
       twPerfMark('boot:load-world-url');
+      // Suppress saves while the fetch is in flight so the placeholder scene
+      // can't autosave over the user's real world (e.g. a 404 world link).
+      suppressSave = true;
+      clearTimeout(saveTimer);
       loadInitialScene();
       resetCameraDefaults();
       loadWorldFromUrl(remoteWorldParam).then((ok) => {
+        // On success applyState manages suppressSave itself; on failure
+        // re-enable saves so later intentional edits still persist.
+        if (!ok) suppressSave = false;
         if (ok && worldHistoryReady) { refreshWorldHistoryUI(); ensureGhostBoardsAroundTarget(); }
       });
     } else if (!loadState()) {
@@ -5216,8 +5235,18 @@ syncTinyworldOwnerToolControls();
 
     // Cheap live update — periodically refresh the active slot snapshot
     // (every 5s) so the popup list reflects the user's current world.
-    window.addEventListener('tinyworld:world-changed', queueActiveSnapshotUpdate);
-    setInterval(updateActiveSnapshot, 5000);
+    // Each tick serializes the full world + parses the multi-slot blob, so
+    // skip it while the tab is hidden or nothing changed since the last run.
+    let activeSnapshotDirty = false;
+    window.addEventListener('tinyworld:world-changed', () => {
+      activeSnapshotDirty = true;
+      queueActiveSnapshotUpdate();
+    });
+    setInterval(() => {
+      if (document.hidden || !activeSnapshotDirty) return;
+      activeSnapshotDirty = false;
+      updateActiveSnapshot();
+    }, 5000);
 
     paintLabel();
     window.__tinyworldWorldMenuRefresh = () => {

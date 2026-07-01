@@ -16,6 +16,18 @@ async function loadEconomy(sql) {
   return rows[0] || {};
 }
 
+// Safety guard shared by every payment-weakening env flag: a deployment whose
+// URL does not look local/preview is treated as production. Fails closed (an
+// unreadable env counts as production) so an env misconfiguration can never
+// weaken payment checks in prod.
+function isProductionLikeHost() {
+  try {
+    const siteUrl = (globalThis.Netlify && Netlify.env && Netlify.env.get('URL')) || process.env.URL || process.env.SITE_URL || '';
+    const host = String(siteUrl).replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+    return !!host && !/localhost|127\.0\.0\.1|\.local|dev\.|\.netlify\.app/i.test(host);
+  } catch (_) { return true; }
+}
+
 // Test mode: claim works for real (ownership flip, claim record, economy bump)
 // but skips the wallet/payment/on-chain steps. Enable with WORLDS_TEST_BYPASS_PAYMENT=1.
 function testBypassPayment() {
@@ -26,19 +38,115 @@ function testBypassPayment() {
     }
     if (v == null || v === '') v = process.env.WORLDS_TEST_BYPASS_PAYMENT;
     if (v !== '1' && v !== 'true') return false;
-    // Safety guard: refuse to bypass payment on production-looking deployments.
-    // This prevents an accidental env copy from enabling free world claims in prod.
-    try {
-      const siteUrl = (globalThis.Netlify && Netlify.env && Netlify.env.get('URL')) || process.env.URL || process.env.SITE_URL || '';
-      const host = String(siteUrl).replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
-      if (host && !/localhost|127\.0\.0\.1|\.local|dev\.|\.netlify\.app/i.test(host)) {
-        console.error('[world-claim] WORLDS_TEST_BYPASS_PAYMENT is set but URL looks like production (' + host + ') — refusing');
-        return false;
-      }
-    } catch (_) { return false; }
+    // Refuse to bypass payment on production-looking deployments. This prevents
+    // an accidental env copy from enabling free world claims in prod.
+    if (isProductionLikeHost()) {
+      console.error('[world-claim] WORLDS_TEST_BYPASS_PAYMENT is set but URL looks like production — refusing');
+      return false;
+    }
     return true;
   } catch (_) {}
   return false;
+}
+
+// WORLDS_VERIFY_ONCHAIN=0 only skips verification on local/preview hosts; on a
+// production-looking deployment the flag is ignored and verification always
+// runs, mirroring the WORLDS_TEST_BYPASS_PAYMENT guard above.
+export function verificationRequired() {
+  if (onchainVerificationRequired()) return true;
+  if (isProductionLikeHost()) {
+    console.error('[world-claim] WORLDS_VERIFY_ONCHAIN=0 is set but URL looks like production — verifying anyway');
+    return true;
+  }
+  return false;
+}
+
+// Confirm-path rejection carrying the HTTP status; thrown inside the claim
+// transaction so the intent consumption rolls back with it.
+export class ClaimRejection extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// The whole confirm flow runs in ONE transaction whose first statement consumes
+// the payment intent (pending -> paid). Every later failure — amount below
+// price, wallet mismatch, failed on-chain verification, losing the world-flip
+// race — throws and rolls the consumption back, so the intent is either fully
+// spent on exactly one world or still pending. A replayed confirm finds the
+// intent no longer pending and gets a 409 before any verification runs.
+// Exported (with injectable verification deps) so tests can drive it against a
+// mock sql without a database or Solana RPC.
+export async function confirmClaim(sql, { profile, worldId, price, paymentIntentId, signature }, deps = {}) {
+  const verifyTransfer = deps.verifyTransfer || verifyUsdcTransfer;
+  const requireVerification = deps.requireVerification || verificationRequired;
+  return sql.begin(async (sql) => {
+    const consumed = await sql`
+      UPDATE wallet_payment_intents
+      SET status = 'paid', signature = COALESCE(${signature || null}, signature), updated_at = NOW()
+      WHERE id = ${paymentIntentId} AND profile_id = ${profile.id} AND status = 'pending'
+      RETURNING *
+    `;
+    if (!consumed.length) {
+      const existing = await sql`
+        SELECT id FROM wallet_payment_intents
+        WHERE id = ${paymentIntentId} AND profile_id = ${profile.id}
+        LIMIT 1
+      `;
+      if (!existing.length) throw new ClaimRejection('Payment intent not found', 404);
+      throw new ClaimRejection('Payment intent already used', 409);
+    }
+    const intent = consumed[0];
+
+    // The amount paid must cover the live price.
+    if (Number(intent.amount) + 1e-9 < price) throw new ClaimRejection('Payment amount is below the world price', 402);
+
+    // The paying wallet must match the signed-in player's linked wallet.
+    const myWallet = await linkedWallet(sql, profile.id);
+    if (!myWallet) throw new ClaimRejection('Link a wallet before buying a world', 400);
+    if (intent.payer_wallet && intent.payer_wallet !== myWallet) {
+      throw new ClaimRejection('The paying wallet must be your linked wallet', 403);
+    }
+
+    // On-chain verification (real USDC). Fails closed unless explicitly
+    // disabled, and the disable flag is ignored on production hosts.
+    let verified = false;
+    if (requireVerification()) {
+      const check = await verifyTransfer({
+        signature,
+        recipient: intent.recipient_wallet,
+        mint: worldsUsdcMint() || intent.token_mint || '',
+        minAmount: price,
+        reference: intent.reference_key,
+      });
+      if (!check.ok) throw new ClaimRejection('Payment not verified on chain: ' + check.reason, 402);
+      verified = true;
+    }
+
+    // Race-safe ownership flip: only one concurrent confirm wins the single
+    // conditional UPDATE; the loser sees zero rows, gets a 409, and keeps its
+    // payment intent (the rollback restores it to pending).
+    const claimed = await sql`
+      UPDATE worlds
+      SET status = 'draft', owner_profile_id = ${profile.id}, price_usdc = ${price}, updated_at = NOW()
+      WHERE id = ${worldId} AND status = 'unclaimed'
+      RETURNING *
+    `;
+    if (!claimed.length) throw new ClaimRejection('World was just claimed by someone else', 409);
+
+    await sql`
+      INSERT INTO world_claims (world_id, buyer_profile_id, seller_profile_id, payment_intent_id, price_usdc, signature, status)
+      VALUES (${worldId}, ${profile.id}, NULL, ${paymentIntentId}, ${price}, ${signature || null}, ${verified ? 'completed' : 'verified'})
+    `;
+    await sql`
+      UPDATE world_economy_state SET claimed_count = claimed_count + 1, updated_at = NOW() WHERE id = 1
+    `;
+    await sql`
+      INSERT INTO player_resources (profile_id) VALUES (${profile.id}) ON CONFLICT (profile_id) DO NOTHING
+    `;
+    return { world: claimed[0], verified };
+  });
 }
 
 async function linkedWallet(sql, profileId) {
@@ -109,69 +217,15 @@ export default async function worldClaimFunction(request) {
     const signature = String((body && body.signature) || '').trim().slice(0, 120);
     if (!Number.isInteger(paymentIntentId) || paymentIntentId < 1) return errorResponse('Missing payment intent', 400, origin);
 
-    const intentRows = await sql`
-      SELECT * FROM wallet_payment_intents
-      WHERE id = ${paymentIntentId} AND profile_id = ${profile.id}
-      LIMIT 1
-    `;
-    if (!intentRows.length) return errorResponse('Payment intent not found', 404, origin);
-    const intent = intentRows[0];
-
-    // The amount paid must cover the live price.
-    if (Number(intent.amount) + 1e-9 < price) return errorResponse('Payment amount is below the world price', 402, origin);
-
-    // The paying wallet must match the signed-in player's linked wallet.
-    const myWallet = await linkedWallet(sql, profile.id);
-    if (!myWallet) return errorResponse('Link a wallet before buying a world', 400, origin);
-    if (intent.payer_wallet && intent.payer_wallet !== myWallet) {
-      return errorResponse('The paying wallet must be your linked wallet', 403, origin);
+    let result;
+    try {
+      result = await confirmClaim(sql, { profile, worldId, price, paymentIntentId, signature });
+    } catch (err) {
+      if (err instanceof ClaimRejection) return errorResponse(err.message, err.status, origin);
+      throw err;
     }
 
-    // On-chain verification (real USDC). Fails closed unless explicitly disabled.
-    let verified = false;
-    if (onchainVerificationRequired()) {
-      const check = await verifyUsdcTransfer({
-        signature,
-        recipient: intent.recipient_wallet,
-        mint: worldsUsdcMint() || intent.token_mint || '',
-        minAmount: price,
-        reference: intent.reference_key,
-      });
-      if (!check.ok) return errorResponse('Payment not verified on chain: ' + check.reason, 402, origin);
-      verified = true;
-    }
-
-    // Race-safe ownership flip: only one concurrent confirm wins the single
-    // conditional UPDATE; the loser sees zero rows and a 409.
-    const claimed = await sql`
-      UPDATE worlds
-      SET status = 'draft', owner_profile_id = ${profile.id}, price_usdc = ${price}, updated_at = NOW()
-      WHERE id = ${worldId} AND status = 'unclaimed'
-      RETURNING *
-    `;
-    if (!claimed.length) return errorResponse('World was just claimed by someone else', 409, origin);
-
-    // Bookkeeping after the atomic win — wrapped in a transaction so all four
-    // writes succeed together or roll back together.
-    await sql.begin(async sql => {
-      await sql`
-        UPDATE wallet_payment_intents
-        SET status = 'paid', signature = ${signature || intent.signature}, updated_at = NOW()
-        WHERE id = ${paymentIntentId} AND profile_id = ${profile.id}
-      `;
-      await sql`
-        INSERT INTO world_claims (world_id, buyer_profile_id, seller_profile_id, payment_intent_id, price_usdc, signature, status)
-        VALUES (${worldId}, ${profile.id}, NULL, ${paymentIntentId}, ${price}, ${signature || null}, ${verified ? 'completed' : 'verified'})
-      `;
-      await sql`
-        UPDATE world_economy_state SET claimed_count = claimed_count + 1, updated_at = NOW() WHERE id = 1
-      `;
-      await sql`
-        INSERT INTO player_resources (profile_id) VALUES (${profile.id}) ON CONFLICT (profile_id) DO NOTHING
-      `;
-    });
-
-    return jsonResponse({ world: worldDto(claimed[0], { includeData: true }), verified }, origin, 201);
+    return jsonResponse({ world: worldDto(result.world, { includeData: true }), verified: result.verified }, origin, 201);
   } catch (err) {
     if (isDatabaseUnavailable(err)) {
       return errorResponse('Netlify Database is not available in this local session.', 503, origin);

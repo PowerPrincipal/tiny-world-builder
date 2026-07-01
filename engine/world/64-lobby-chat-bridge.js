@@ -138,7 +138,7 @@
       _lcbActive = !!slug && slug === _lcbLobbyWorldSlug;
       if (_lcbActive) _lcbStart(); else _lcbStop();
     });
-    WS.on('leave-room', function () { _lcbActive = false; _lcbStop(); });
+    WS.on('leave', function () { _lcbActive = false; _lcbStop(); });
   }
 
   // Expose for debugging / manual control.

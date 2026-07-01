@@ -2482,6 +2482,11 @@
   // keyboard shortcuts
   window.addEventListener('keydown', e => {
     if (shortcutTargetBlocked(e.target)) return;
+    // First-person walk owns the keyboard: WASD/space/c are movement keys
+    // there, and this handler used to stay live (holding W spammed the Wheat
+    // tool; a reflexive 'c' for crouch ran doClear and wiped the world). Only
+    // Escape falls through — the FP controller's own listener exits walk.
+    if (typeof fp !== 'undefined' && fp.active && e.key !== 'Escape') return;
     const comboKey = e.key.toLowerCase();
     // Viewers/players cannot mutate the world: block editing shortcuts (undo/
     // redo, cut/paste, delete, duplicate, clear, raise/lower, selection move).
@@ -2619,7 +2624,7 @@
       selectTool(shortcutTool);
       return;
     }
-    if (k === 'c') doClear();
+    if (k === 'c') confirmThenClear();
     else if (k === 'd') {
       if (duplicateActiveCellIntent()) e.preventDefault();
     }
@@ -2658,7 +2663,7 @@
   });
 
   document.getElementById('reset').addEventListener('click', () => confirmReset());
-  document.getElementById('clear').addEventListener('click', doClear);
+  document.getElementById('clear').addEventListener('click', confirmThenClear);
   document.getElementById('home').addEventListener('click', flyHomeCamera);
   const perspBtn = document.getElementById('persp');
   perspBtn.addEventListener('click', togglePerspective);
@@ -3672,7 +3677,28 @@
       else if (e.key === 'Enter') { e.preventDefault(); close(); doReset(); }
     });
   })();
+  // Interactive entry point for clearing: confirm first (this wipes islands
+  // and moorings too), then run the real clear. Programmatic callers (agent
+  // intents, remote ops) call doClear() directly — deliberate actions that
+  // already carry user intent — and still get the undo snapshot below.
+  function confirmThenClear() {
+    if (typeof window.twConfirm === 'function') {
+      window.twConfirm({
+        title: 'Clear world?',
+        message: 'Clear the whole board back to empty grass?',
+        details: 'Islands and mooring cables are removed too. Undo (Cmd/Ctrl+Z) can restore it.',
+        confirmLabel: 'Clear',
+        intent: 'danger',
+      }).then((ok) => { if (ok) doClear(); });
+      return;
+    }
+    doClear();
+  }
+
   function doClear() {
+    // Snapshot BEFORE any destruction so a clear is always undoable — islands
+    // and moorings are destroyed below and were previously unrecoverable.
+    if (typeof pushWorldHistorySnapshot === 'function') pushWorldHistorySnapshot();
     useLandscapeEngine = false;
     landscapeEngineInstance = null;
     disposeLandscapeMesh();

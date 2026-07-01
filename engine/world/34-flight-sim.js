@@ -1173,6 +1173,7 @@
 
   // -------- minimal HUD + entry menu --------
   let flightHudEl = null;
+  let flightHudLastHtml = '';
   function showFlightHud(on) {
     if (on && !flightHudEl) {
       flightHudEl = document.createElement('div');
@@ -1180,13 +1181,27 @@
       document.body.appendChild(flightHudEl);
     }
     if (flightHudEl) {
-      flightHudEl.innerHTML = '<b>' + flightHudStatus + '</b> &middot; W down / S or X up &middot; A/D roll &middot; Q/E yaw &middot; Shift/Ctrl throttle &middot; B brake &middot; <b>Esc</b> exit';
+      // Status updates arrive per-frame while grounded — only touch the DOM
+      // when the composed string actually changed.
+      const html = '<b>' + flightHudStatus + '</b> &middot; W down / S or X up &middot; A/D roll &middot; Q/E yaw &middot; Shift/Ctrl throttle &middot; B brake &middot; <b>Esc</b> exit';
+      if (html !== flightHudLastHtml) {
+        flightHudEl.innerHTML = html;
+        flightHudLastHtml = html;
+      }
       flightHudEl.style.display = on ? 'block' : 'none';
     }
   }
 
   let flightMenuEl = null;
+  let flightMenuAwayHandler = null;
   function hideFlightMenu() {
+    // Every close path funnels through here, so the click-away listener can
+    // never outlive the menu (it used to leak when the menu's own button
+    // closed it, stacking one window listener per open).
+    if (flightMenuAwayHandler) {
+      window.removeEventListener('pointerdown', flightMenuAwayHandler);
+      flightMenuAwayHandler = null;
+    }
     if (flightMenuEl) { flightMenuEl.remove(); flightMenuEl = null; }
   }
   function showFlightMenu(x, z, clientX, clientY) {
@@ -1203,9 +1218,11 @@
     document.body.appendChild(m);
     flightMenuEl = m;
     setTimeout(() => {
-      window.addEventListener('pointerdown', function onAway(e) {
-        if (flightMenuEl && !flightMenuEl.contains(e.target)) { hideFlightMenu(); window.removeEventListener('pointerdown', onAway); }
-      });
+      if (flightMenuEl !== m) return; // closed or replaced before the timeout
+      flightMenuAwayHandler = function onAway(e) {
+        if (flightMenuEl && !flightMenuEl.contains(e.target)) hideFlightMenu();
+      };
+      window.addEventListener('pointerdown', flightMenuAwayHandler);
     }, 0);
   }
   window.showFlightMenu = showFlightMenu;

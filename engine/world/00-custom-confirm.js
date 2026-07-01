@@ -46,7 +46,19 @@
   function onKey(e) {
     if (!twConfirmActive) return;
     if (e.key === 'Escape') { e.preventDefault(); teardown(false); }
-    if (e.key === 'Enter') { e.preventDefault(); teardown(true); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Danger dialogs focus Cancel by default — Enter must activate the
+      // focused button (cancel unless the user tabbed to Confirm), not
+      // blindly confirm a destructive action.
+      if (twConfirmActive.request && twConfirmActive.request.intent === 'danger') {
+        const focused = document.activeElement;
+        const action = focused && focused.getAttribute && focused.getAttribute('data-action');
+        teardown(action === 'confirm');
+        return;
+      }
+      teardown(true);
+    }
   }
   function render(req) {
     ensureStyle();

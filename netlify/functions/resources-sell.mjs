@@ -44,13 +44,14 @@ export default async function resourcesSell(request) {
   // cleanly (400) rather than rolling back the transaction with an invalid-amount 500.
   if (creditedGold > MAX_COIN_AMOUNT) return errorResponse('sale-too-large', 400, origin);
 
-  // Fixed-length coin ref so a long key can never overflow the ref limit.
-  const coinRef = 'sell:' + createHash('sha256').update(`${auth.user && auth.user.sub}:${idempotencyKey}`).digest('hex').slice(0, 48);
-
   try {
     const sql = getSql();
     const profile = await ensureProfile(auth.user);
     const buyerId = Number(profile.id);
+    // Fixed-length coin ref so a long key can never overflow the ref limit. Namespaced
+    // by profile id (auth.user.sub is undefined for email/Identity users, which would
+    // collapse every such user into one 'undefined:' namespace).
+    const coinRef = 'sell:' + createHash('sha256').update(`${buyerId}:${idempotencyKey}`).digest('hex').slice(0, 48);
 
     const result = await coinsTransaction(sql, async ({ credit, tx }) => {
       await tx`SELECT pg_advisory_xact_lock(hashtext(${'coin:' + buyerId})::bigint)`;

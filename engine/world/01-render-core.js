@@ -1924,7 +1924,10 @@
     const sceneRenderStart = repaintProfileBegin();
     renderer.render(scene, camera);
     repaintProfileEnd('render.scene', sceneRenderStart);
-    if ((wantDepthEdge || wantNormals) && pixelState.depthTarget) {
+    // Depth and normal edge passes are independent: normals-only mode has no
+    // depthTarget (ensurePixelResources disposes it), so gate on each pass's
+    // own target instead of requiring the depth one.
+    if ((wantDepthEdge && pixelState.depthTarget) || (wantNormals && pixelState.normalTarget)) {
       // Combine depth and normal passes under a single state save/restore
       // to avoid double state-swapping overhead. Each still renders to its
       // own target, but the scene state (overrideMaterial, background, fog,
@@ -1934,13 +1937,14 @@
       const prevFog = scene.fog;
       const prevSkyBubbleVisible = skyBubble ? skyBubble.visible : false;
       const clipPlanes = (landscapeMeshEngine && landscapeMeshEngine._clipEnabled && landscapeMeshEngine._clipPlanes) ? landscapeMeshEngine._clipPlanes : null;
+      // Both edge passes render geometry only — no background/fog/sky bubble.
+      scene.background = null;
+      scene.fog = null;
+      if (skyBubble) skyBubble.visible = false;
 
-      if (wantDepthEdge && pixelState.depthMaterial) {
+      if (wantDepthEdge && pixelState.depthTarget && pixelState.depthMaterial) {
         pixelState.depthMaterial.clippingPlanes = clipPlanes;
         scene.overrideMaterial = pixelState.depthMaterial;
-        scene.background = null;
-        scene.fog = null;
-        if (skyBubble) skyBubble.visible = false;
         renderer.setRenderTarget(pixelState.depthTarget);
         renderer.clear();
         const depthRenderStart = repaintProfileBegin();

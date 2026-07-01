@@ -198,7 +198,7 @@
       if (nowActive && !_lbnActive) { _lbnActive = true; _lbnStart(); }
       else if (!nowActive && _lbnActive) { _lbnStop(); }
     });
-    LBW.on('leave-room', _lbnStop);
+    LBW.on('leave', _lbnStop);
   }
 
   window.__tinyworldLobbyBenches = { isActive: () => _lbnActive, seated: () => _lbnSeated.size, sync: _lbnSync };

@@ -1268,7 +1268,11 @@
     const appearance = normalizeAppearance(c.appearance);
     const economy = normalizeCellEconomy(c.economy);
     const wf = normalizeWaterFlow(c.waterFlow);
-    if (economy) {
+    // Stargate destination / label only round-trip through the object form —
+    // the tuple layout has no slot for them (applyState reads entry.dest/.label).
+    const gateDest = (c.kind === 'stargate' && c.dest != null) ? c.dest : undefined;
+    const gateLabel = (c.kind === 'stargate' && c.label != null) ? c.label : undefined;
+    if (economy || gateDest !== undefined || gateLabel !== undefined) {
       const out = {
         x,
         z,
@@ -1278,8 +1282,10 @@
         buildingType: bt,
         terrainFloors: tf,
         fenceSide: fs,
-        economy,
       };
+      if (economy) out.economy = economy;
+      if (gateDest !== undefined) out.dest = gateDest;
+      if (gateLabel !== undefined) out.label = gateLabel;
       if (extras) out.extras = extras;
       if (hasTransform) out.transform = [ry, ox, oz, oy];
       if (appearance) out.appearance = appearance;

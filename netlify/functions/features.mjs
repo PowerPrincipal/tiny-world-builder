@@ -2,6 +2,7 @@ import { getSql, isDatabaseUnavailable } from './lib/db.mjs';
 import { corsResponse, errorResponse, jsonResponse, readJson, sameOriginWriteGuard } from './lib/http.mjs';
 import { getAuthUser, requireAuthUser } from './lib/auth.mjs';
 import { isWorldAdminEmail } from './lib/worlds.mjs';
+import { requestHasAdminSecret } from './lib/admin-secret.mjs';
 
 export const config = { path: '/api/features' };
 
@@ -121,16 +122,6 @@ function suggestionDto(row) {
   };
 }
 
-function envValue(name) {
-  try {
-    if (globalThis.Netlify && Netlify.env && typeof Netlify.env.get === 'function') {
-      const value = Netlify.env.get(name);
-      if (value) return value;
-    }
-  } catch (_) {}
-  return process.env[name] || '';
-}
-
 // Admin authority is decided SERVER-SIDE from a verified account session.
 // Prod path: the requester's Netlify Identity (or wallet) session resolves to an
 // email on the world-admin allowlist (isWorldAdminEmail). No host check, so it
@@ -150,9 +141,7 @@ function isLocalSecretAdmin(request) {
     const host = (request.headers.get('host') || '').toLowerCase();
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return false;
   } catch (_) { return false; }
-  const secret = envValue('TINYWORLD_ADMIN_SECRET');
-  if (!secret) return false;
-  return (request.headers.get('x-admin-secret') || '') === secret;
+  return requestHasAdminSecret(request);
 }
 
 export default async function featuresFunction(request) {

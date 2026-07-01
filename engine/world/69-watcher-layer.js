@@ -65,6 +65,7 @@
     const WATCHER_FRAME_MS = 1000 / 24;
     const WATCHER_BROADCAST_MS = 220;
     const WATCHER_REMOTE_TIMEOUT = 3500;
+    const WATCHER_REMOTE_MIN_MS = 100;   // min gap between remote voxel rebuilds (host sends every 220ms)
     const watcherCross = [];
     const watcherM = new THREE.Matrix4();
     const watcherV = new THREE.Vector3();
@@ -97,6 +98,7 @@
     let watcherStartBtn = null;
     let watcherInitialized = false;
     let watcherSelfId = '';
+    let watcherRemoteLastApply = 0;
 
     {
       const r = Math.max(1, Math.round(FINGER_R / HAND_CELL));
@@ -255,6 +257,20 @@
         watcherSetStatus('watcher live');
       })();
       return watcherVisionPromise;
+    }
+
+    function watcherStopCamera() {
+      if (watcherVideo) {
+        try {
+          const stream = watcherVideo.srcObject;
+          if (stream && stream.getTracks) stream.getTracks().forEach(tr => { try { tr.stop(); } catch (_) {} });
+        } catch (_) {}
+        watcherVideo.srcObject = null;
+        if (watcherVideo.parentNode) watcherVideo.parentNode.removeChild(watcherVideo);
+        watcherVideo = null;
+      }
+      // let a later start() re-run init and reacquire the camera
+      watcherVisionPromise = null;
     }
 
     function watcherDisposeOwnedObject(obj) {
@@ -582,6 +598,10 @@
         const p = mp && typeof mp.presence === 'function' ? mp.presence() : null;
         if (p && source && String(source) === String(p.id)) return;
       } catch (_) {}
+      // rate-limit voxel rebuilds so a flooding sender can't peg the client
+      const nowMs = Date.now();
+      if (nowMs - watcherRemoteLastApply < WATCHER_REMOTE_MIN_MS) return;
+      watcherRemoteLastApply = nowMs;
       watcherEnsureScene();
       watcherLoadSourceFaceTris().then(() => {
         watcherRemote = {
@@ -634,7 +654,9 @@
     }
 
     function watcherTick(t, dt) {
-      watcherEnsureScene();
+      // scene is built lazily (enable toggle / start / remote frames) so the
+      // instanced buffers are never allocated for users who never turn this on
+      if (watcherRunning) watcherEnsureScene();
       const now = performance.now();
       if (watcherRunning && now - watcherLastTrack >= WATCHER_FRAME_MS) {
         watcherLastTrack = now;
@@ -682,7 +704,7 @@
         enabled.addEventListener('change', () => {
           watcherSettings.enabled = !!enabled.checked;
           watcherSave(WATCHER_LS.enabled, watcherSettings.enabled ? '1' : '0');
-          watcherEnsureScene();
+          if (watcherSettings.enabled) watcherEnsureScene();
         });
       }
       if (watcherStartBtn) {
@@ -719,7 +741,6 @@
 
     function watcherBoot() {
       watcherBindSettings();
-      watcherEnsureScene();
       watcherSyncControlsVisibility();
     }
 
@@ -737,8 +758,11 @@
         watcherRunning = false;
         watcherTracking = false;
         if (watcherFaceVox) watcherFaceVox.count = 0;
+        watcherStopCamera();
       },
       dispose: () => {
+        watcherRunning = false;
+        watcherStopCamera();
         if (watcherRoot && watcherRoot.parent) watcherRoot.parent.remove(watcherRoot);
         watcherDisposeOwnedObject(watcherRoot);
         watcherRoot = null;
