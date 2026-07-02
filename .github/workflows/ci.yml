@@ -16,3 +16,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+  boot-smoke:
+    # Headless browser boot check — catches the "page throws on load / white
+    # screens" class the browser-free unit tests can't see. Separate job so the
+    # fast `test` job stays dependency-free; this one installs Chromium.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: npm i --no-save playwright && npx playwright install --with-deps chromium
+      - name: Start dev server
+        run: node tools/dev-server.js & npx --yes wait-on http://localhost:3000/tiny-world-builder
+      - name: Boot smoke
+        run: node tools/smoke-boot.mjs
+        env:
+          BASE_URL: http://localhost:3000

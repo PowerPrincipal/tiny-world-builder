@@ -229,8 +229,16 @@
       obj.updateMatrixWorld(true);
       _flcolBox.setFromObject(obj);
       if (_flcolBox.isEmpty()) continue;
-      if (scenePos.x < _flcolBox.min.x - 0.08 || scenePos.x > _flcolBox.max.x + 0.08) continue;
-      if (scenePos.z < _flcolBox.min.z - 0.08 || scenePos.z > _flcolBox.max.z + 0.08) continue;
+      // Object collisions were far too eager: an axis-aligned box is much larger
+      // than the visual object, and testing only "XZ inside box + top" made the
+      // plane crash while merely passing NEAR or flying ABOVE an object. Require
+      // the plane to be genuinely within the object's footprint (inset, not
+      // padded out) AND at its height (below the box top by a real margin), so
+      // clipping the empty top corner of a tall bbox from above no longer counts.
+      const inset = 0.12;
+      if (scenePos.x < _flcolBox.min.x + inset || scenePos.x > _flcolBox.max.x - inset) continue;
+      if (scenePos.z < _flcolBox.min.z + inset || scenePos.z > _flcolBox.max.z - inset) continue;
+      if (scenePos.y > _flcolBox.max.y - 0.06) continue; // flying over the top, not into it
       if (_flcolBox.max.y > (hit ? hit.surfaceY : -Infinity)) {
         hit = { surfaceY: _flcolBox.max.y, terrainY, objectY: _flcolBox.max.y, objectKind: cell.kind || 'object', x, z };
       }
@@ -891,9 +899,12 @@
     } else {
       flightVeilManaged = false;
     }
-    flightEnsurePlanetUnderlay();
-    if (typeof window.__setPlanetLandscapeNearView === 'function') window.__setPlanetLandscapeNearView(true);
-    if (window.__tinyworldPoserSurface) window.__tinyworldPoserSurface.show();
+    // The infinite procedural surface (71) is the single fly-down ocean/land.
+    // The finite poser surface (a fixed square sea + island ring) and the planet
+    // underlay both used to render here too, which put a big square sea plane
+    // inside the infinite ocean and z-fought at the same depth. Show only the
+    // infinite surface while flying; the poser stays for on-foot surface roam.
+    if (window.__tinyworldInfiniteSurface) window.__tinyworldInfiniteSurface.show();
   }
 
   function flightEndVeil() {
@@ -901,6 +912,7 @@
     flightVeilActive = false;
     if (typeof window.__setPlanetLandscapeNearView === 'function') window.__setPlanetLandscapeNearView(false);
     if (window.__tinyworldPoserSurface) window.__tinyworldPoserSurface.hide();
+    if (window.__tinyworldInfiniteSurface) window.__tinyworldInfiniteSurface.hide();
     if (flightVeilManaged && typeof setCloudSeaEnabled === 'function') {
       setCloudSeaEnabled(flightVeilCloudWasEnabled);
       flightVeilManaged = false;
@@ -1101,15 +1113,19 @@
   let flightSpawnQueued = null;
 
   function normalizeFlightSpawnModel(model) {
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-    const span = Math.max(size.x, size.z, 0.001);
-    model.position.sub(center);
-    model.scale.setScalar(FLIGHT_SPAWN_WINGSPAN / span);
+    // Scale FIRST, then recentre on the post-scale bounding box. The old order
+    // (offset by the unscaled centre, then scale) left the model's visual centre
+    // ~0.36 units above the group origin — more than the plane's own height — so
+    // the jet rotated about a point below itself, sat high in frame, and the
+    // wing-relative gun muzzles didn't line up. Centre it on its group origin so
+    // roll/pitch pivot through the middle and the chase cam frames it centred.
     model.rotation.y = 0;
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    const span = Math.max(size.x, size.z, 0.001);
+    model.scale.setScalar(FLIGHT_SPAWN_WINGSPAN / span);
+    model.updateMatrixWorld(true);
+    const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    model.position.sub(center);
     model.traverse(o => {
       if (o.isMesh) {
         o.castShadow = false;

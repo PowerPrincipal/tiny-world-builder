@@ -187,6 +187,46 @@
     }
   }
 
+  // Multi-cell house placement, shared by the classic renderer (this file) and
+  // the voxel-build path (09b). Both must resolve the SAME world coordinates for
+  // a stretched/composite/square cluster, including the editable-island local
+  // frame: on an island, cluster cell coords are global-board indices, so they
+  // must be folded back with positiveMod(.., GRID) before the tile-centre math —
+  // exactly what cellRenderPositionForCell does for the linear anchor. (x, z) is
+  // the anchor cell currently being rendered. Returns null for non-cluster kinds.
+  function clusterHouseRenderPosition(cluster, x, z) {
+    if (cluster.kind === 'linear') {
+      const a = cellRenderPositionForCell(cluster.anchorX, cluster.anchorZ);
+      let posX = a.x;
+      let posZ = a.z;
+      if (cluster.orientation === 'x') posX += (cluster.length - 1) * TILE / 2;
+      else                              posZ += (cluster.length - 1) * TILE / 2;
+      return { posX, posZ };
+    }
+    if (cluster.kind === 'composite') {
+      const t = cluster.topology;
+      if (isEditableIslandCell(x, z)) {
+        return {
+          posX: (positiveMod(t.bbox.xMin, GRID) + positiveMod(t.bbox.xMax, GRID)) / 2 - GRID / 2 + 0.5,
+          posZ: (positiveMod(t.bbox.zMin, GRID) + positiveMod(t.bbox.zMax, GRID)) / 2 - GRID / 2 + 0.5,
+        };
+      }
+      return {
+        posX: (t.bbox.xMin + t.bbox.xMax) / 2 - GRID / 2 + 0.5,
+        posZ: (t.bbox.zMin + t.bbox.zMax) / 2 - GRID / 2 + 0.5,
+      };
+    }
+    if (cluster.kind === 'square') {
+      const sx = isEditableIslandCell(x, z) ? positiveMod(cluster.anchorX, GRID) : cluster.anchorX;
+      const sz = isEditableIslandCell(x, z) ? positiveMod(cluster.anchorZ, GRID) : cluster.anchorZ;
+      return {
+        posX: (sx + 0.5) - GRID / 2 + 0.5,
+        posZ: (sz + 0.5) - GRID / 2 + 0.5,
+      };
+    }
+    return null;
+  }
+
   function renderCellObjectImpl(x, z, opts) {
     const { animate = false, delay = 0, impactDust = true } = opts || {};
     const key = x + ',' + z;
@@ -373,30 +413,20 @@
         // Position at cluster CENTRE (not the anchor cell), so the visible house
         // spans the run cleanly. Skip gx/gz so pickTile falls through to whichever
         // tile is actually under the cursor.
-        const a = cellRenderPositionForCell(cluster.anchorX, cluster.anchorZ);
-        posX = a.x; posZ = a.z;
-        if (cluster.orientation === 'x') posX += (cluster.length - 1) * TILE / 2;
-        else                              posZ += (cluster.length - 1) * TILE / 2;
+        const p = clusterHouseRenderPosition(cluster, x, z);
+        posX = p.posX; posZ = p.posZ;
         setGridUserData = false;
       } else if (cluster.kind === 'composite') {
         mesh = buildCompositeHouse(cluster.topology, floors);
         // Position at cluster bounding-box centre so wings fall in place.
-        const t = cluster.topology;
-        if (isEditableIslandCell(x, z)) {
-          posX = (positiveMod(t.bbox.xMin, GRID) + positiveMod(t.bbox.xMax, GRID)) / 2 - GRID / 2 + 0.5;
-          posZ = (positiveMod(t.bbox.zMin, GRID) + positiveMod(t.bbox.zMax, GRID)) / 2 - GRID / 2 + 0.5;
-        } else {
-          posX = (t.bbox.xMin + t.bbox.xMax) / 2 - GRID / 2 + 0.5;
-          posZ = (t.bbox.zMin + t.bbox.zMax) / 2 - GRID / 2 + 0.5;
-        }
+        const p = clusterHouseRenderPosition(cluster, x, z);
+        posX = p.posX; posZ = p.posZ;
         setGridUserData = false;
       } else if (cluster.kind === 'square') {
         mesh = buildSquareHouse(floors);
         // Centre the 2x2 mesh between the four cells.
-        const sx = isEditableIslandCell(x, z) ? positiveMod(cluster.anchorX, GRID) : cluster.anchorX;
-        const sz = isEditableIslandCell(x, z) ? positiveMod(cluster.anchorZ, GRID) : cluster.anchorZ;
-        posX = (sx + 0.5) - GRID / 2 + 0.5;
-        posZ = (sz + 0.5) - GRID / 2 + 0.5;
+        const p = clusterHouseRenderPosition(cluster, x, z);
+        posX = p.posX; posZ = p.posZ;
         setGridUserData = false;
       }
       } // close skyscraper-bypass else

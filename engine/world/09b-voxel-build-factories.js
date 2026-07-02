@@ -2756,22 +2756,24 @@
           mesh = makeVoxelLinearHouse(1, 'z', floors, { appearance: cell.appearance });
         } else if (cluster.kind === 'linear') {
           mesh = makeVoxelLinearHouse(cluster.length, cluster.orientation, floors, { appearance: cell.appearance });
-          const a = tilePos(cluster.anchorX, cluster.anchorZ);
-          posX = a.x;
-          posZ = a.z;
-          if (cluster.orientation === 'x') posX += (cluster.length - 1) * TILE / 2;
-          else posZ += (cluster.length - 1) * TILE / 2;
+          // Same island-aware cluster placement as the classic renderer (17), so
+          // stretched houses on editable islands land in the island-local frame
+          // instead of the global board frame that plain tilePos() would give.
+          const p = clusterHouseRenderPosition(cluster, x, z);
+          posX = p.posX;
+          posZ = p.posZ;
           setGridUserData = false;
         } else if (cluster.kind === 'composite') {
           mesh = makeVoxelCompositeHouse(cluster.topology, floors);
-          const t = cluster.topology;
-          posX = (t.bbox.xMin + t.bbox.xMax) / 2 - GRID / 2 + 0.5;
-          posZ = (t.bbox.zMin + t.bbox.zMax) / 2 - GRID / 2 + 0.5;
+          const p = clusterHouseRenderPosition(cluster, x, z);
+          posX = p.posX;
+          posZ = p.posZ;
           setGridUserData = false;
         } else if (cluster.kind === 'square') {
           mesh = makeVoxelSquareHouse(floors);
-          posX = (cluster.anchorX + 0.5) - GRID / 2 + 0.5;
-          posZ = (cluster.anchorZ + 0.5) - GRID / 2 + 0.5;
+          const p = clusterHouseRenderPosition(cluster, x, z);
+          posX = p.posX;
+          posZ = p.posZ;
           setGridUserData = false;
         }
       }

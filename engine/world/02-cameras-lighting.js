@@ -174,8 +174,11 @@
   //      shadows render correctly anywhere on the world, not just near
   //      the home board origin.
   // Environment multiplier lifts all non-shadowing scene light without making
-  // the sun harsher or increasing shadow-map cost.
-  const ENVIRONMENT_LIGHT_MULTIPLIER = 4.0;
+  // the sun harsher or increasing shadow-map cost. Kept moderate: the renderer
+  // uses NoToneMapping (01-render-core), so there is no highlight roll-off and a
+  // high fill multiplier blows lit surfaces to flat white. 2.4 keeps shadowed
+  // sides readable without washing the scene out.
+  const ENVIRONMENT_LIGHT_MULTIPLIER = 2.4;
   const DIRECTIONAL_SUN_INTENSITY_MULTIPLIER = 0.7;
 
   // Low ambient floor — just enough so shadowed sides aren't pitch black.

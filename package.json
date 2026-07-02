@@ -10,6 +10,7 @@
     "i18n:check": "node tools/i18n-check.js",
     "i18n:report": "node tools/i18n-check.js --report",
     "smoke": "node tools/smoke-static.js",
+    "smoke:boot": "node tools/smoke-boot.mjs",
     "perf": "node tools/perf-probe.js",
     "vendor:three": "node tools/build-three-vendor.mjs",
     "stats:random-island": "node tools/random-island-stats.mjs",
@@ -50,7 +51,6 @@
     "@netlify/blobs": "^10.7.9",
     "@netlify/database": "^1.1.0",
     "@netlify/identity": "^1.2.0",
-    "@open-pets/client": "^3.0.0",
     "netlify-cli": "^26.1.0",
     "postgres": "^3.4.9"
   }
