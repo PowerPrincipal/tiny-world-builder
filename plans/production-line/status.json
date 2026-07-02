@@ -216,6 +216,21 @@
   ],
   "feed": [
     {
+      "ts": "2026-07-02T22:18:45.052Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-02T22-18-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
+      "ts": "2026-07-02T20:41:13.817Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-02T20-41-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
+      "ts": "2026-07-02T18:48:02.992Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-02T18-48-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
       "ts": "2026-07-02T17:01:46.228Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-02T17-01-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
@@ -399,22 +414,7 @@
       "ts": "2026-06-29T13:47:46.645Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-29T13-47-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
-    },
-    {
-      "ts": "2026-06-29T11:56:39.330Z",
-      "kind": "tick",
-      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-29T11-56-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
-    },
-    {
-      "ts": "2026-06-29T09:54:23.292Z",
-      "kind": "tick",
-      "text": "Autonomous tick (safe scope): drafted news/tweet for \"Merge branch 'main' of https://github.com/jasonkneen/tiny-world-builder\" -> plans/production-line/drafts/2026-06-29T09-54-merge-branch-main-of-https-github-com-jasonkneen.md. No economy paths touched."
-    },
-    {
-      "ts": "2026-06-29T08:08:30.589Z",
-      "kind": "tick",
-      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-06-29T08-08-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
     }
   ],
-  "lastTick": "2026-07-02T17:01:46.228Z"
+  "lastTick": "2026-07-02T22:18:45.052Z"
 }
