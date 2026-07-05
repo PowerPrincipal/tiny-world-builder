@@ -216,6 +216,11 @@
   ],
   "feed": [
     {
+      "ts": "2026-07-05T10:29:18.037Z",
+      "kind": "tick",
+      "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-05T10-29-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
+    },
+    {
       "ts": "2026-07-05T08:16:08.892Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-05T08-16-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
@@ -409,12 +414,7 @@
       "ts": "2026-07-01T05:54:24.006Z",
       "kind": "tick",
       "text": "Autonomous tick (safe scope): drafted news/tweet for \"production-line: tick drafts + dashboard refresh [skip ci]\" -> plans/production-line/drafts/2026-07-01T05-54-production-line-tick-drafts-dashboard-refresh-sk.md. No economy paths touched."
-    },
-    {
-      "ts": "2026-07-01T00:21:20.653Z",
-      "kind": "tick",
-      "text": "Autonomous tick (safe scope): drafted news/tweet for \"Merge remote-tracking branch 'origin/pl/sec-tinyverse-email-auth'\" -> plans/production-line/drafts/2026-07-01T00-21-merge-remote-tracking-branch-origin-pl-sec-tinyv.md. No economy paths touched."
     }
   ],
-  "lastTick": "2026-07-05T08:16:08.892Z"
+  "lastTick": "2026-07-05T10:29:18.037Z"
 }
